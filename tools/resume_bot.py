@@ -410,6 +410,8 @@ def extract_template_sections(template_text: str) -> list[str]:
     for t in titles:
         t = re.sub(r'<.*?>', '', t).strip()
         if t:
+            if t.lower() == 'additional information':
+                continue
             cleaned.append(t)
     return cleaned
 
@@ -555,6 +557,8 @@ def render_sections_to_html(sections, allowed_sections):
         return (1, title)
 
     for section in sorted(sections, key=section_sort_key):
+        if section['title'].lower() == 'additional information':
+            continue
         html_parts.append('<div class="section">')
         html_parts.append(f'<div class="section-title">{section["title"]}</div>')
 
@@ -1045,6 +1049,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         style_css = style_match.group(1).strip()
     else:
         style_css = ''
+    extra_pdf_css = "\n@media print { .page { padding-top: 6mm; } }\n"
+    style_css = style_css + extra_pdf_css
 
     header_lines, sections = split_sections(resume_text)
     name, contact = parse_header(header_lines)
