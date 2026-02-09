@@ -4,6 +4,9 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+# Page limit for PDF output (defaults to 2 pages).
+MAX_PAGES = int(os.environ.get('RESUME_MAX_PAGES', '2'))
+
 STOPWORDS = {
     'the','and','a','an','to','of','in','for','with','on','at','by','from','as','is','are','be','this',
     'that','it','or','we','you','your','our','their','they','i','me','my','us','will','can','may','must',
@@ -411,6 +414,195 @@ def extract_template_sections(template_text: str) -> list[str]:
     return cleaned
 
 
+def build_sections_from_tailored_text(
+    text: str,
+    name: str | None = None,
+    allowed_sections: list[str] | None = None,
+):
+    allowed_sections = [s.lower() for s in (allowed_sections or [])]
+    allowed_set = set(allowed_sections)
+
+    lines = [normalize_text(l.rstrip()) for l in text.splitlines()]
+    sections = []
+    current = None
+    current_entry = None
+
+    def new_section(title: str):
+        nonlocal current, current_entry
+        current_entry = None
+        current = {
+            'title': title,
+            'entries': [],
+            'bullets': [],
+            'paragraphs': [],
+            'skills': [],
+        }
+        sections.append(current)
+
+    def clean_md(s: str) -> str:
+        s = re.sub(r'\*\*(.*?)\*\*', r'\1', s)
+        s = re.sub(r'__([^_]+)__', r'\1', s)
+        return s.strip()
+
+    def looks_like_date(s: str) -> bool:
+        return bool(re.search(r'\b\d{2}/\d{4}\b|\b\d{4}\b|\bPresent\b', s, re.IGNORECASE))
+
+    def ensure_section():
+        if current is None:
+            new_section('Tailored Resume')
+
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+
+        line = clean_md(line)
+
+        if line.startswith('# '):
+            continue
+        if line.startswith('## '):
+            title = line[3:].strip()
+            if name and title.lower() == name.lower():
+                continue
+            title_key = title.lower()
+            if not allowed_set or title_key in allowed_set:
+                new_section(title)
+            else:
+                current = None
+            continue
+        if line.startswith('### '):
+            ensure_section()
+            current_entry = {'title': '', 'subtitle': '', 'date': '', 'bullets': []}
+            content = line[4:].strip()
+            parts = [p.strip() for p in content.split('|')]
+            if len(parts) >= 2 and looks_like_date(parts[-1]):
+                current_entry['date'] = parts[-1]
+                current_entry['title'] = parts[0]
+                if len(parts) > 2:
+                    current_entry['subtitle'] = ' | '.join(parts[1:-1])
+            else:
+                current_entry['title'] = parts[0]
+                if len(parts) > 1:
+                    current_entry['subtitle'] = ' | '.join(parts[1:])
+            current['entries'].append(current_entry)
+            continue
+
+        if line in ('---', '—', '--'):
+            continue
+
+        if line.startswith('- ') or line.startswith('* '):
+            ensure_section()
+            item = line[2:].strip()
+            if current['title'].lower().find('skill') >= 0:
+                if ':' in item:
+                    item = item.split(':', 1)[1].strip()
+                for part in [p.strip() for p in item.split(',')]:
+                    if part:
+                        current['skills'].append(part)
+            else:
+                if current_entry is not None:
+                    current_entry['bullets'].append(item)
+                else:
+                    current['bullets'].append(item)
+            continue
+
+        if not current and allowed_set:
+            continue
+        ensure_section()
+        if current['title'].lower() == 'education':
+            if '|' in line:
+                left, right = [p.strip() for p in line.split('|', 1)]
+                entry = {'title': '', 'subtitle': '', 'date': right, 'bullets': []}
+                if ' - ' in left:
+                    entry['title'], entry['subtitle'] = [p.strip() for p in left.split(' - ', 1)]
+                else:
+                    entry['title'] = left
+                current['entries'].append(entry)
+                continue
+        if current_entry is not None:
+            if looks_like_date(line):
+                current_entry['date'] = line
+            elif not current_entry['subtitle']:
+                current_entry['subtitle'] = line
+            else:
+                current['paragraphs'].append(line)
+        else:
+            current['paragraphs'].append(line)
+
+    return sections, allowed_sections
+
+
+def render_sections_to_html(sections, allowed_sections):
+    html_parts = []
+    preferred_order = allowed_sections[:]
+    if not preferred_order:
+        preferred_order = [
+            'professional summary',
+            'key skills / technical skills',
+            'key skills',
+            'technical skills',
+            'professional experience',
+            'projects',
+            'education',
+            'certifications',
+            'additional information',
+        ]
+
+    def section_sort_key(s):
+        title = s['title'].lower()
+        if title in preferred_order:
+            return (0, preferred_order.index(title))
+        return (1, title)
+
+    for section in sorted(sections, key=section_sort_key):
+        html_parts.append('<div class="section">')
+        html_parts.append(f'<div class="section-title">{section["title"]}</div>')
+
+        if section['skills']:
+            html_parts.append('<div class="skills-grid">')
+            for skill in section['skills']:
+                html_parts.append(f'<span class="skill-tag">{skill}</span>')
+            html_parts.append('</div>')
+
+        for p in section['paragraphs']:
+            html_parts.append(f'<p class="summary">{p}</p>')
+
+        for entry in section['entries']:
+            html_parts.append('<div class="entry">')
+            html_parts.append('<div class="entry-header">')
+            html_parts.append(f'<span class="entry-title">{entry.get("title", "")}</span>')
+            if entry.get('date'):
+                html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
+            html_parts.append('</div>')
+            if entry.get('subtitle'):
+                html_parts.append(f'<div class="entry-subtitle">{entry["subtitle"]}</div>')
+            if entry.get('bullets'):
+                html_parts.append('<ul>')
+                for b in entry['bullets']:
+                    html_parts.append(f'<li>{b}</li>')
+                html_parts.append('</ul>')
+            html_parts.append('</div>')
+
+        if section['bullets']:
+            html_parts.append('<ul>')
+            for b in section['bullets']:
+                html_parts.append(f'<li>{b}</li>')
+            html_parts.append('</ul>')
+
+        html_parts.append('</div>')
+
+    return '\n'.join(html_parts)
+
+
+def _format_tailored_text_to_html(
+    text: str,
+    name: str | None = None,
+    allowed_sections: list[str] | None = None,
+) -> str:
+    sections, allowed_sections = build_sections_from_tailored_text(text, name, allowed_sections)
+    return render_sections_to_html(sections, allowed_sections)
+
+
 def _format_tailored_text_to_html(
     text: str,
     name: str | None = None,
@@ -466,10 +658,8 @@ def _format_tailored_text_to_html(
             if not allowed_set or title_key in allowed_set:
                 new_section(title)
             else:
-                # Treat unexpected section headers as summary content.
-                if current is None:
-                    new_section('Professional Summary')
-                current['paragraphs'].append(title)
+                # Skip sections not present in the template.
+                current = None
             continue
         if line.startswith('### '):
             ensure_section()
@@ -508,6 +698,9 @@ def _format_tailored_text_to_html(
                     current['bullets'].append(item)
             continue
 
+        if not current and allowed_set:
+            # Drop content outside allowed sections.
+            continue
         ensure_section()
         if current['title'].lower() == 'education':
             # Attempt to parse "Title - School | Date"
@@ -601,18 +794,149 @@ def _extract_tagline(text: str):
     return None, text
 
 
+def _validate_tagline(tagline: str, resume_text: str) -> str | None:
+    if not tagline:
+        return None
+    resume_l = normalize_text(resume_text).lower()
+    # Allow common separators and small words.
+    stop = {
+        'and', 'or', 'for', 'with', 'in', 'on', 'to', 'of', 'the', 'a', 'an',
+        'developer', 'engineer', 'analyst', 'specialist'
+    }
+    tokens = re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', tagline.lower())
+    for t in tokens:
+        if t in stop or len(t) < 3:
+            continue
+        if t not in resume_l:
+            return None
+    return tagline
+
+
+def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
+    try:
+        from openai import OpenAI
+    except Exception:
+        return None
+    client = OpenAI()
+    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    prompt = (
+        "Create a concise, role-specific resume tagline based on the job description and the resume. "
+        "Return a single line only, no quotes, no extra text. "
+        "Format like: '<Role> · <Skill> · <Skill>' or similar. "
+        "STRICT RULE: Use only roles/skills/terms that already appear in the resume text. "
+        "Do NOT invent or add new tools, skills, or roles.\n\n"
+        f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
+    )
+    resp = client.responses.create(model=model, input=prompt)
+    text = getattr(resp, 'output_text', None)
+    if text:
+        tagline = text.strip().splitlines()[0]
+        return _validate_tagline(tagline, resume_text)
+    output = getattr(resp, 'output', [])
+    if output:
+        parts = []
+        for item in output:
+            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
+            for c in content:
+                if getattr(c, 'type', None) == 'output_text':
+                    parts.append(c.text)
+                elif isinstance(c, dict) and c.get('type') == 'output_text':
+                    parts.append(c.get('text', ''))
+        if parts:
+            tagline = parts[0].strip().splitlines()[0]
+            return _validate_tagline(tagline, resume_text)
+    return None
+
+
+def _section_has_content(section) -> bool:
+    if section['skills'] or section['bullets'] or section['paragraphs']:
+        return True
+    for e in section['entries']:
+        if e.get('title') or e.get('subtitle') or e.get('date') or e.get('bullets'):
+            if e.get('bullets') or e.get('title') or e.get('subtitle') or e.get('date'):
+                return True
+    return False
+
+
+def trim_sections_once(sections) -> bool:
+    # Returns True if something was removed.
+    priority = [
+        'additional information',
+        'certifications',
+        'projects',
+        'professional experience',
+        'education',
+        'key skills / technical skills',
+        'key skills',
+        'technical skills',
+        'professional summary',
+    ]
+
+    def find_section(title):
+        for s in sections:
+            if s['title'].lower() == title:
+                return s
+        return None
+
+    for title in priority:
+        section = find_section(title)
+        if not section:
+            continue
+        # Trim entries' bullets
+        if section['entries']:
+            for e in reversed(section['entries']):
+                if e.get('bullets'):
+                    e['bullets'].pop()
+                    return True
+        # Trim section bullets
+        if section['bullets']:
+            section['bullets'].pop()
+            return True
+        # Trim skills
+        if section['skills']:
+            section['skills'].pop()
+            return True
+        # Trim paragraphs (keep at least one summary if possible)
+        if section['paragraphs'] and not (title == 'professional summary' and len(section['paragraphs']) <= 1):
+            section['paragraphs'].pop()
+            return True
+        # Remove empty section
+        if not _section_has_content(section):
+            sections.remove(section)
+            return True
+    return False
+
+
+def count_pdf_pages(pdf_path: Path) -> int:
+    try:
+        from PyPDF2 import PdfReader
+    except Exception as e:
+        raise SystemExit('PyPDF2 is required. Install with: python -m pip install PyPDF2') from e
+    reader = PdfReader(str(pdf_path))
+    return len(reader.pages)
+
+
 def _apply_tagline_to_header(header_html: str, tagline: str | None) -> str:
     if not header_html or not tagline:
         return header_html
-    return re.sub(
-        r'(<div\\s+class=\"tagline\">)(.*?)(</div>)',
-        r'\\1' + tagline + r'\\3',
-        header_html,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
+    start_token = '<div class="tagline">'
+    end_token = '</div>'
+    start = header_html.find(start_token)
+    if start == -1:
+        return header_html
+    start += len(start_token)
+    end = header_html.find(end_token, start)
+    if end == -1:
+        return header_html
+    return header_html[:start] + tagline + header_html[end:]
 
 
-def tailor_resume_with_openai(job_text: str, resume_text: str, allowed_sections: list[str] | None = None):
+def tailor_resume_with_openai(
+    job_text: str,
+    resume_text: str,
+    allowed_sections: list[str] | None = None,
+    fallback_tagline: str | None = None,
+):
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         raise SystemExit('OPENAI_API_KEY is required to use AI tailoring.')
@@ -683,7 +1007,10 @@ def tailor_resume_with_openai(job_text: str, resume_text: str, allowed_sections:
     text = getattr(response, 'output_text', None)
     if text:
         text = text.strip()
-        return _extract_tagline(text)
+        tagline, body = _extract_tagline(text)
+        if not tagline:
+            tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text) or fallback_tagline
+        return tagline, body
     output = getattr(response, 'output', [])
     if output:
         parts = []
@@ -696,11 +1023,14 @@ def tailor_resume_with_openai(job_text: str, resume_text: str, allowed_sections:
                     parts.append(c.get('text', ''))
         text = '\n'.join([p for p in parts if p]).strip()
         if text:
-            return _extract_tagline(text)
+            tagline, body = _extract_tagline(text)
+            if not tagline:
+                tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text) or fallback_tagline
+            return tagline, body
     raise SystemExit('OpenAI response did not include text output.')
 
 
-def generate_resume(resume_path, template_path, job_text=None, out_dir=None, label=None):
+def generate_resume(resume_path, template_path, job_text=None, out_dir=None, label=None, job_label=None):
     resume_path = Path(resume_path)
     template_path = Path(template_path)
     if not resume_path.exists():
@@ -726,19 +1056,29 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     template_header_html = extract_template_header(template_text)
     template_sections = extract_template_sections(template_text)
 
+    ai_sections = None
+    ai_allowed_sections = None
+    ai_header_html = None
+
     if os.environ.get('OPENAI_API_KEY') and (job_text or '').strip():
         tagline, tailored_text = tailor_resume_with_openai(
             job_text=job_text,
             resume_text=resume_text,
             allowed_sections=template_sections,
+            fallback_tagline=None,
         )
         header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
-        header_html = _apply_tagline_to_header(header_html, tagline)
-        html_body = header_html + _format_tailored_text_to_html(
+        if tagline:
+            header_html = _apply_tagline_to_header(header_html, tagline)
+        sections, allowed_sections = build_sections_from_tailored_text(
             tailored_text,
             name=name,
             allowed_sections=template_sections,
         )
+        ai_sections = sections
+        ai_allowed_sections = allowed_sections
+        ai_header_html = header_html
+        html_body = header_html + render_sections_to_html(sections, allowed_sections)
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -838,6 +1178,56 @@ ul {{ margin: 6px 0 12px 18px; }}
         from playwright.sync_api import sync_playwright
     except Exception as e:
         raise SystemExit('Playwright is required. Install with: python -m pip install playwright && python -m playwright install chromium') from e
+
+    # If AI sections exist, trim to fit within MAX_PAGES (default 2).
+    if ai_sections is not None and MAX_PAGES > 0:
+        def build_html_from_sections():
+            body = ai_header_html + render_sections_to_html(ai_sections, ai_allowed_sections)
+            return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tailored Resume</title>
+<style>
+{style_css}
+.section-title {{ font-weight: 700; margin-top: 16px; }}
+.summary {{ margin: 6px 0; }}
+ul {{ margin: 6px 0 12px 18px; }}
+</style>
+</head>
+<body>
+<div class="page">
+{body}
+</div>
+</body>
+</html>
+"""
+
+        tmp_html = out_dir / f'{base}_tmp.html'
+        tmp_pdf = out_dir / f'{base}_tmp.pdf'
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            while True:
+                html = build_html_from_sections()
+                tmp_html.write_text(html, encoding='utf-8')
+                page = browser.new_page()
+                page.goto(tmp_html.as_uri(), wait_until='networkidle')
+                page.pdf(path=str(tmp_pdf), format='A4', print_background=True, margin={
+                    'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
+                })
+                page.close()
+                try:
+                    pages = count_pdf_pages(tmp_pdf)
+                except Exception:
+                    pages = MAX_PAGES
+                if pages <= MAX_PAGES:
+                    html_path.write_text(html, encoding='utf-8')
+                    break
+                if not trim_sections_once(ai_sections):
+                    html_path.write_text(html, encoding='utf-8')
+                    break
+            browser.close()
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
