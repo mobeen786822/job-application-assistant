@@ -39,6 +39,9 @@ PAGE = """
         radial-gradient(1200px 600px at 10% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%),
         radial-gradient(1000px 600px at 100% 0%, #ecfccb 0%, rgba(236,252,203,0) 55%),
         #f1f5f9;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      min-height: 100vh;
     }
 
     .shell {
@@ -121,6 +124,15 @@ PAGE = """
       .grid { grid-template-columns: 1fr; }
       .preview { height: 640px; }
     }
+    .alert {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }
   </style>
 </head>
 <body>
@@ -146,6 +158,9 @@ PAGE = """
             <div id="loading-text">Generating resume…</div>
           </div>
         </form>
+        {% if error_msg %}
+        <div class="alert">{{ error_msg }}</div>
+        {% endif %}
       </div>
 
       <div class="card">
@@ -179,7 +194,13 @@ PAGE = """
   let stepIdx = 0;
   let timer = null;
 
-  form.addEventListener('submit', () => {
+  let submitting = false;
+  form.addEventListener('submit', (e) => {
+    if (submitting) {
+      e.preventDefault();
+      return;
+    }
+    submitting = true;
     const result = document.getElementById('result');
     if (result) {
       result.remove();
@@ -197,6 +218,7 @@ PAGE = """
     form.reset();
     btn.disabled = false;
     loading.style.display = 'none';
+    submitting = false;
     if (timer) {
       clearInterval(timer);
       timer = null;
@@ -218,23 +240,28 @@ def index():
     html_url = None
     pdf_url = None
     preview_url = None
+    error_msg = None
     if request.method == 'POST':
-        job_text = request.form.get('job_text', '').strip()
-        label = 'Tailored'
-        job_label = None
-        html_path, pdf_path = generate_resume(
-            resume_path=DEFAULT_RESUME,
-            template_path=DEFAULT_TEMPLATE,
-            job_text=job_text,
-            out_dir=OUTPUT_DIR,
-            label=label,
-            job_label=job_label,
-        )
-        html_path = str(html_path)
-        pdf_path = str(pdf_path)
-        html_url = url_for('download_output', filename=Path(html_path).name)
-        pdf_url = url_for('download_output', filename=Path(pdf_path).name)
-        preview_url = url_for('preview_output', filename=Path(html_path).name)
+        try:
+            job_text = request.form.get('job_text', '').strip()
+            label = 'Tailored'
+            job_label = None
+            html_path, pdf_path = generate_resume(
+                resume_path=DEFAULT_RESUME,
+                template_path=DEFAULT_TEMPLATE,
+                job_text=job_text,
+                out_dir=OUTPUT_DIR,
+                label=label,
+                job_label=job_label,
+            )
+            html_path = str(html_path)
+            pdf_path = str(pdf_path)
+            html_url = url_for('download_output', filename=Path(html_path).name)
+            pdf_url = url_for('download_output', filename=Path(pdf_path).name)
+            preview_url = url_for('preview_output', filename=Path(html_path).name)
+        except Exception as e:
+            error_msg = f"Something went wrong while generating the resume. {e}"
+
     return render_template_string(
         PAGE,
         html_path=html_path,
@@ -242,6 +269,7 @@ def index():
         html_url=html_url,
         pdf_url=pdf_url,
         preview_url=preview_url,
+        error_msg=error_msg,
     )
 
 
