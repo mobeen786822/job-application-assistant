@@ -1,4 +1,5 @@
-﻿import argparse
+import argparse
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -16,10 +17,10 @@ DATE_LINE = re.compile(r'\b\d{2}/\d{4}\s*-\s*(Present|\d{2}/\d{4})\b', re.IGNORE
 def normalize_text(text: str) -> str:
     # Fix common mojibake and replace non-ASCII punctuation with ASCII.
     replacements = {
-        'â€“': '-',
-        'â€”': '-',
-        'Â·': '-',
-        'Ã—': 'x',
+        '–': '-',
+        '—': '-',
+        '·': '-',
+        '×': 'x',
         '\u2013': '-',
         '\u2014': '-',
         '\u2022': '-',
@@ -345,6 +346,280 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
     return html
 
 
+def render_header_html(name: str, headline: str, contact):
+    contact_items = []
+    for c in contact:
+        if c.startswith('http'):
+            label = c.replace('https://', '').replace('http://', '')
+            contact_items.append(f'<a href="{c}">{label}</a>')
+        elif '@' in c:
+            contact_items.append(c)
+        else:
+            contact_items.append(c)
+
+    def join_contact(items):
+        if not items:
+            return ''
+        parts = []
+        for item in items:
+            parts.append(item)
+        return ' <span>·</span> '.join(parts)
+
+    tagline = headline or ''
+    return f"""
+<div class="header">
+  <h1>{name}</h1>
+  <div class="tagline">{tagline}</div>
+  <div class="contact-row">{join_contact(contact_items).replace('·', '&middot;')}</div>
+</div>
+"""
+
+
+def _format_tailored_text_to_html(text: str, name: str | None = None) -> str:
+    lines = [normalize_text(l.rstrip()) for l in text.splitlines()]
+
+    sections = []
+    current = None
+    current_entry = None
+
+    def new_section(title: str):
+        nonlocal current, current_entry
+        current_entry = None
+        current = {
+            'title': title,
+            'entries': [],
+            'bullets': [],
+            'paragraphs': [],
+            'skills': [],
+        }
+        sections.append(current)
+
+    def clean_md(s: str) -> str:
+        s = re.sub(r'\*\*(.*?)\*\*', r'\1', s)
+        s = re.sub(r'__([^_]+)__', r'\1', s)
+        return s.strip()
+
+    def looks_like_date(s: str) -> bool:
+        return bool(re.search(r'\b\d{2}/\d{4}\b|\b\d{4}\b|\bPresent\b', s, re.IGNORECASE))
+
+    def ensure_section():
+        if current is None:
+            new_section('Tailored Resume')
+
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+
+        line = clean_md(line)
+
+        if line.startswith('# '):
+            # Top-level title, ignore if it's the name/header.
+            continue
+        if line.startswith('## '):
+            title = line[3:].strip()
+            if name and title.lower() == name.lower():
+                continue
+            new_section(title)
+            continue
+        if line.startswith('### '):
+            ensure_section()
+            current_entry = {'title': '', 'subtitle': '', 'date': '', 'bullets': []}
+            content = line[4:].strip()
+            parts = [p.strip() for p in content.split('|')]
+            if len(parts) >= 2 and looks_like_date(parts[-1]):
+                current_entry['date'] = parts[-1]
+                current_entry['title'] = parts[0]
+                if len(parts) > 2:
+                    current_entry['subtitle'] = ' | '.join(parts[1:-1])
+            else:
+                current_entry['title'] = parts[0]
+                if len(parts) > 1:
+                    current_entry['subtitle'] = ' | '.join(parts[1:])
+            current['entries'].append(current_entry)
+            continue
+
+        if line in ('---', '—', '--'):
+            continue
+
+        if line.startswith('- ') or line.startswith('* '):
+            ensure_section()
+            item = line[2:].strip()
+            if current['title'].lower().find('skill') >= 0:
+                # Split skills by commas and ignore category labels.
+                if ':' in item:
+                    item = item.split(':', 1)[1].strip()
+                for part in [p.strip() for p in item.split(',')]:
+                    if part:
+                        current['skills'].append(part)
+            else:
+                if current_entry is not None:
+                    current_entry['bullets'].append(item)
+                else:
+                    current['bullets'].append(item)
+            continue
+
+        ensure_section()
+        if current['title'].lower() == 'education':
+            # Attempt to parse "Title - School | Date"
+            if '|' in line:
+                left, right = [p.strip() for p in line.split('|', 1)]
+                entry = {'title': '', 'subtitle': '', 'date': right, 'bullets': []}
+                if ' - ' in left:
+                    entry['title'], entry['subtitle'] = [p.strip() for p in left.split(' - ', 1)]
+                else:
+                    entry['title'] = left
+                current['entries'].append(entry)
+                continue
+        if current_entry is not None and not current_entry['subtitle']:
+            # Treat as subtitle if entry exists and subtitle not set.
+            current_entry['subtitle'] = line
+        else:
+            current['paragraphs'].append(line)
+
+    html_parts = []
+    preferred_order = [
+        'professional summary',
+        'key skills / technical skills',
+        'key skills',
+        'technical skills',
+        'professional experience',
+        'projects',
+        'education',
+        'certifications',
+        'additional information',
+    ]
+
+    def section_sort_key(s):
+        title = s['title'].lower()
+        if title in preferred_order:
+            return (0, preferred_order.index(title))
+        return (1, title)
+
+    for section in sorted(sections, key=section_sort_key):
+        html_parts.append('<div class="section">')
+        html_parts.append(f'<div class="section-title">{section["title"]}</div>')
+
+        if section['skills']:
+            html_parts.append('<div class="skills-grid">')
+            for skill in section['skills']:
+                html_parts.append(f'<span class="skill-tag">{skill}</span>')
+            html_parts.append('</div>')
+
+        for p in section['paragraphs']:
+            html_parts.append(f'<p class="summary">{p}</p>')
+
+        for entry in section['entries']:
+            html_parts.append('<div class="entry">')
+            html_parts.append('<div class="entry-header">')
+            html_parts.append(f'<span class="entry-title">{entry.get("title", "")}</span>')
+            if entry.get('date'):
+                html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
+            html_parts.append('</div>')
+            if entry.get('subtitle'):
+                html_parts.append(f'<div class="entry-subtitle">{entry["subtitle"]}</div>')
+            if entry.get('bullets'):
+                html_parts.append('<ul>')
+                for b in entry['bullets']:
+                    html_parts.append(f'<li>{b}</li>')
+                html_parts.append('</ul>')
+            html_parts.append('</div>')
+
+        if section['bullets']:
+            html_parts.append('<ul>')
+            for b in section['bullets']:
+                html_parts.append(f'<li>{b}</li>')
+            html_parts.append('</ul>')
+
+        html_parts.append('</div>')
+
+    return '\n'.join(html_parts)
+
+
+def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise SystemExit('OPENAI_API_KEY is required to use AI tailoring.')
+
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+
+    instructions = (
+        "You are a professional resume writer and ATS optimisation expert.\n\n"
+        "I will provide you with:\n\n"
+        "A job description\n\n"
+        "My current resume\n\n"
+        "Your task:\n\n"
+        "Update my resume so it is tailored specifically to the job description.\n\n"
+        "Strict rules (must follow):\n\n"
+        "DO NOT invent, exaggerate, or add any new experience, skills, certifications, tools, or qualifications.\n\n"
+        "DO NOT claim I have done something that is not already written in my resume.\n\n"
+        "You may only rewrite, restructure, reword, reorder, and remove content based on what already exists.\n\n"
+        "If something is not relevant to the job description, remove it completely.\n\n"
+        "If something is important but buried, move it higher and make it more visible.\n\n"
+        "Improve bullet points to sound more achievement-based, but only using the same meaning and information already provided.\n\n"
+        "Optimise the resume for ATS keyword matching using wording from the job description, but only when it truthfully matches my existing experience.\n\n"
+        "Output requirements:\n\n"
+        "Return the updated resume in a clean professional format with these sections (only include sections that apply):\n\n"
+        "Professional Summary (tailored to the job)\n\n"
+        "Key Skills / Technical Skills\n\n"
+        "Professional Experience\n\n"
+        "Projects\n\n"
+        "Education\n\n"
+        "Certifications\n\n"
+        "Additional Information (only if relevant)\n\n"
+        "Additional formatting rules:\n\n"
+        "Keep it concise, modern, and recruiter-friendly.\n\n"
+        "Use bullet points.\n\n"
+        "Use action verbs.\n\n"
+        "Avoid fluff.\n\n"
+        "Keep everything aligned to the job description.\n\n"
+        "Most important objective:\n\n"
+        "Make my resume look like it was written specifically for this job posting, without adding false information.\n\n"
+        "Formatting constraints:\n\n"
+        "Output plain text only.\n"
+        "Use section headers starting with '## '.\n"
+        "Use entry headers starting with '### '.\n"
+        "Use bullet lines starting with '- '.\n"
+        "Do not include name/contact at the top.\n"
+        "Do not include separators like '---'.\n"
+        "Do not include notes, disclaimers, or meta commentary."
+    )
+
+    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    client = OpenAI()
+    response = client.responses.create(
+        model=model,
+        instructions=instructions,
+        input=(
+            "Job description:\n"
+            f"{job_text}\n\n"
+            "Current resume:\n"
+            f"{resume_text}\n"
+        ),
+    )
+
+    text = getattr(response, 'output_text', None)
+    if text:
+        return text.strip()
+    output = getattr(response, 'output', [])
+    if output:
+        parts = []
+        for item in output:
+            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
+            for c in content:
+                if getattr(c, 'type', None) == 'output_text':
+                    parts.append(c.text)
+                elif isinstance(c, dict) and c.get('type') == 'output_text':
+                    parts.append(c.get('text', ''))
+        text = '\n'.join([p for p in parts if p]).strip()
+        if text:
+            return text
+    raise SystemExit('OpenAI response did not include text output.')
+
+
 def generate_resume(resume_path, template_path, job_text=None, out_dir=None, label=None):
     resume_path = Path(resume_path)
     template_path = Path(template_path)
@@ -360,6 +635,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         style_css = style_match.group(1).strip()
     else:
         style_css = ''
+
     header_lines, sections = split_sections(resume_text)
     name, contact = parse_header(header_lines)
 
@@ -367,69 +643,102 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     if 'Software Engineer' in sections:
         headline = 'Software Engineer'
 
-    summary_lines = sections.get('Software Engineer', [])
-    summary = ' '.join([l for l in summary_lines if l.strip()])
+    if os.environ.get('OPENAI_API_KEY') and (job_text or '').strip():
+        tailored_text = tailor_resume_with_openai(job_text=job_text, resume_text=resume_text)
+        header_html = render_header_html(name=name, headline=headline, contact=contact)
+        html_body = header_html + _format_tailored_text_to_html(tailored_text, name=name)
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tailored Resume</title>
+<style>
+{style_css}
+.section-title {{ font-weight: 700; margin-top: 16px; }}
+.summary {{ margin: 6px 0; }}
+ul {{ margin: 6px 0 12px 18px; }}
+</style>
+</head>
+<body>
+<div class="page">
+{html_body}
+</div>
+</body>
+</html>
+"""
+        out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
+        base = f"Resume_{safe_label}_{stamp}"
+        html_path = out_dir / f"{base}.html"
+        pdf_path = out_dir / f"{base}.pdf"
+        html_path.write_text(html, encoding='utf-8')
+    else:
+        summary_lines = sections.get('Software Engineer', [])
+        summary = ' '.join([l for l in summary_lines if l.strip()])
 
-    education = parse_education(sections.get('Education', []))
+        education = parse_education(sections.get('Education', []))
 
-    skills = parse_skills(sections.get('Skills', []))
+        skills = parse_skills(sections.get('Skills', []))
 
-    work_entries = parse_experience(sections.get('Work experience/Projects', []))
-    volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
+        work_entries = parse_experience(sections.get('Work experience/Projects', []))
+        volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
 
-    # Split projects vs experience based on title keywords
-    projects = []
-    experience = []
-    for e in work_entries:
-        title_l = e['title'].lower()
-        if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
-            experience.append(e)
-        else:
-            projects.append(e)
+        # Split projects vs experience based on title keywords
+        projects = []
+        experience = []
+        for e in work_entries:
+            title_l = e['title'].lower()
+            if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
+                experience.append(e)
+            else:
+                projects.append(e)
 
-    certificates = parse_list(sections.get('Certificates', []))
-    interests = parse_list(sections.get('Interests', []))
+        certificates = parse_list(sections.get('Certificates', []))
+        interests = parse_list(sections.get('Interests', []))
 
-    keywords = extract_keywords(job_text or '', skills)
+        keywords = extract_keywords(job_text or '', skills)
 
-    # Reorder skills by relevance
-    if keywords:
-        skills = sorted(skills, key=lambda s: (s.lower() not in [k.lower() for k in keywords], s.lower()))
+        # Reorder skills by relevance
+        if keywords:
+            skills = sorted(skills, key=lambda s: (s.lower() not in [k.lower() for k in keywords], s.lower()))
 
-        # Reorder projects and experience by relevance
-        projects = sorted(projects, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
-        experience = sorted(experience, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
+            # Reorder projects and experience by relevance
+            projects = sorted(projects, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
+            experience = sorted(experience, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
 
-    # Use first sentence as summary fallback
-    if not summary:
-        summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
+        # Use first sentence as summary fallback
+        if not summary:
+            summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
 
-    html = render_html(
-        name=name,
-        headline=headline,
-        contact=contact,
-        summary=summary,
-        education=education,
-        skills=skills,
-        projects=projects,
-        experience=experience,
-        volunteer=volunteer_entries,
-        certificates=certificates,
-        interests=interests,
-        keywords=keywords,
-        style_css=style_css,
-    )
+        html = render_html(
+            name=name,
+            headline=headline,
+            contact=contact,
+            summary=summary,
+            education=education,
+            skills=skills,
+            projects=projects,
+            experience=experience,
+            volunteer=volunteer_entries,
+            certificates=certificates,
+            interests=interests,
+            keywords=keywords,
+            style_css=style_css,
+        )
 
-    out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
-    out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
-    base = f'Resume_{safe_label}_{stamp}'
+        out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
+        base = f"Resume_{safe_label}_{stamp}"
 
-    html_path = out_dir / f'{base}.html'
-    pdf_path = out_dir / f'{base}.pdf'
+        html_path = out_dir / f"{base}.html"
+        pdf_path = out_dir / f"{base}.pdf"
 
-    html_path.write_text(html, encoding='utf-8')
+        html_path.write_text(html, encoding='utf-8')
 
     try:
         from playwright.sync_api import sync_playwright
@@ -446,6 +755,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         browser.close()
 
     return html_path, pdf_path
+
 
 
 def main():

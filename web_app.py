@@ -1,7 +1,7 @@
 
 import os
 from pathlib import Path
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, send_from_directory, url_for
 from tools.resume_bot import generate_resume
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -44,6 +44,12 @@ PAGE = """
   {% if html_path %}
   <div class="result">
     <div>Generated files:</div>
+    <div>
+      <a href="{{ html_url }}" target="_blank" rel="noopener">Open HTML</a>
+    </div>
+    <div>
+      <a href="{{ pdf_url }}" target="_blank" rel="noopener">Download PDF</a>
+    </div>
     <code>{{ html_path }}</code>
     <code>{{ pdf_path }}</code>
   </div>
@@ -57,6 +63,8 @@ PAGE = """
 def index():
     html_path = None
     pdf_path = None
+    html_url = None
+    pdf_url = None
     if request.method == 'POST':
         job_text = request.form.get('job_text', '').strip()
         label = request.form.get('label', '').strip() or 'Tailored'
@@ -69,7 +77,20 @@ def index():
         )
         html_path = str(html_path)
         pdf_path = str(pdf_path)
-    return render_template_string(PAGE, html_path=html_path, pdf_path=pdf_path)
+        html_url = url_for('download_output', filename=Path(html_path).name)
+        pdf_url = url_for('download_output', filename=Path(pdf_path).name)
+    return render_template_string(
+        PAGE,
+        html_path=html_path,
+        pdf_path=pdf_path,
+        html_url=html_url,
+        pdf_url=pdf_url,
+    )
+
+
+@app.route('/outputs/<path:filename>')
+def download_output(filename: str):
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=False)
 
 
 if __name__ == '__main__':
