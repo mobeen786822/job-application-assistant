@@ -5,8 +5,8 @@ from flask import Flask, request, render_template_string
 from tools.resume_bot import generate_resume
 
 APP_ROOT = Path(__file__).resolve().parent
-DEFAULT_RESUME = os.environ.get('RESUME_TXT', r'C:\\Users\\mobee\\Downloads\\My Resume (1).txt')
-DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', r'C:\\Users\\mobee\\Desktop\\Blackmagic CV.html')
+DEFAULT_RESUME = os.environ.get('RESUME_TXT', str(APP_ROOT / 'assets' / 'resume.txt'))
+DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', str(APP_ROOT / 'assets' / 'template.html'))
 OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(APP_ROOT / 'outputs'))
 
 app = Flask(__name__)
