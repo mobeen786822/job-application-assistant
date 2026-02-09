@@ -85,7 +85,7 @@ Volunteer Experience
 ------------------------
 Web Developer (catchadrive.com)
 Catch a Drive
-11/2025 - Present
+11/2025 - 01/2026
 Tasks/Achievements
 - Contributed to both front-end and back-end development of the Catch A Drive web platform. 
 - Implemented responsive and user-centric UI components to enhance usability and visual appeal. 
@@ -96,7 +96,7 @@ x-t-c2-color: Abdul - 0498 273 226
 
 Web Developer (Hentley.co)
 Hentley
-01/2018 - Present
+01/2018 - 03/2019
 Tasks/Achievements
 - Implemented custom front-end features for an eCommerce website, focusing on clean layout, responsiveness, and intuitive user flows. 
 - Supported server-side functionality to enable product displays, transactional workflows, and content updates. 
@@ -164,6 +164,4 @@ Interests
 -AI Machine Learning and Applications in UX
 -Functional Programming in Web Development
 -Modern JavaScript Frameworks
-
-
 

@@ -210,7 +210,7 @@ def relevance_score(text, keywords):
     return sum(1 for k in keywords if k.lower() in t)
 
 
-def render_html(name, headline, contact, summary, education, skills, projects, experience, volunteer, certificates, interests, keywords, style_css):
+def render_html(name, headline, contact, summary, education, skills, projects, experience, volunteer, certificates, interests, keywords, style_css, header_html=None):
     contact_items = []
     for c in contact:
         if c.startswith('http'):
@@ -290,6 +290,14 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 </div>
 """
 
+    header_block = header_html if header_html else f"""
+<div class="header">
+  <h1>{name}</h1>
+  <div class="tagline">{tagline}</div>
+  <div class="contact-row">{join_contact(contact_items)}</div>
+</div>
+"""
+
     html = f"""<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -304,11 +312,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 <body>
 <div class=\"page\">
 
-<div class=\"header\">
-  <h1>{name}</h1>
-  <div class=\"tagline\">{tagline}</div>
-  <div class=\"contact-row\">{join_contact(contact_items)}</div>
-</div>
+{header_block}
 
 <div class=\"section\">
   <div class=\"section-title\">Professional Summary</div>
@@ -370,12 +374,50 @@ def render_header_html(name: str, headline: str, contact):
 <div class="header">
   <h1>{name}</h1>
   <div class="tagline">{tagline}</div>
-  <div class="contact-row">{join_contact(contact_items).replace('·', '&middot;')}</div>
+  <div class="contact-row">{join_contact(contact_items)}</div>
 </div>
 """
 
 
-def _format_tailored_text_to_html(text: str, name: str | None = None) -> str:
+def extract_template_header(template_text: str) -> str | None:
+    start = template_text.find('<div class="header">')
+    if start == -1:
+        return None
+    i = start
+    depth = 0
+    while i < len(template_text):
+        if template_text.startswith('<div', i):
+            depth += 1
+        elif template_text.startswith('</div>', i):
+            depth -= 1
+            if depth == 0:
+                end = i + len('</div>')
+                return template_text[start:end]
+        i += 1
+    return None
+
+
+def extract_template_sections(template_text: str) -> list[str]:
+    titles = re.findall(
+        r'<div\\s+class=\"section-title\"\\s*>\\s*(.*?)\\s*</div>',
+        template_text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    cleaned = []
+    for t in titles:
+        t = re.sub(r'<.*?>', '', t).strip()
+        if t:
+            cleaned.append(t)
+    return cleaned
+
+
+def _format_tailored_text_to_html(
+    text: str,
+    name: str | None = None,
+    allowed_sections: list[str] | None = None,
+) -> str:
+    allowed_sections = [s.lower() for s in (allowed_sections or [])]
+    allowed_set = set(allowed_sections)
     lines = [normalize_text(l.rstrip()) for l in text.splitlines()]
 
     sections = []
@@ -420,7 +462,14 @@ def _format_tailored_text_to_html(text: str, name: str | None = None) -> str:
             title = line[3:].strip()
             if name and title.lower() == name.lower():
                 continue
-            new_section(title)
+            title_key = title.lower()
+            if not allowed_set or title_key in allowed_set:
+                new_section(title)
+            else:
+                # Treat unexpected section headers as summary content.
+                if current is None:
+                    new_section('Professional Summary')
+                current['paragraphs'].append(title)
             continue
         if line.startswith('### '):
             ensure_section()
@@ -471,24 +520,31 @@ def _format_tailored_text_to_html(text: str, name: str | None = None) -> str:
                     entry['title'] = left
                 current['entries'].append(entry)
                 continue
-        if current_entry is not None and not current_entry['subtitle']:
-            # Treat as subtitle if entry exists and subtitle not set.
-            current_entry['subtitle'] = line
+        if current_entry is not None:
+            if looks_like_date(line):
+                current_entry['date'] = line
+            elif not current_entry['subtitle']:
+                # Treat as subtitle if entry exists and subtitle not set.
+                current_entry['subtitle'] = line
+            else:
+                current['paragraphs'].append(line)
         else:
             current['paragraphs'].append(line)
 
     html_parts = []
-    preferred_order = [
-        'professional summary',
-        'key skills / technical skills',
-        'key skills',
-        'technical skills',
-        'professional experience',
-        'projects',
-        'education',
-        'certifications',
-        'additional information',
-    ]
+    preferred_order = allowed_sections[:]
+    if not preferred_order:
+        preferred_order = [
+            'professional summary',
+            'key skills / technical skills',
+            'key skills',
+            'technical skills',
+            'professional experience',
+            'projects',
+            'education',
+            'certifications',
+            'additional information',
+        ]
 
     def section_sort_key(s):
         title = s['title'].lower()
@@ -536,7 +592,27 @@ def _format_tailored_text_to_html(text: str, name: str | None = None) -> str:
     return '\n'.join(html_parts)
 
 
-def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
+def _extract_tagline(text: str):
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if lines and lines[0].lower().startswith('tagline:'):
+        tagline = lines[0].split(':', 1)[1].strip()
+        rest = '\n'.join(lines[1:])
+        return tagline, rest
+    return None, text
+
+
+def _apply_tagline_to_header(header_html: str, tagline: str | None) -> str:
+    if not header_html or not tagline:
+        return header_html
+    return re.sub(
+        r'(<div\\s+class=\"tagline\">)(.*?)(</div>)',
+        r'\\1' + tagline + r'\\3',
+        header_html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+
+def tailor_resume_with_openai(job_text: str, resume_text: str, allowed_sections: list[str] | None = None):
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         raise SystemExit('OPENAI_API_KEY is required to use AI tailoring.')
@@ -546,6 +622,7 @@ def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
     except Exception as e:
         raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
 
+    allowed_section_text = "\\n".join(allowed_sections) + "\\n" if allowed_sections else ""
     instructions = (
         "You are a professional resume writer and ATS optimisation expert.\n\n"
         "I will provide you with:\n\n"
@@ -580,7 +657,9 @@ def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
         "Make my resume look like it was written specifically for this job posting, without adding false information.\n\n"
         "Formatting constraints:\n\n"
         "Output plain text only.\n"
-        "Use section headers starting with '## '.\n"
+        "Start your response with a single line: 'TAGLINE: <short role-specific tagline>'.\n"
+        "Use section headers starting with '## ' and ONLY these exact section titles:\n"
+        f"{allowed_section_text}"
         "Use entry headers starting with '### '.\n"
         "Use bullet lines starting with '- '.\n"
         "Do not include name/contact at the top.\n"
@@ -603,7 +682,8 @@ def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
 
     text = getattr(response, 'output_text', None)
     if text:
-        return text.strip()
+        text = text.strip()
+        return _extract_tagline(text)
     output = getattr(response, 'output', [])
     if output:
         parts = []
@@ -616,7 +696,7 @@ def tailor_resume_with_openai(job_text: str, resume_text: str) -> str:
                     parts.append(c.get('text', ''))
         text = '\n'.join([p for p in parts if p]).strip()
         if text:
-            return text
+            return _extract_tagline(text)
     raise SystemExit('OpenAI response did not include text output.')
 
 
@@ -643,10 +723,22 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     if 'Software Engineer' in sections:
         headline = 'Software Engineer'
 
+    template_header_html = extract_template_header(template_text)
+    template_sections = extract_template_sections(template_text)
+
     if os.environ.get('OPENAI_API_KEY') and (job_text or '').strip():
-        tailored_text = tailor_resume_with_openai(job_text=job_text, resume_text=resume_text)
-        header_html = render_header_html(name=name, headline=headline, contact=contact)
-        html_body = header_html + _format_tailored_text_to_html(tailored_text, name=name)
+        tagline, tailored_text = tailor_resume_with_openai(
+            job_text=job_text,
+            resume_text=resume_text,
+            allowed_sections=template_sections,
+        )
+        header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
+        header_html = _apply_tagline_to_header(header_html, tagline)
+        html_body = header_html + _format_tailored_text_to_html(
+            tailored_text,
+            name=name,
+            allowed_sections=template_sections,
+        )
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -713,6 +805,7 @@ ul {{ margin: 6px 0 12px 18px; }}
         if not summary:
             summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
 
+        header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
         html = render_html(
             name=name,
             headline=headline,
@@ -727,6 +820,7 @@ ul {{ margin: 6px 0 12px 18px; }}
             interests=interests,
             keywords=keywords,
             style_css=style_css,
+            header_html=header_html,
         )
 
         out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
