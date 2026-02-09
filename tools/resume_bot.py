@@ -801,6 +801,10 @@ def _extract_tagline(text: str):
 def _validate_tagline(tagline: str, resume_text: str) -> str | None:
     if not tagline:
         return None
+    # Enforce short tagline (few words).
+    words = re.findall(r'[A-Za-z0-9\+\#\-]+', tagline)
+    if len(words) > 6:
+        return None
     resume_l = normalize_text(resume_text).lower()
     # Allow common separators and small words.
     stop = {
@@ -824,9 +828,9 @@ def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
     client = OpenAI()
     model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
     prompt = (
-        "Create a concise, role-specific resume tagline based on the job description and the resume. "
+        "Create a very short, role-specific resume tagline based on the job description and the resume. "
         "Return a single line only, no quotes, no extra text. "
-        "Format like: '<Role> · <Skill> · <Skill>' or similar. "
+        "Use 3 to 6 words maximum. Avoid separators like '·' or '|'. "
         "STRICT RULE: Use only roles/skills/terms that already appear in the resume text. "
         "Do NOT invent or add new tools, skills, or roles.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"

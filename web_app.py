@@ -180,6 +180,10 @@ PAGE = """
   let timer = null;
 
   form.addEventListener('submit', () => {
+    const result = document.getElementById('result');
+    if (result) {
+      result.remove();
+    }
     btn.disabled = true;
     loading.style.display = 'flex';
     loadingText.textContent = steps[0];

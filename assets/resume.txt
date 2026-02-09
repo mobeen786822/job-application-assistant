@@ -35,6 +35,13 @@ Courses
 
 Work experience/Projects
 ------------------------
+Job Application Assistant
+- Private repo available on request
+- Built a web app that tailors resumes from job descriptions and exports PDF/HTML.
+- Implemented OpenAI-powered content tailoring with strict no-fabrication rules.
+- Added private access via VPN-only deployment (Tailscale) on a cloud VM.
+- Added UI preview, download actions, and loading feedback.
+
 SEO-Optimised Blog Posts for eCommerce
 06/2023 - 08/2023
 - Developed a secure and responsive front-end interface, prioritising user experience and trust and safety. 
@@ -164,4 +171,3 @@ Interests
 -AI Machine Learning and Applications in UX
 -Functional Programming in Web Development
 -Modern JavaScript Frameworks
-
