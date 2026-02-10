@@ -224,13 +224,17 @@ PAGE = """
         <div class="result" id="result">
           <div class="actions">
             <a href="{{ html_url }}" target="_blank" rel="noopener">Download HTML</a>
-            <a href="{{ pdf_url }}" target="_blank" rel="noopener">Download PDF</a>
+            {# PDF download removed by request #}
             {% if cover_url %}
-            <a href="{{ cover_url }}" target="_blank" rel="noopener">Download Cover Letter</a>
+            <a href="{{ cover_url }}" target="_blank" rel="noopener">Download Cover Letter HTML</a>
             {% endif %}
           </div>
           <iframe class="preview" id="preview" src="{{ preview_url }}"></iframe>
-          {% if cover_text %}
+          {% if cover_preview_url %}
+          <div style="height:12px"></div>
+          <label>Cover letter</label>
+          <iframe class="preview" id="cover-preview" src="{{ cover_preview_url }}"></iframe>
+          {% elif cover_text %}
           <div style="height:12px"></div>
           <label>Cover letter</label>
           <div class="cover-box">{{ cover_text }}</div>
@@ -330,6 +334,8 @@ def index():
     pdf_url = None
     preview_url = None
     cover_url = None
+    cover_pdf_url = None
+    cover_preview_url = None
     cover_text = None
     error_msg = None
     if request.method == 'POST':
@@ -351,13 +357,19 @@ def index():
             pdf_url = url_for('download_output', filename=Path(pdf_path).name)
             preview_url = url_for('preview_output', filename=Path(html_path).name)
             if job_text:
-                cover_path, cover_text = generate_cover_letter(
+                cover_path, cover_pdf_path, cover_text = generate_cover_letter(
                     resume_path=DEFAULT_RESUME,
                     job_text=job_text,
                     out_dir=OUTPUT_DIR,
                     label=label,
+                    template_path=DEFAULT_TEMPLATE,
                 )
-                cover_url = url_for('download_output', filename=Path(cover_path).name)
+                cover_name = Path(cover_path).name
+                cover_url = url_for('download_output', filename=cover_name)
+                if cover_name.lower().endswith('.html'):
+                    cover_preview_url = url_for('preview_output', filename=cover_name)
+                if cover_pdf_path:
+                    cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
         except Exception as e:
             error_msg = f"Something went wrong while generating the resume. {e}"
 
@@ -369,6 +381,8 @@ def index():
         pdf_url=pdf_url,
         preview_url=preview_url,
         cover_url=cover_url,
+        cover_pdf_url=cover_pdf_url,
+        cover_preview_url=cover_preview_url,
         cover_text=cover_text,
         error_msg=error_msg,
     )

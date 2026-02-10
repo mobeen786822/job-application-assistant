@@ -892,7 +892,7 @@ def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str
         "Use Australian/UK spelling.\n\n"
         "Do not use overly formal outdated wording (avoid: \"To whom it may concern\").\n\n"
         "Address the company by name. If the company name is not present in the job description, use: \"Dear Hiring Manager\".\n\n"
-        f"End with: Kind regards, \n{name}\n\n"
+        f"End with:\nKind regards,\n\n{name}\n\n"
         "Return plain text only. Do not include a subject line.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
@@ -919,11 +919,81 @@ def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str
     raise SystemExit('OpenAI response did not include text output.')
 
 
+def _parse_cover_letter_paragraphs(cover_text: str) -> list[tuple[str, str]]:
+    raw_lines = [line.rstrip() for line in cover_text.strip().splitlines()]
+    lines = [line for line in raw_lines if line.strip() or line == '']
+
+    paragraphs: list[str] = []
+    buf: list[str] = []
+    for line in lines:
+        if not line.strip():
+            if buf:
+                paragraphs.append(' '.join(buf).strip())
+                buf = []
+            continue
+        buf.append(line.strip())
+    if buf:
+        paragraphs.append(' '.join(buf).strip())
+
+    styled: list[tuple[str, str]] = []
+    for i, para in enumerate(paragraphs):
+        lower = para.lower()
+        if lower.startswith('kind regards'):
+            styled.append(('signature', 'Kind regards,'))
+            if i + 1 < len(paragraphs):
+                styled.append(('signature', paragraphs[i + 1]))
+            break
+        styled.append(('body', para))
+    return styled
+
+
+def _build_cover_letter_html(style_css: str, header_html: str, cover_text: str) -> str:
+    paragraphs = _parse_cover_letter_paragraphs(cover_text)
+    blocks = []
+    for cls, text in paragraphs:
+        class_attr = 'signature' if cls == 'signature' else 'body'
+        blocks.append(f'<p class="{class_attr}">{text}</p>')
+    body = "\n".join(blocks)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover Letter</title>
+<style>
+{style_css}
+.section-title {{ font-weight: 700; margin-top: 16px; }}
+.cover-letter p {{ margin: 0 0 10px; }}
+.cover-letter .signature {{ margin-top: 10px; }}
+@media print {{
+  .page {{ padding-top: 6mm; }}
+}}
+@media screen {{
+  .page {{ padding-top: 24px; }}
+}}
+</style>
+</head>
+<body>
+<div class="page">
+{header_html}
+<div class="section">
+  <div class="section-title">Cover Letter</div>
+  <div class="cover-letter">
+    {body}
+  </div>
+</div>
+</div>
+</body>
+</html>
+"""
+
+
 def generate_cover_letter(
     resume_path,
     job_text: str,
     out_dir,
     label: str | None = None,
+    template_path=None,
 ):
     resume_path = Path(resume_path)
     if not resume_path.exists():
@@ -938,14 +1008,53 @@ def generate_cover_letter(
         name=name or 'Candidate',
     )
 
+    template_header_html = None
+    style_css = ''
+    if template_path:
+        template_path = Path(template_path)
+        if not template_path.exists():
+            raise SystemExit(f'Template file not found: {template_path}')
+        template_text = template_path.read_text(encoding='utf-8', errors='replace')
+        style_match = re.search(r'<style>(.*?)</style>', template_text, re.DOTALL | re.IGNORECASE)
+        if style_match:
+            style_css = style_match.group(1).strip()
+        template_header_html = extract_template_header(template_text)
+
+    header_html = template_header_html or render_header_html(name=name, headline='', contact='')
+    if (job_text or '').strip():
+        tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text)
+        if tagline:
+            header_html = _apply_tagline_to_header(header_html, tagline)
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
     base = f'CoverLetter_{safe_label}_{stamp}'
     txt_path = out_dir / f'{base}.txt'
+    html_path = out_dir / f'{base}.html'
+    pdf_path = out_dir / f'{base}.pdf'
     txt_path.write_text(cover_text, encoding='utf-8')
-    return txt_path, cover_text
+
+    if style_css:
+        html = _build_cover_letter_html(style_css=style_css, header_html=header_html, cover_text=cover_text)
+        html_path.write_text(html, encoding='utf-8')
+
+        try:
+            from playwright.sync_api import sync_playwright
+        except Exception as e:
+            raise SystemExit('Playwright is required. Install with: python -m pip install playwright && python -m playwright install chromium') from e
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(html_path.as_uri(), wait_until='networkidle')
+            page.pdf(path=str(pdf_path), format='A4', print_background=True, margin={
+                'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
+            })
+            browser.close()
+
+    return html_path if html_path.exists() else txt_path, pdf_path if pdf_path.exists() else None, cover_text
 
 
 def _section_has_content(section) -> bool:
