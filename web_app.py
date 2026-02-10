@@ -28,6 +28,23 @@ PAGE = """
       --panel-2: #f8fafc;
       --stroke: #e2e8f0;
       --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+      --bg-base: #f1f5f9;
+      --bg-radial-1: #dbeafe;
+      --bg-radial-2: #ecfccb;
+    }
+
+    body[data-theme="dark"] {
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #34d399;
+      --panel: #0f172a;
+      --panel-2: #111827;
+      --stroke: #1f2937;
+      --shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
+      --bg-base: #0b1220;
+      --bg-radial-1: #0c2740;
+      --bg-radial-2: #1f2a1b;
     }
 
     * { box-sizing: border-box; }
@@ -36,9 +53,9 @@ PAGE = """
       font-family: "Space Grotesk", "Sora", "Manrope", system-ui, sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(1200px 600px at 10% -10%, #dbeafe 0%, rgba(219,234,254,0) 60%),
-        radial-gradient(1000px 600px at 100% 0%, #ecfccb 0%, rgba(236,252,203,0) 55%),
-        #f1f5f9;
+        radial-gradient(1200px 600px at 10% -10%, var(--bg-radial-1) 0%, rgba(219,234,254,0) 60%),
+        radial-gradient(1000px 600px at 100% 0%, var(--bg-radial-2) 0%, rgba(236,252,203,0) 55%),
+        var(--bg-base);
       background-repeat: no-repeat;
       background-attachment: fixed;
       min-height: 100vh;
@@ -78,7 +95,8 @@ PAGE = """
       padding: 12px 14px;
       border: 1px solid var(--stroke);
       border-radius: 12px;
-      background: #fff;
+      background: var(--panel);
+      color: var(--ink);
     }
 
     .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
@@ -93,6 +111,22 @@ PAGE = """
     }
     button[disabled] { opacity: 0.6; cursor: not-allowed; }
     .secondary-btn { background: var(--panel-2); color: var(--ink); border: 1px solid var(--stroke); }
+    .theme-btn {
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--stroke);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+    }
+    .theme-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
 
     .loading { display: none; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
     .spinner {
@@ -113,14 +147,15 @@ PAGE = """
       font-size: 13px;
       border: 1px solid #bbf7d0;
     }
-    .preview { width: 100%; height: 780px; border: 1px solid var(--stroke); border-radius: 12px; background: #fff; }
+    .preview { width: 100%; height: 780px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel); }
     .cover-box {
       width: 100%;
       min-height: 260px;
       border: 1px solid var(--stroke);
       border-radius: 12px;
       padding: 12px;
-      background: #fff;
+      background: var(--panel);
+      color: var(--ink);
       font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
       font-size: 12.5px;
       white-space: pre-wrap;
@@ -144,6 +179,12 @@ PAGE = """
       background: #fef2f2;
       color: #991b1b;
     }
+
+    body[data-theme="dark"] .alert {
+      border: 1px solid #7f1d1d;
+      background: #1f0a0a;
+      color: #fecaca;
+    }
   </style>
 </head>
 <body>
@@ -153,6 +194,10 @@ PAGE = """
         <h1>Resume Tailor</h1>
         <div class="hint">Paste a job description and generate a tailored HTML + PDF.</div>
       </div>
+      <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
+        <span class="theme-dot"></span>
+        <span id="theme-label">Dark mode</span>
+      </button>
     </div>
 
     <div class="grid">
@@ -204,6 +249,8 @@ PAGE = """
   const clearBtn = document.getElementById('clear-btn');
   const loading = document.getElementById('loading');
   const loadingText = document.getElementById('loading-text');
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeLabel = document.getElementById('theme-label');
   const steps = [
     'Parsing job description…',
     'Tailoring resume…',
@@ -246,6 +293,29 @@ PAGE = """
     if (result) {
       result.remove();
     }
+  });
+
+  const applyTheme = (mode) => {
+    document.body.setAttribute('data-theme', mode);
+    const isDark = mode === 'dark';
+    themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    themeLabel.textContent = isDark ? 'Light mode' : 'Dark mode';
+  };
+
+  const storedTheme = localStorage.getItem('theme');
+  if (storedTheme) {
+    applyTheme(storedTheme);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyTheme('dark');
+  } else {
+    applyTheme('light');
+  }
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.body.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('theme', next);
   });
 </script>
 </html>

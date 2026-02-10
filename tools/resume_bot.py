@@ -892,7 +892,7 @@ def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str
         "Use Australian/UK spelling.\n\n"
         "Do not use overly formal outdated wording (avoid: \"To whom it may concern\").\n\n"
         "Address the company by name. If the company name is not present in the job description, use: \"Dear Hiring Manager\".\n\n"
-        f"End with: Kind regards, {name}\n\n"
+        f"End with: Kind regards, \n{name}\n\n"
         "Return plain text only. Do not include a subject line.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
