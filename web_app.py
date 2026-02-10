@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
-from tools.resume_bot import generate_resume
+from tools.resume_bot import generate_resume, generate_cover_letter
 
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_RESUME = os.environ.get('RESUME_TXT', str(APP_ROOT / 'assets' / 'resume.txt'))
@@ -114,6 +114,17 @@ PAGE = """
       border: 1px solid #bbf7d0;
     }
     .preview { width: 100%; height: 780px; border: 1px solid var(--stroke); border-radius: 12px; background: #fff; }
+    .cover-box {
+      width: 100%;
+      min-height: 260px;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+      font-size: 12.5px;
+      white-space: pre-wrap;
+    }
 
     .grid {
       display: grid;
@@ -169,8 +180,16 @@ PAGE = """
           <div class="actions">
             <a href="{{ html_url }}" target="_blank" rel="noopener">Download HTML</a>
             <a href="{{ pdf_url }}" target="_blank" rel="noopener">Download PDF</a>
+            {% if cover_url %}
+            <a href="{{ cover_url }}" target="_blank" rel="noopener">Download Cover Letter</a>
+            {% endif %}
           </div>
           <iframe class="preview" id="preview" src="{{ preview_url }}"></iframe>
+          {% if cover_text %}
+          <div style="height:12px"></div>
+          <label>Cover letter</label>
+          <div class="cover-box">{{ cover_text }}</div>
+          {% endif %}
         </div>
         {% else %}
         <div class="hint">Your tailored resume preview will appear here.</div>
@@ -240,6 +259,8 @@ def index():
     html_url = None
     pdf_url = None
     preview_url = None
+    cover_url = None
+    cover_text = None
     error_msg = None
     if request.method == 'POST':
         try:
@@ -259,6 +280,14 @@ def index():
             html_url = url_for('download_output', filename=Path(html_path).name)
             pdf_url = url_for('download_output', filename=Path(pdf_path).name)
             preview_url = url_for('preview_output', filename=Path(html_path).name)
+            if job_text:
+                cover_path, cover_text = generate_cover_letter(
+                    resume_path=DEFAULT_RESUME,
+                    job_text=job_text,
+                    out_dir=OUTPUT_DIR,
+                    label=label,
+                )
+                cover_url = url_for('download_output', filename=Path(cover_path).name)
         except Exception as e:
             error_msg = f"Something went wrong while generating the resume. {e}"
 
@@ -269,6 +298,8 @@ def index():
         html_url=html_url,
         pdf_url=pdf_url,
         preview_url=preview_url,
+        cover_url=cover_url,
+        cover_text=cover_text,
         error_msg=error_msg,
     )
 

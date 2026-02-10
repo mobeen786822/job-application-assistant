@@ -856,6 +856,98 @@ def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
     return None
 
 
+def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str) -> str:
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise SystemExit('OPENAI_API_KEY is required to use AI cover letters.')
+
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+
+    prompt = (
+        "You are a professional cover letter writer and recruitment specialist.\n\n"
+        "I will provide you with:\n\n"
+        "A job description\n\n"
+        "My resume\n\n"
+        "Your task:\n\n"
+        "Write a highly tailored cover letter for this specific role.\n\n"
+        "Strict rules (must follow):\n\n"
+        "DO NOT invent or exaggerate experience, achievements, or skills.\n\n"
+        "DO NOT add fake metrics, fake projects, or fake responsibilities.\n\n"
+        "Only use information that already exists in my resume.\n\n"
+        "If something is not in my resume, do not mention it.\n\n"
+        "You may reword and present my experience in a stronger way, but the meaning must stay truthful.\n\n"
+        "Use keywords and language from the job description where relevant, but only when it matches my actual experience.\n\n"
+        "Cover letter requirements:\n\n"
+        "Tone must be confident, professional, and modern (not generic or robotic).\n\n"
+        "It must sound like a real person wrote it, not AI.\n\n"
+        "Keep it concise: 300–450 words max.\n\n"
+        "Structure it properly:\n\n"
+        "Strong opening paragraph (role + excitement + value)\n\n"
+        "Middle paragraph(s) linking my skills/projects to the job requirements\n\n"
+        "Closing paragraph with enthusiasm + call to action\n\n"
+        "Formatting rules:\n\n"
+        "Use Australian/UK spelling.\n\n"
+        "Do not use overly formal outdated wording (avoid: \"To whom it may concern\").\n\n"
+        "Address the company by name. If the company name is not present in the job description, use: \"Dear Hiring Manager\".\n\n"
+        f"End with: Kind regards, {name}\n\n"
+        "Return plain text only. Do not include a subject line.\n\n"
+        f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
+    )
+
+    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    client = OpenAI()
+    response = client.responses.create(model=model, input=prompt)
+
+    text = getattr(response, 'output_text', None)
+    if text:
+        return text.strip()
+    output = getattr(response, 'output', [])
+    if output:
+        parts = []
+        for item in output:
+            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
+            for c in content:
+                if getattr(c, 'type', None) == 'output_text':
+                    parts.append(c.text)
+                elif isinstance(c, dict) and c.get('type') == 'output_text':
+                    parts.append(c.get('text', ''))
+        if parts:
+            return "\n".join(parts).strip()
+    raise SystemExit('OpenAI response did not include text output.')
+
+
+def generate_cover_letter(
+    resume_path,
+    job_text: str,
+    out_dir,
+    label: str | None = None,
+):
+    resume_path = Path(resume_path)
+    if not resume_path.exists():
+        raise SystemExit(f'Resume file not found: {resume_path}')
+    resume_text = resume_path.read_text(encoding='utf-8', errors='replace')
+    header_lines, _sections = split_sections(resume_text)
+    name, _contact = parse_header(header_lines)
+
+    cover_text = generate_cover_letter_with_openai(
+        job_text=job_text,
+        resume_text=resume_text,
+        name=name or 'Candidate',
+    )
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
+    base = f'CoverLetter_{safe_label}_{stamp}'
+    txt_path = out_dir / f'{base}.txt'
+    txt_path.write_text(cover_text, encoding='utf-8')
+    return txt_path, cover_text
+
+
 def _section_has_content(section) -> bool:
     if section['skills'] or section['bullets'] or section['paragraphs']:
         return True
