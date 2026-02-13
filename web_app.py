@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
-from tools.resume_bot import generate_resume, generate_cover_letter
+from tools.resume_bot import generate_resume, generate_cover_letter, assess_job_fit
 
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_RESUME = os.environ.get('RESUME_TXT', str(APP_ROOT / 'assets' / 'resume.txt'))
@@ -185,6 +185,47 @@ PAGE = """
       background: #1f0a0a;
       color: #fecaca;
     }
+    .fit-card {
+      margin: 0 0 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: var(--panel);
+    }
+    .fit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .fit-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .fit-apply { background: #dcfce7; color: #14532d; border-color: #bbf7d0; }
+    .fit-maybe { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
+    .fit-no { background: #fee2e2; color: #7f1d1d; border-color: #fecaca; }
+    .fit-meta { font-size: 12px; color: var(--muted); }
+    .fit-rationale { font-size: 13px; margin: 6px 0; }
+    .fit-gaps { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+    .fit-breakdown-title {
+      margin-top: 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+    .fit-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -204,14 +245,17 @@ PAGE = """
       <div class="card">
         <form method="post" id="resume-form">
           <label>Job description</label>
-          <textarea name="job_text" placeholder="Paste the full job description here..."></textarea>
+          <textarea name="job_text" placeholder="Paste the full job description here...">{{ job_text_value }}</textarea>
           <div class="form-actions">
-            <button type="submit" id="generate-btn">Generate</button>
+            <button type="submit" name="action" value="analyze" id="analyze-btn">Analyze Gaps</button>
+            {% if fit %}
+            <button type="submit" name="action" value="generate" id="generate-btn">Proceed & Generate</button>
+            {% endif %}
             <button type="button" id="clear-btn" class="secondary-btn">Clear</button>
           </div>
           <div class="loading" id="loading">
             <div class="spinner"></div>
-            <div id="loading-text">Generating resume…</div>
+            <div id="loading-text">Analyzing fit...</div>
           </div>
         </form>
         {% if error_msg %}
@@ -220,8 +264,51 @@ PAGE = """
       </div>
 
       <div class="card">
-        {% if html_path %}
+        {% if html_path or fit %}
         <div class="result" id="result">
+          {% if fit %}
+          <div class="fit-card">
+            <div class="fit-row">
+              <div class="fit-pill {% if fit.recommendation == 'APPLY' %}fit-apply{% elif fit.recommendation == 'NO' %}fit-no{% else %}fit-maybe{% endif %}">
+                {% if fit.recommendation == 'APPLY' %}
+                Recommended to apply
+                {% elif fit.recommendation == 'NO' %}
+                Not recommended yet
+                {% else %}
+                Borderline fit
+                {% endif %}
+              </div>
+              <div class="fit-meta">Confidence: {{ fit.confidence }}%</div>
+            </div>
+            {% if fit.rationale %}
+            <div class="fit-rationale">{{ fit.rationale }}</div>
+            {% endif %}
+            {% if fit.gaps %}
+            <ul class="fit-gaps">
+              {% for gap in fit.gaps %}
+              <li>{{ gap }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            {% if fit.matched_requirements %}
+            <div class="fit-breakdown-title">Matched requirements</div>
+            <ul class="fit-list">
+              {% for req in fit.matched_requirements %}
+              <li>{{ req }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            {% if fit.missing_requirements %}
+            <div class="fit-breakdown-title">Gap breakdown (missing)</div>
+            <ul class="fit-list">
+              {% for req in fit.missing_requirements %}
+              <li>{{ req }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if html_path %}
           <div class="actions">
             <a href="{{ html_url }}" target="_blank" rel="noopener">Download HTML</a>
             {# PDF download removed by request #}
@@ -239,6 +326,7 @@ PAGE = """
           <label>Cover letter</label>
           <div class="cover-box">{{ cover_text }}</div>
           {% endif %}
+          {% endif %}
         </div>
         {% else %}
         <div class="hint">Your tailored resume preview will appear here.</div>
@@ -249,17 +337,22 @@ PAGE = """
 </body>
 <script>
   const form = document.getElementById('resume-form');
-  const btn = document.getElementById('generate-btn');
+  const submitButtons = form.querySelectorAll('button[type="submit"]');
   const clearBtn = document.getElementById('clear-btn');
   const loading = document.getElementById('loading');
   const loadingText = document.getElementById('loading-text');
   const themeToggle = document.getElementById('theme-toggle');
   const themeLabel = document.getElementById('theme-label');
-  const steps = [
-    'Parsing job description…',
-    'Tailoring resume…',
-    'Rendering HTML…',
-    'Generating PDF…'
+  const analyzeSteps = [
+    'Parsing job description...',
+    'Assessing fit...',
+    'Building gap breakdown...'
+  ];
+  const generateSteps = [
+    'Parsing job description...',
+    'Assessing fit...',
+    'Tailoring resume...',
+    'Rendering HTML...'
   ];
   let stepIdx = 0;
   let timer = null;
@@ -275,8 +368,11 @@ PAGE = """
     if (result) {
       result.remove();
     }
-    btn.disabled = true;
+    const action = (e.submitter && e.submitter.value) ? e.submitter.value : 'analyze';
+    // Keep the clicked submit button enabled so its name/value is posted.
+    submitButtons.forEach((b) => { b.disabled = (b !== e.submitter); });
     loading.style.display = 'flex';
+    const steps = action === 'generate' ? generateSteps : analyzeSteps;
     loadingText.textContent = steps[0];
     timer = setInterval(() => {
       stepIdx = (stepIdx + 1) % steps.length;
@@ -286,7 +382,11 @@ PAGE = """
 
   clearBtn.addEventListener('click', () => {
     form.reset();
-    btn.disabled = false;
+    const jobText = form.querySelector('textarea[name="job_text"]');
+    if (jobText) {
+      jobText.value = '';
+    }
+    submitButtons.forEach((b) => { b.disabled = false; });
     loading.style.display = 'none';
     submitting = false;
     if (timer) {
@@ -337,26 +437,36 @@ def index():
     cover_pdf_url = None
     cover_preview_url = None
     cover_text = None
+    fit = None
+    job_text_value = ''
     error_msg = None
     if request.method == 'POST':
         try:
             job_text = request.form.get('job_text', '').strip()
+            job_text_value = job_text
+            action = request.form.get('action', 'analyze').strip().lower()
             label = 'Tailored'
             job_label = None
-            html_path, pdf_path = generate_resume(
-                resume_path=DEFAULT_RESUME,
-                template_path=DEFAULT_TEMPLATE,
-                job_text=job_text,
-                out_dir=OUTPUT_DIR,
-                label=label,
-                job_label=job_label,
-            )
-            html_path = str(html_path)
-            pdf_path = str(pdf_path)
-            html_url = url_for('download_output', filename=Path(html_path).name)
-            pdf_url = url_for('download_output', filename=Path(pdf_path).name)
-            preview_url = url_for('preview_output', filename=Path(html_path).name)
             if job_text:
+                resume_text = Path(DEFAULT_RESUME).read_text(encoding='utf-8', errors='replace')
+                fit = assess_job_fit(job_text=job_text, resume_text=resume_text)
+            else:
+                raise ValueError('Please paste a job description first.')
+
+            if action == 'generate':
+                html_path, pdf_path = generate_resume(
+                    resume_path=DEFAULT_RESUME,
+                    template_path=DEFAULT_TEMPLATE,
+                    job_text=job_text,
+                    out_dir=OUTPUT_DIR,
+                    label=label,
+                    job_label=job_label,
+                )
+                html_path = str(html_path)
+                pdf_path = str(pdf_path)
+                html_url = url_for('download_output', filename=Path(html_path).name)
+                pdf_url = url_for('download_output', filename=Path(pdf_path).name)
+                preview_url = url_for('preview_output', filename=Path(html_path).name)
                 cover_path, cover_pdf_path, cover_text = generate_cover_letter(
                     resume_path=DEFAULT_RESUME,
                     job_text=job_text,
@@ -371,7 +481,7 @@ def index():
                 if cover_pdf_path:
                     cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
         except Exception as e:
-            error_msg = f"Something went wrong while generating the resume. {e}"
+            error_msg = f"Something went wrong. {e}"
 
     return render_template_string(
         PAGE,
@@ -384,6 +494,8 @@ def index():
         cover_pdf_url=cover_pdf_url,
         cover_preview_url=cover_preview_url,
         cover_text=cover_text,
+        fit=fit,
+        job_text_value=job_text_value,
         error_msg=error_msg,
     )
 
@@ -417,3 +529,5 @@ def preview_output(filename: str):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5055, debug=False)
+
+

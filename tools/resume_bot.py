@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import re
 from datetime import datetime
@@ -211,6 +212,195 @@ def relevance_score(text, keywords):
         return 0
     t = text.lower()
     return sum(1 for k in keywords if k.lower() in t)
+
+
+def _extract_response_text(response) -> str:
+    text = getattr(response, 'output_text', None)
+    if text:
+        return text.strip()
+    output = getattr(response, 'output', [])
+    if output:
+        parts = []
+        for item in output:
+            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
+            for c in content:
+                if getattr(c, 'type', None) == 'output_text':
+                    parts.append(c.text)
+                elif isinstance(c, dict) and c.get('type') == 'output_text':
+                    parts.append(c.get('text', ''))
+        return "\n".join([p for p in parts if p]).strip()
+    return ''
+
+
+def assess_job_fit_with_openai(job_text: str, resume_text: str) -> dict:
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+
+    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    prompt = (
+        "Assess whether the candidate should apply for this role based only on the resume.\n"
+        "Return strict JSON only with keys: recommendation, confidence, rationale, matched_requirements, missing_requirements.\n"
+        "Rules:\n"
+        "- recommendation: one of APPLY, MAYBE, NO\n"
+        "- confidence: integer 0-100\n"
+        "- rationale: one short sentence\n"
+        "- matched_requirements: array of concise requirement statements found in both job description and resume\n"
+        "- missing_requirements: array of concise requirement statements present in job description but not evidenced in resume\n"
+        "- keep each array item short and specific\n"
+        "- Do not invent resume facts.\n\n"
+        f"Job description:\n{job_text}\n\n"
+        f"Resume:\n{resume_text}\n"
+    )
+    client = OpenAI()
+    response = client.responses.create(model=model, input=prompt)
+    raw = _extract_response_text(response)
+    if not raw:
+        raise SystemExit('OpenAI response did not include text output.')
+
+    # Model sometimes wraps JSON with prose; extract first JSON object.
+    match = re.search(r'\{[\s\S]*\}', raw)
+    payload = match.group(0) if match else raw
+    data = json.loads(payload)
+
+    rec = str(data.get('recommendation', 'MAYBE')).upper().strip()
+    if rec not in ('APPLY', 'MAYBE', 'NO'):
+        rec = 'MAYBE'
+    try:
+        confidence = int(data.get('confidence', 50))
+    except Exception:
+        confidence = 50
+    confidence = max(0, min(100, confidence))
+    rationale = str(data.get('rationale', '')).strip()
+    matched = data.get('matched_requirements', [])
+    if not isinstance(matched, list):
+        matched = []
+    matched = [str(m).strip() for m in matched if str(m).strip()][:15]
+    missing = data.get('missing_requirements', [])
+    if not isinstance(missing, list):
+        missing = []
+    missing = [str(m).strip() for m in missing if str(m).strip()][:15]
+    return {
+        'recommendation': rec,
+        'confidence': confidence,
+        'rationale': rationale,
+        'matched_requirements': matched,
+        'missing_requirements': missing,
+        'gaps': missing[:3],
+    }
+
+
+def assess_job_fit(job_text: str, resume_text: str) -> dict:
+    if not job_text.strip():
+        return {
+            'recommendation': 'MAYBE',
+            'confidence': 0,
+            'rationale': 'Paste a job description to get an apply recommendation.',
+            'matched_requirements': [],
+            'missing_requirements': [],
+            'gaps': [],
+        }
+
+    if os.environ.get('OPENAI_API_KEY'):
+        try:
+            return assess_job_fit_with_openai(job_text=job_text, resume_text=resume_text)
+        except Exception:
+            pass
+
+    # Heuristic fallback when OpenAI is unavailable or fails.
+    resume_norm = normalize_text(resume_text).lower()
+    words = [
+        w for w in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', normalize_text(job_text).lower())
+        if len(w) >= 3 and w not in STOPWORDS
+    ]
+    if not words:
+        return {
+            'recommendation': 'MAYBE',
+            'confidence': 40,
+            'rationale': 'Not enough detail in the job description to score fit accurately.',
+            'matched_requirements': [],
+            'missing_requirements': [],
+            'gaps': [],
+        }
+    top_words = []
+    freq = {}
+    for w in words:
+        freq[w] = freq.get(w, 0) + 1
+    for w, _ in sorted(freq.items(), key=lambda kv: kv[1], reverse=True)[:18]:
+        top_words.append(w)
+    matched = [w for w in top_words if w in resume_norm]
+    ratio = len(matched) / max(1, len(top_words))
+    confidence = int(ratio * 100)
+    if confidence >= 65:
+        rec = 'APPLY'
+    elif confidence >= 40:
+        rec = 'MAYBE'
+    else:
+        rec = 'NO'
+    missing = [w for w in top_words if w not in resume_norm]
+    matched_requirements = [w for w in top_words if w in resume_norm]
+    return {
+        'recommendation': rec,
+        'confidence': confidence,
+        'rationale': f'Match score based on keyword overlap: {confidence}%.',
+        'matched_requirements': matched_requirements,
+        'missing_requirements': missing,
+        'gaps': missing[:3],
+    }
+
+
+def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
+    if not skills:
+        return skills
+    if not job_text:
+        return skills[:max_skills]
+
+    job_norm = normalize_text(job_text).lower()
+    job_words = set(
+        w for w in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', job_norm)
+        if len(w) >= 3 and w not in STOPWORDS
+    )
+
+    scored = []
+    for idx, skill in enumerate(skills):
+        s_norm = normalize_text(skill).lower()
+        score = 0
+        if s_norm and s_norm in job_norm:
+            score += 5
+        for token in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', s_norm):
+            if token in job_words:
+                score += 1
+        scored.append((score, idx, skill))
+
+    matches = [t for t in scored if t[0] > 0]
+    selected = []
+    selected_keys = set()
+
+    if matches:
+        matches.sort(key=lambda t: (-t[0], t[1]))
+        for _, _, skill in matches:
+            key = skill.lower()
+            if key not in selected_keys:
+                selected.append(skill)
+                selected_keys.add(key)
+            if len(selected) >= max_skills:
+                break
+
+    # Pad with existing resume skills to avoid an overly sparse section.
+    for skill in skills:
+        key = skill.lower()
+        if key in selected_keys:
+            continue
+        if len(selected) >= max_skills:
+            break
+        selected.append(skill)
+        selected_keys.add(key)
+        if len(selected) >= min_skills and matches:
+            # If we already have matches, stop after reaching a healthy count.
+            break
+
+    return selected[:max_skills]
 
 
 def render_html(name, headline, contact, summary, education, skills, projects, experience, volunteer, certificates, interests, keywords, style_css, header_html=None):
@@ -459,6 +649,8 @@ def build_sections_from_tailored_text(
             continue
 
         line = clean_md(line)
+        if re.fullmatch(r'#+', line):
+            continue
 
         if line.startswith('# '):
             continue
@@ -650,6 +842,8 @@ def _format_tailored_text_to_html(
             continue
 
         line = clean_md(line)
+        if re.fullmatch(r'#+', line):
+            continue
 
         if line.startswith('# '):
             # Top-level title, ignore if it's the name/header.
@@ -1071,7 +1265,6 @@ def trim_sections_once(sections) -> bool:
     # Returns True if something was removed.
     priority = [
         'additional information',
-        'certifications',
         'projects',
         'professional experience',
         'education',
@@ -1080,6 +1273,12 @@ def trim_sections_once(sections) -> bool:
         'technical skills',
         'professional summary',
     ]
+    bullet_required_sections = {
+        'projects',
+        'professional experience',
+        'work experience/projects',
+        'volunteer experience',
+    }
 
     def find_section(title):
         for s in sections:
@@ -1096,6 +1295,12 @@ def trim_sections_once(sections) -> bool:
             for e in reversed(section['entries']):
                 if e.get('bullets'):
                     e['bullets'].pop()
+                    # In experience/project style sections, hide entries with no detail bullets.
+                    if (
+                        section['title'].lower() in bullet_required_sections
+                        and not e.get('bullets')
+                    ):
+                        section['entries'].remove(e)
                     return True
         # Trim section bullets
         if section['bullets']:
@@ -1286,6 +1491,14 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             name=name,
             allowed_sections=template_sections,
         )
+        for section in sections:
+            if 'skill' in section['title'].lower() and section['skills']:
+                section['skills'] = filter_skills_for_job(
+                    section['skills'],
+                    job_text=job_text or '',
+                    max_skills=16,
+                    min_skills=10,
+                )
         ai_sections = sections
         ai_allowed_sections = allowed_sections
         ai_header_html = header_html
@@ -1325,6 +1538,12 @@ ul {{ margin: 6px 0 12px 18px; }}
         education = parse_education(sections.get('Education', []))
 
         skills = parse_skills(sections.get('Skills', []))
+        skills = filter_skills_for_job(
+            skills,
+            job_text=job_text or '',
+            max_skills=16,
+            min_skills=10,
+        )
 
         work_entries = parse_experience(sections.get('Work experience/Projects', []))
         volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
