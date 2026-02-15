@@ -33,6 +33,22 @@ Courses
 
 
 
+Relevant Coursework
+------------------------
+- CSCI203 Algorithms and Data Structures - algorithm design, complexity analysis, and core data structures.
+- CSCI235 Database Systems - relational database modelling, SQL, and schema design principles.
+- CSCI251 Advanced Programming - advanced programming concepts and robust software construction techniques.
+- CSIT314 Software Development Methodologies - Agile delivery, software lifecycle methods, and team-based development.
+- CSCI318 Software Engineering Practices and Principles - software quality, testing, and maintainable engineering practices.
+- CSCI334 Software Design - design principles, modular architecture, and system-level software design.
+- CSIT214 IT Project Management - project planning, delivery coordination, and risk management in IT projects.
+- CSIT226 Human Computer Interaction - user-centred design, usability principles, and interface evaluation.
+- CSIT127 Networks and Communications - networking fundamentals, communication protocols, and system connectivity.
+- CSIT115 Data Management and Security - data handling fundamentals and core security concepts.
+- CSCI369 Ethical Hacking - vulnerability assessment concepts and ethical security testing techniques.
+- CSIT377 Artificial Intelligence for Cybersecurity - applying AI and ML techniques to threat and anomaly detection.
+
+
 Work experience/Projects
 ------------------------
 Job Application Assistant
@@ -41,6 +57,13 @@ Job Application Assistant
 - Implemented OpenAI-powered content tailoring with strict no-fabrication rules.
 - Added private access via VPN-only deployment (Tailscale) on a cloud VM.
 - Added UI preview, download actions, and loading feedback.
+
+Production Support Incident Console
+- Private repo available on request
+- Built a web-based incident management console to simulate production support workflows end-to-end.
+- Implemented incident lifecycle tracking with severity, status transitions, ownership, and event timelines.
+- Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
+- Implemented runbook and root-cause analysis capture to improve incident resolution consistency.
 
 SEO-Optimised Blog Posts for eCommerce
 06/2023 - 08/2023
