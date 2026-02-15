@@ -33,22 +33,6 @@ Courses
 
 
 
-Relevant Coursework
-------------------------
-- CSCI203 Algorithms and Data Structures - algorithm design, complexity analysis, and core data structures.
-- CSCI235 Database Systems - relational database modelling, SQL, and schema design principles.
-- CSCI251 Advanced Programming - advanced programming concepts and robust software construction techniques.
-- CSIT314 Software Development Methodologies - Agile delivery, software lifecycle methods, and team-based development.
-- CSCI318 Software Engineering Practices and Principles - software quality, testing, and maintainable engineering practices.
-- CSCI334 Software Design - design principles, modular architecture, and system-level software design.
-- CSIT214 IT Project Management - project planning, delivery coordination, and risk management in IT projects.
-- CSIT226 Human Computer Interaction - user-centred design, usability principles, and interface evaluation.
-- CSIT127 Networks and Communications - networking fundamentals, communication protocols, and system connectivity.
-- CSIT115 Data Management and Security - data handling fundamentals and core security concepts.
-- CSCI369 Ethical Hacking - vulnerability assessment concepts and ethical security testing techniques.
-- CSIT377 Artificial Intelligence for Cybersecurity - applying AI and ML techniques to threat and anomaly detection.
-
-
 Work experience/Projects
 ------------------------
 Job Application Assistant
@@ -64,6 +48,12 @@ Production Support Incident Console
 - Implemented incident lifecycle tracking with severity, status transitions, ownership, and event timelines.
 - Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
 - Implemented runbook and root-cause analysis capture to improve incident resolution consistency.
+
+Cancer Awareness Mobile App (321_Project_CancerAwareness1)
+- University coursework project.
+- Built a cross-platform mobile app using React Native and TypeScript.
+- Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.
+- Added geolocation and media upload capabilities with structured in-app navigation.
 
 SEO-Optimised Blog Posts for eCommerce
 06/2023 - 08/2023
@@ -143,6 +133,7 @@ Skills
 -HTML
 -CSS
 -JavaScript
+-TypeScript
 -PHP
 -Java
 -C++
@@ -156,7 +147,19 @@ Skills
 -UI/UX Design
 -AI
 -React
--React native
+-React Native
+-Next.js
+-Vite
+-Tailwind CSS
+-Framer Motion
+-React Router
+-Firebase
+-Cloud Firestore
+-REST API Integration
+-Axios
+-Jest
+-React Testing Library
+-ESLint
 -Front-End
 
 

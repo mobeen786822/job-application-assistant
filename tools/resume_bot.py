@@ -16,6 +16,12 @@ STOPWORDS = {
 
 DASH_LINE = re.compile(r'^-\s*-\s*-\s*[-\s]*$')
 DATE_LINE = re.compile(r'\b\d{2}/\d{4}\s*-\s*(Present|\d{2}/\d{4})\b', re.IGNORECASE)
+EXCLUDED_PROJECT_TITLES = {
+    'seo-optimised blog posts for ecommerce',
+    'ai image generator',
+    'ai essay writer',
+    'cartoon yourself',
+}
 
 
 def normalize_text(text: str) -> str:
@@ -212,6 +218,20 @@ def relevance_score(text, keywords):
         return 0
     t = text.lower()
     return sum(1 for k in keywords if k.lower() in t)
+
+
+def _is_excluded_project_title(title: str) -> bool:
+    return normalize_text(title).strip().lower() in EXCLUDED_PROJECT_TITLES
+
+
+def _filter_excluded_entries_in_sections(sections) -> None:
+    for section in sections:
+        if not section.get('entries'):
+            continue
+        section['entries'] = [
+            e for e in section['entries']
+            if not _is_excluded_project_title(e.get('title', ''))
+        ]
 
 
 def _extract_response_text(response) -> str:
@@ -1491,6 +1511,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             name=name,
             allowed_sections=template_sections,
         )
+        _filter_excluded_entries_in_sections(sections)
         for section in sections:
             if 'skill' in section['title'].lower() and section['skills']:
                 section['skills'] = filter_skills_for_job(
@@ -1546,6 +1567,7 @@ ul {{ margin: 6px 0 12px 18px; }}
         )
 
         work_entries = parse_experience(sections.get('Work experience/Projects', []))
+        work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
         volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
 
         # Split projects vs experience based on title keywords
