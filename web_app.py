@@ -1,5 +1,6 @@
 
 import os
+import subprocess
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
 from tools.resume_bot import generate_resume, generate_cover_letter, assess_job_fit
@@ -10,6 +11,25 @@ DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', str(APP_ROOT / 'assets' / '
 OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(APP_ROOT / 'outputs'))
 
 app = Flask(__name__)
+
+
+def get_app_version() -> str:
+    env_version = os.environ.get('APP_VERSION')
+    if env_version:
+        return env_version.strip()
+    try:
+        out = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=str(APP_ROOT),
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        version = out.strip()
+        if version:
+            return version
+    except Exception:
+        pass
+    return 'unknown'
 
 PAGE = """
 <!doctype html>
@@ -233,7 +253,7 @@ PAGE = """
     <div class="header">
       <div>
         <h1>Resume Tailor</h1>
-        <div class="hint">Paste a job description and generate a tailored HTML + PDF.</div>
+        <div class="hint">Paste a job description and generate a tailored HTML + PDF. Build: <code>{{ app_version }}</code></div>
       </div>
       <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
         <span class="theme-dot"></span>
@@ -497,6 +517,7 @@ def index():
         fit=fit,
         job_text_value=job_text_value,
         error_msg=error_msg,
+        app_version=get_app_version(),
     )
 
 

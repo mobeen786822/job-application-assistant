@@ -3,7 +3,8 @@ Mobeen Khan
 
 mobeenk89@gmail.com
 https://www.mobeenkhan.com
-https://github.com/DJGankstar
+https://github.com/mobeen786822
+https://www.linkedin.com/in/mobeen-khan-6b3340197/
 
 
 
@@ -55,33 +56,12 @@ Cancer Awareness Mobile App (321_Project_CancerAwareness1)
 - Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.
 - Added geolocation and media upload capabilities with structured in-app navigation.
 
-SEO-Optimised Blog Posts for eCommerce
-06/2023 - 08/2023
-- Developed a secure and responsive front-end interface, prioritising user experience and trust and safety. 
-- Integrated real-time user feedback mechanisms to enhance engagement and security compliance. 
-- Optimised JavaScript and React components for scalability, contributing to high-performing, user-friendly experiences. 
-
-
-AI Image Generator
-08/2023 - 09/2023
-- Designed and deployed a responsive, user-focused AI image generation tool, utilising JavaScript and CSS for seamless cross-device compatibility. 
-- Implemented robust error handling and real-time processing to improve trust in platform reliability and responsiveness. 
-- Created a scalable, modular codebase in JavaScript, facilitating future front-end improvements. 
-
-
-AI Essay Writer
-10/2023 - 11/2023
-- Engineered an interactive user interface with real-time feedback using React and JavaScript, enhancing user satisfaction and engagement. 
-- Enhanced the system's reliability through advanced error-handling mechanisms, increasing user trust. 
-- Aligned the tool's functionality with user needs, ensuring a smooth and intuitive experience. 
-
-
-Cartoon Yourself
-11/2023 - 12/2023
-- Developed a feature for converting photos into cartoons using multi-stage API integration. 
-- Created a drag-and-drop interface to streamline user interaction and enhance satisfaction. 
-- Ensured secure handling of user data through advanced data management practices. 
-- Structured the codebase for scalability and seamless future updates, adhering to best practices. 
+Bunkerify (www.bunkerify.com)
+- Built Bunkerify, a free cyber health check platform based on the ACSC Essential Eight maturity model.
+- Designed and implemented a 19-question assessment with automated scoring and category-level risk breakdowns.
+- Delivered HTML email reports with clear CTAs, improving lead follow-up and conversion.
+- Integrated lead capture and booking workflow (Calendly) to turn assessments into consultations.
+- Deployed a live marketing funnel (landing page and LinkedIn launch assets) to drive inbound leads.
 
 
 Independent Contractor – Delivery Driver
@@ -111,7 +91,6 @@ Tasks/Achievements
 - Implemented responsive and user-centric UI components to enhance usability and visual appeal. 
 - Developed and integrated back-end features to support dynamic content, user interactions, and API workflows. 
 -  Ensured cross-browser compatibility and performance optimisation across pages.     Collaborated with stakeholders to refine requirements and translate them into functional code.  
-x-t-c2-color: Abdul - 0498 273 226
 
 
 Web Developer (Hentley.co)
@@ -122,7 +101,6 @@ Tasks/Achievements
 - Supported server-side functionality to enable product displays, transactional workflows, and content updates. 
 - Enhanced site structure and styling to improve mobile usability and visual consistency across devices. 
 - Assisted with maintaining and extending existing code to support business requirements and scalability. 
-x-t-c2-color: Rizwan - 0404 961 855
 
 
 
@@ -172,23 +150,6 @@ AWS Academy Graduate - AWS Academy Cloud Foundations award
 
 
 
-References
-------------------------
-Sean - Supervisor
-x-t-c2-color: 0487 687 687
-
-
-Abdul - Supervisor (Catch a Drive)
-x-t-c2-color: abdulkhan.email@gmail.com - 0498 273 226
-
-
-Rizwan - Supervisor (Hentley)
-x-t-c2-color: 0404 961 855
-
-
-
-
-
 Interests
 ------------------------
 -Front-end Development and Web Technologies
@@ -197,3 +158,4 @@ Interests
 -AI Machine Learning and Applications in UX
 -Functional Programming in Web Development
 -Modern JavaScript Frameworks
+
