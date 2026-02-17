@@ -477,8 +477,8 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
     skills_html = ''.join([f'<span class="skill-tag">{s}</span>' for s in skills])
 
     proj_html = render_entries(projects)
-    exp_html = render_entries(experience)
-    vol_html = render_entries(volunteer)
+    combined_experience = (experience or []) + (volunteer or [])
+    exp_html = render_entries(combined_experience)
 
     cert_html = ''
     if certificates:
@@ -493,15 +493,6 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
     interests_html = ''
     if interests:
         interests_html = '<div class="section"><div class="section-title">Interests</div><p class="summary">' + ' - '.join(interests) + '</p></div>'
-
-    volunteer_section = ''
-    if vol_html:
-        volunteer_section = f"""
-<div class=\"section\">
-  <div class=\"section-title\">Volunteer Experience</div>
-  {vol_html}
-</div>
-"""
 
     header_block = header_html if header_html else f"""
 <div class="header">
@@ -533,13 +524,13 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 </div>
 
 <div class=\"section\">
-  <div class=\"section-title\">Education</div>
-  {edu_html}
+  <div class=\"section-title\">Key Skills</div>
+  <div class=\"skills-grid\">{skills_html}</div>
 </div>
 
 <div class=\"section\">
-  <div class=\"section-title\">Technical Skills</div>
-  <div class=\"skills-grid\">{skills_html}</div>
+  <div class=\"section-title\">Professional Experience</div>
+  {exp_html}
 </div>
 
 <div class=\"section\">
@@ -548,11 +539,10 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 </div>
 
 <div class=\"section\">
-  <div class=\"section-title\">Experience</div>
-  {exp_html}
+  <div class=\"section-title\">Education</div>
+  {edu_html}
 </div>
 
-{volunteer_section}
 {cert_html}
 {interests_html}
 
@@ -759,6 +749,8 @@ def render_sections_to_html(sections, allowed_sections):
             'projects',
             'education',
             'certifications',
+            'certificates',
+            'interests',
             'additional information',
         ]
 
@@ -954,6 +946,8 @@ def _format_tailored_text_to_html(
             'projects',
             'education',
             'certifications',
+            'certificates',
+            'interests',
             'additional information',
         ]
 

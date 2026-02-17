@@ -13,7 +13,7 @@ Software Engineer
 
 
 ------------------------
-I am a software engineer with a strong foundation in web technologies, networking, and object-oriented programming
+Graduate Software Engineer with a Bachelor of Computer Science majoring in Software Engineering and Cybersecurity and hands-on experience building web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST API integrations. Delivered maintainable, user-focused products including an AI-assisted resume web app and an incident management console, with exposure to cloud deployment, authentication, and application testing (Jest/React Testing Library). Known for disciplined, self-driven delivery, clear communication, and strong collaboration across stakeholders.
 
 
 Education

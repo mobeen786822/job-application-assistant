@@ -267,15 +267,12 @@ PAGE = """
           <label>Job description</label>
           <textarea name="job_text" placeholder="Paste the full job description here...">{{ job_text_value }}</textarea>
           <div class="form-actions">
-            <button type="submit" name="action" value="analyze" id="analyze-btn">Analyze Gaps</button>
-            {% if fit %}
-            <button type="submit" name="action" value="generate" id="generate-btn">Proceed & Generate</button>
-            {% endif %}
+            <button type="submit" name="action" value="generate" id="generate-btn">Generate Resume</button>
             <button type="button" id="clear-btn" class="secondary-btn">Clear</button>
           </div>
           <div class="loading" id="loading">
             <div class="spinner"></div>
-            <div id="loading-text">Analyzing fit...</div>
+            <div id="loading-text">Parsing job description...</div>
           </div>
         </form>
         {% if error_msg %}
@@ -363,16 +360,11 @@ PAGE = """
   const loadingText = document.getElementById('loading-text');
   const themeToggle = document.getElementById('theme-toggle');
   const themeLabel = document.getElementById('theme-label');
-  const analyzeSteps = [
-    'Parsing job description...',
-    'Assessing fit...',
-    'Building gap breakdown...'
-  ];
-  const generateSteps = [
+  const steps = [
     'Parsing job description...',
     'Assessing fit...',
     'Tailoring resume...',
-    'Rendering HTML...'
+    'Rendering resume and cover letter...'
   ];
   let stepIdx = 0;
   let timer = null;
@@ -388,11 +380,9 @@ PAGE = """
     if (result) {
       result.remove();
     }
-    const action = (e.submitter && e.submitter.value) ? e.submitter.value : 'analyze';
     // Keep the clicked submit button enabled so its name/value is posted.
     submitButtons.forEach((b) => { b.disabled = (b !== e.submitter); });
     loading.style.display = 'flex';
-    const steps = action === 'generate' ? generateSteps : analyzeSteps;
     loadingText.textContent = steps[0];
     timer = setInterval(() => {
       stepIdx = (stepIdx + 1) % steps.length;
@@ -464,7 +454,6 @@ def index():
         try:
             job_text = request.form.get('job_text', '').strip()
             job_text_value = job_text
-            action = request.form.get('action', 'analyze').strip().lower()
             label = 'Tailored'
             job_label = None
             if job_text:
@@ -473,33 +462,32 @@ def index():
             else:
                 raise ValueError('Please paste a job description first.')
 
-            if action == 'generate':
-                html_path, pdf_path = generate_resume(
-                    resume_path=DEFAULT_RESUME,
-                    template_path=DEFAULT_TEMPLATE,
-                    job_text=job_text,
-                    out_dir=OUTPUT_DIR,
-                    label=label,
-                    job_label=job_label,
-                )
-                html_path = str(html_path)
-                pdf_path = str(pdf_path)
-                html_url = url_for('download_output', filename=Path(html_path).name)
-                pdf_url = url_for('download_output', filename=Path(pdf_path).name)
-                preview_url = url_for('preview_output', filename=Path(html_path).name)
-                cover_path, cover_pdf_path, cover_text = generate_cover_letter(
-                    resume_path=DEFAULT_RESUME,
-                    job_text=job_text,
-                    out_dir=OUTPUT_DIR,
-                    label=label,
-                    template_path=DEFAULT_TEMPLATE,
-                )
-                cover_name = Path(cover_path).name
-                cover_url = url_for('download_output', filename=cover_name)
-                if cover_name.lower().endswith('.html'):
-                    cover_preview_url = url_for('preview_output', filename=cover_name)
-                if cover_pdf_path:
-                    cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
+            html_path, pdf_path = generate_resume(
+                resume_path=DEFAULT_RESUME,
+                template_path=DEFAULT_TEMPLATE,
+                job_text=job_text,
+                out_dir=OUTPUT_DIR,
+                label=label,
+                job_label=job_label,
+            )
+            html_path = str(html_path)
+            pdf_path = str(pdf_path)
+            html_url = url_for('download_output', filename=Path(html_path).name)
+            pdf_url = url_for('download_output', filename=Path(pdf_path).name)
+            preview_url = url_for('preview_output', filename=Path(html_path).name)
+            cover_path, cover_pdf_path, cover_text = generate_cover_letter(
+                resume_path=DEFAULT_RESUME,
+                job_text=job_text,
+                out_dir=OUTPUT_DIR,
+                label=label,
+                template_path=DEFAULT_TEMPLATE,
+            )
+            cover_name = Path(cover_path).name
+            cover_url = url_for('download_output', filename=cover_name)
+            if cover_name.lower().endswith('.html'):
+                cover_preview_url = url_for('preview_output', filename=cover_name)
+            if cover_pdf_path:
+                cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
         except Exception as e:
             error_msg = f"Something went wrong. {e}"
 
