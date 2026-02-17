@@ -137,21 +137,57 @@ def parse_education(block_lines):
 
 def parse_experience(block_lines):
     entries = []
+    subtitle_bullet_markers = {
+        'private repo available on request',
+        'private repository available on request',
+        'university coursework',
+        'university coursework project',
+        'university coursework project.',
+    }
     for lines in split_entries(block_lines):
         if not lines:
             continue
         title = lines[0]
+        subtitle = ''
+        # Convert trailing parenthetical text into subtitle, e.g.:
+        # "Bunkerify (www.bunkerify.com)" -> title "Bunkerify", subtitle "www.bunkerify.com"
+        m = re.match(r'^(.*?)\s*\(([^()]+)\)\s*$', title)
+        if m:
+            title = m.group(1).strip()
+            subtitle = m.group(2).strip()
+
         date = ''
         idx = 1
         if len(lines) > 1 and DATE_LINE.search(lines[1]):
             date = lines[1]
             idx = 2
+        elif len(lines) > 2 and not lines[1].startswith('-') and DATE_LINE.search(lines[2]):
+            subtitle = subtitle or lines[1].strip()
+            date = lines[2]
+            idx = 3
         bullets = []
         for line in lines[idx:]:
+            line_s = line.strip()
+            if not line_s:
+                continue
+            if line_s.lower() in ('tasks/achievements', 'courses'):
+                continue
             if line.startswith('-'):
-                bullets.append(line.lstrip('-').strip())
+                b = line.lstrip('-').strip()
+                if b.lower() in subtitle_bullet_markers:
+                    marker = b.rstrip('.')
+                    if subtitle:
+                        if marker.lower() not in subtitle.lower():
+                            subtitle = f'{subtitle} - {marker}'
+                    else:
+                        subtitle = marker
+                    continue
+                bullets.append(b)
+            elif not subtitle and not DATE_LINE.search(line_s):
+                subtitle = line_s
         entries.append({
             'title': title,
+            'subtitle': subtitle,
             'date': date,
             'bullets': bullets,
             'raw': ' '.join(lines),
@@ -464,6 +500,8 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
             html.append('</div>')
             if with_subtitle and e.get('school'):
                 html.append(f'<div class="entry-subtitle">{e["school"]}</div>')
+            elif e.get('subtitle'):
+                html.append(f'<div class="entry-subtitle">{e["subtitle"]}</div>')
             if e.get('bullets'):
                 html.append('<ul>')
                 for b in e['bullets']:
@@ -1300,6 +1338,9 @@ def trim_sections_once(sections) -> bool:
                 return s
         return None
 
+    def is_protected_entry(entry) -> bool:
+        return 'bunkerify' in normalize_text(entry.get('title', '')).lower()
+
     for title in priority:
         section = find_section(title)
         if not section:
@@ -1307,6 +1348,8 @@ def trim_sections_once(sections) -> bool:
         # Trim entries' bullets
         if section['entries']:
             for e in reversed(section['entries']):
+                if is_protected_entry(e):
+                    continue
                 if e.get('bullets'):
                     e['bullets'].pop()
                     # In experience/project style sections, hide entries with no detail bullets.
