@@ -86,3 +86,20 @@ Generated in `outputs/` with timestamped names:
 
 - Without `OPENAI_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
 - PDF export depends on Playwright Chromium being installed.
+
+## Auto Deploy (GitHub -> VM)
+
+This repo includes `.github/workflows/deploy-vm.yml` to auto-deploy on every push to `main`.
+
+Required GitHub repository secrets:
+
+- `VM_HOST` - VM public IP or DNS (for example `3.107.22.189`)
+- `VM_USER` - SSH user (for example `ubuntu`)
+- `VM_SSH_KEY` - private SSH key content (PEM) used to access the VM
+- `VM_PORT` - optional SSH port (defaults to `22` if omitted)
+
+Deployment behavior:
+
+- Connects to VM over SSH
+- Runs `git fetch`, `git checkout main`, `git reset --hard origin/main`
+- Restarts `resume-tailor` service

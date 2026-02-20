@@ -1,0 +1,36 @@
+name: Deploy to Lightsail VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vm
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /home/ubuntu/job-application-assistant
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+            sudo systemctl restart resume-tailor
+            sudo systemctl is-active resume-tailor
+            git rev-parse --short HEAD
