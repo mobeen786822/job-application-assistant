@@ -37,14 +37,14 @@ Courses
 Work experience/Projects
 ------------------------
 Job Application Assistant
-- Private repo available on request
+- Public repo: https://github.com/mobeen786822/job-application-assistant
 - Built a web app that tailors resumes from job descriptions and exports PDF/HTML.
 - Implemented OpenAI-powered content tailoring with strict no-fabrication rules.
 - Added private access via VPN-only deployment (Tailscale) on a cloud VM.
 - Added UI preview, download actions, and loading feedback.
 
 Production Support Incident Console
-- Private repo available on request
+- Public repo: https://github.com/mobeen786822/Production-Support-Incident-Console
 - Built a web-based incident management console to simulate production support workflows end-to-end.
 - Implemented incident lifecycle tracking with severity, status transitions, ownership, and event timelines.
 - Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
