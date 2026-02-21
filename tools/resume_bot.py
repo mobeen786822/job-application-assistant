@@ -1,4 +1,5 @@
 import argparse
+import html
 import json
 import os
 import re
@@ -22,6 +23,7 @@ EXCLUDED_PROJECT_TITLES = {
     'ai essay writer',
     'cartoon yourself',
 }
+URL_PATTERN = re.compile(r'((?:https?://|www\.)[^\s<>"\']+)', re.IGNORECASE)
 
 
 def normalize_text(text: str) -> str:
@@ -41,6 +43,34 @@ def normalize_text(text: str) -> str:
     # Strip stray control characters
     text = re.sub(r'[ \t]{2,}', ' ', text)
     return text
+
+
+def linkify_text(text: str) -> str:
+    if not text:
+        return ''
+    out = []
+    last = 0
+    for match in URL_PATTERN.finditer(text):
+        start, end = match.span()
+        out.append(html.escape(text[last:start]))
+        raw = match.group(1)
+        trailing = ''
+        while raw and raw[-1] in '.,);:!?':
+            trailing = raw[-1] + trailing
+            raw = raw[:-1]
+        if not raw:
+            out.append(html.escape(match.group(1)))
+            last = end
+            continue
+        href = raw if raw.lower().startswith(('http://', 'https://')) else f'https://{raw}'
+        out.append(
+            f'<a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{html.escape(raw)}</a>'
+        )
+        if trailing:
+            out.append(html.escape(trailing))
+        last = end
+    out.append(html.escape(text[last:]))
+    return ''.join(out)
 
 
 def split_sections(text: str):
@@ -499,13 +529,13 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
                 html.append(f'<span class="entry-date">{e["date"]}</span>')
             html.append('</div>')
             if with_subtitle and e.get('school'):
-                html.append(f'<div class="entry-subtitle">{e["school"]}</div>')
+                html.append(f'<div class="entry-subtitle">{linkify_text(e["school"])}</div>')
             elif e.get('subtitle'):
-                html.append(f'<div class="entry-subtitle">{e["subtitle"]}</div>')
+                html.append(f'<div class="entry-subtitle">{linkify_text(e["subtitle"])}</div>')
             if e.get('bullets'):
                 html.append('<ul>')
                 for b in e['bullets']:
-                    html.append(f'<li>{b}</li>')
+                    html.append(f'<li>{linkify_text(b)}</li>')
                 html.append('</ul>')
             html.append('</div>')
         return '\n'.join(html)
@@ -520,7 +550,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 
     cert_html = ''
     if certificates:
-        items = ''.join([f'<li>{c}</li>' for c in certificates])
+        items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates])
         cert_html = f"""
 <div class=\"section\">
   <div class=\"section-title\">Certificates</div>
@@ -530,7 +560,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 
     interests_html = ''
     if interests:
-        interests_html = '<div class="section"><div class="section-title">Interests</div><p class="summary">' + ' - '.join(interests) + '</p></div>'
+        interests_html = '<div class="section"><div class="section-title">Interests</div><p class="summary">' + linkify_text(' - '.join(interests)) + '</p></div>'
 
     header_block = header_html if header_html else f"""
 <div class="header">
@@ -558,7 +588,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 
 <div class=\"section\">
   <div class=\"section-title\">Professional Summary</div>
-  <p class=\"summary\">{summary_text}</p>
+  <p class=\"summary\">{linkify_text(summary_text)}</p>
 </div>
 
 <div class=\"section\">
@@ -811,7 +841,7 @@ def render_sections_to_html(sections, allowed_sections):
             html_parts.append('</div>')
 
         for p in section['paragraphs']:
-            html_parts.append(f'<p class="summary">{p}</p>')
+            html_parts.append(f'<p class="summary">{linkify_text(p)}</p>')
 
         for entry in section['entries']:
             html_parts.append('<div class="entry">')
@@ -821,18 +851,18 @@ def render_sections_to_html(sections, allowed_sections):
                 html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
             html_parts.append('</div>')
             if entry.get('subtitle'):
-                html_parts.append(f'<div class="entry-subtitle">{entry["subtitle"]}</div>')
+                html_parts.append(f'<div class="entry-subtitle">{linkify_text(entry["subtitle"])}</div>')
             if entry.get('bullets'):
                 html_parts.append('<ul>')
                 for b in entry['bullets']:
-                    html_parts.append(f'<li>{b}</li>')
+                    html_parts.append(f'<li>{linkify_text(b)}</li>')
                 html_parts.append('</ul>')
             html_parts.append('</div>')
 
         if section['bullets']:
             html_parts.append('<ul>')
             for b in section['bullets']:
-                html_parts.append(f'<li>{b}</li>')
+                html_parts.append(f'<li>{linkify_text(b)}</li>')
             html_parts.append('</ul>')
 
         html_parts.append('</div>')
@@ -1006,7 +1036,7 @@ def _format_tailored_text_to_html(
             html_parts.append('</div>')
 
         for p in section['paragraphs']:
-            html_parts.append(f'<p class="summary">{p}</p>')
+            html_parts.append(f'<p class="summary">{linkify_text(p)}</p>')
 
         for entry in section['entries']:
             html_parts.append('<div class="entry">')
@@ -1016,18 +1046,18 @@ def _format_tailored_text_to_html(
                 html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
             html_parts.append('</div>')
             if entry.get('subtitle'):
-                html_parts.append(f'<div class="entry-subtitle">{entry["subtitle"]}</div>')
+                html_parts.append(f'<div class="entry-subtitle">{linkify_text(entry["subtitle"])}</div>')
             if entry.get('bullets'):
                 html_parts.append('<ul>')
                 for b in entry['bullets']:
-                    html_parts.append(f'<li>{b}</li>')
+                    html_parts.append(f'<li>{linkify_text(b)}</li>')
                 html_parts.append('</ul>')
             html_parts.append('</div>')
 
         if section['bullets']:
             html_parts.append('<ul>')
             for b in section['bullets']:
-                html_parts.append(f'<li>{b}</li>')
+                html_parts.append(f'<li>{linkify_text(b)}</li>')
             html_parts.append('</ul>')
 
         html_parts.append('</div>')
