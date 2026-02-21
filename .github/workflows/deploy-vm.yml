@@ -14,15 +14,36 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      VM_HOST: ${{ secrets.VM_HOST || vars.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USER || vars.VM_USER }}
+      VM_PORT: ${{ secrets.VM_PORT || vars.VM_PORT || '22' }}
+      VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
 
     steps:
+      - name: Validate deploy config
+        run: |
+          if [ -z "${VM_HOST}" ]; then
+            echo "VM_HOST is missing (add as repo secret or variable)."
+            exit 1
+          fi
+          if [ -z "${VM_USER}" ]; then
+            echo "VM_USER is missing (add as repo secret or variable)."
+            exit 1
+          fi
+          if [ -z "${VM_SSH_KEY}" ]; then
+            echo "VM_SSH_KEY is missing (add as repo secret)."
+            exit 1
+          fi
+          echo "Deploy config looks present (host/user/key)."
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          port: ${{ secrets.VM_PORT || 22 }}
+          host: ${{ env.VM_HOST }}
+          username: ${{ env.VM_USER }}
+          key: ${{ env.VM_SSH_KEY }}
+          port: ${{ env.VM_PORT }}
           script_stop: true
           command_timeout: 20m
           script: |
