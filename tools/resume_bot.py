@@ -60,6 +60,14 @@ def normalize_text(text: str) -> str:
     return text
 
 
+def clean_skill_token(skill: str) -> str:
+    token = normalize_text(skill).strip()
+    token = re.sub(r'^[\(\[\{]+', '', token)
+    token = re.sub(r'[\)\]\}]+$', '', token)
+    token = token.strip(' -;:,.')
+    return token.strip()
+
+
 def linkify_text(text: str) -> str:
     if not text:
         return ''
@@ -287,7 +295,7 @@ def parse_skills(block_lines):
         if line.startswith('-'):
             line = line.lstrip('-').strip()
         for part in re.split(r'[\|,]', line):
-            part = part.strip()
+            part = clean_skill_token(part)
             if part:
                 skills.append(part)
     # De-dup preserve order
@@ -846,8 +854,9 @@ def build_sections_from_tailored_text(
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
                 for part in [p.strip() for p in item.split(',')]:
-                    if part:
-                        current['skills'].append(part)
+                    cleaned = clean_skill_token(part)
+                    if cleaned:
+                        current['skills'].append(cleaned)
             else:
                 if current_entry is not None:
                     current_entry['bullets'].append(item)
@@ -1187,8 +1196,9 @@ def _format_tailored_text_to_html(
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
                 for part in [p.strip() for p in item.split(',')]:
-                    if part:
-                        current['skills'].append(part)
+                    cleaned = clean_skill_token(part)
+                    if cleaned:
+                        current['skills'].append(cleaned)
             else:
                 if current_entry is not None:
                     current_entry['bullets'].append(item)
