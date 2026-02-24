@@ -1,80 +1,116 @@
 # Job Application Assistant
 
-Tailors resumes and cover letters to a job description, scores job fit, and exports recruiter-ready HTML/PDF documents from a web interface.
+Tailors a resume and cover letter to a pasted job description, then renders recruiter-ready HTML and PDF outputs.
 
-## Live Site
+## Features
 
-- http://3.107.22.189
+- Web UI (`Flask`) for pasting a job description and generating tailored documents
+- Job-fit assessment with recommendation (`APPLY`, `MAYBE`, `NO`) and gap breakdown
+- Resume generation from `assets/resume.txt` + `assets/template.html`
+- Cover letter generation with HTML preview (or text fallback)
+- CLI support for resume generation
+- Optional AI tailoring when `OPENAI_API_KEY` is set, with heuristic fallback when unavailable
 
-## What It Does
+## Project Structure
 
-- Accepts a pasted job description in a Flask web app
-- Evaluates fit with `APPLY` / `MAYBE` / `NO`, confidence, and requirement gaps
-- Generates a tailored resume from structured source data (`assets/resume.txt`) and template styles (`assets/template.html`)
-- Generates a tailored cover letter
-- Exports both resume and cover letter as HTML and PDF
-- Supports AI-driven tailoring with strict no-fabrication rules, with heuristic fallback when AI is unavailable
+- `web_app.py` - Flask web app (default port `5055`)
+- `tools/resume_bot.py` - core parsing, fit scoring, tailoring, and rendering logic
+- `assets/resume.txt` - source resume text
+- `assets/template.html` - base visual template/style
+- `outputs/` - generated files (created automatically)
 
-## Tech Stack
+## Requirements
 
-- Backend: Python, Flask
-- AI: OpenAI Responses API (`openai` SDK)
-- Document generation: HTML/CSS templates + Playwright (Chromium) for PDF rendering
-- PDF handling: PyPDF2 (page counting/constraints)
-- Deployment: GitHub Actions -> Linux VM service restart (`resume-tailor`)
-
-## Architecture
-
-- `web_app.py`: Flask routes, form handling, orchestration
-- `tools/resume_bot.py`: resume parsing, tailoring logic, fit scoring, HTML rendering, PDF generation
-- `assets/resume.txt`: canonical resume source content
-- `assets/template.html`: visual template for outputs
-- `outputs/`: generated artifacts
-
-## Local Setup
-
-Requirements:
 - Python 3.10+
 - `pip`
-- Playwright Chromium
+- Playwright Chromium (for PDF rendering)
 
-Install:
+Install dependencies:
 
 ```powershell
 python -m pip install flask openai playwright PyPDF2
 python -m playwright install chromium
 ```
 
-Run:
+## Run the Web App
 
 ```powershell
 python web_app.py
 ```
 
 Open:
-- http://localhost:5055
 
-## Configuration
+- `http://localhost:5055`
 
-- `RESUME_TXT` (default: `assets/resume.txt`)
-- `RESUME_TEMPLATE` (default: `assets/template.html`)
-- `RESUME_OUTPUT_DIR` (default: `outputs`)
-- `RESUME_MAX_PAGES` (default: `2`)
-- `OPENAI_API_KEY` (enables AI tailoring + AI fit assessment + AI cover letter)
-- `OPENAI_MODEL` (default: `gpt-5.2`)
-- `APP_VERSION` (optional UI build label)
+## Environment Variables
 
-## CLI Example
+- `RESUME_TXT` - path to source resume text  
+  Default: `assets/resume.txt`
+- `RESUME_TEMPLATE` - path to HTML template  
+  Default: `assets/template.html`
+- `RESUME_OUTPUT_DIR` - output directory  
+  Default: `outputs`
+- `RESUME_MAX_PAGES` - max pages for AI-tailored resume PDF  
+  Default: `2`
+- `OPENAI_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters
+- `OPENAI_MODEL` - model name used by OpenAI calls  
+  Default: `gpt-5.2`
+- `APP_VERSION` - optional build/version label shown in UI
+
+## CLI Usage
+
+Generate a tailored resume from files:
 
 ```powershell
 python tools/resume_bot.py --resume assets/resume.txt --template assets/template.html --job job.txt --out-dir outputs
 ```
 
-## Deployment
+Arguments:
 
-- CI/CD workflow: `.github/workflows/deploy-vm.yml`
-- Trigger: push to `main`
-- Action: SSH to VM, hard reset to `origin/main`, restart `resume-tailor`
+- `--resume` (required): path to resume `.txt`
+- `--template` (required): path to template `.html`
+- `--job` (optional): path to job description text file
+- `--out-dir` (optional): output folder
+- `--label` (optional): filename label
 
-Required secret:
-- `VM_SSH_KEY` (repository secret)
+## Output Files
+
+Generated in `outputs/` with timestamped names:
+
+- `Resume_<Label>_<Timestamp>.html`
+- `Resume_<Label>_<Timestamp>.pdf`
+- `CoverLetter_<Label>_<Timestamp>.html` (or `.txt` fallback)
+- `CoverLetter_<Label>_<Timestamp>.pdf` (when HTML render succeeds)
+
+## Notes
+
+- Without `OPENAI_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
+- PDF export depends on Playwright Chromium being installed.
+
+## Auto Deploy (GitHub -> VM)
+
+This repo includes `.github/workflows/deploy-vm.yml` to auto-deploy on every push to `main`.
+
+Required GitHub repository secret:
+
+- `VM_SSH_KEY` - private SSH key content (PEM) used to access the VM
+
+Notes:
+
+- Current workflow has host/user/port hardcoded for this VM:
+  - host: `3.107.22.189`
+  - user: `ubuntu`
+  - port: `22`
+- `VM_SSH_KEY` must be added under **Settings -> Secrets and variables -> Actions -> Repository secrets**.
+- If you put the key under Repository variables, deploy will fail.
+
+Deployment behavior:
+
+- Connects to VM over SSH
+- Runs `git fetch`, `git checkout main`, `git reset --hard origin/main`
+- Restarts `resume-tailor` service
+
+Verify workflow success:
+
+- GitHub `Actions` -> `Deploy to Lightsail VM` -> latest run is green
+- Open app and confirm `Build: <commit>` matches the latest pushed commit
