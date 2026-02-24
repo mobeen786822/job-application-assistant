@@ -25,6 +25,21 @@ EXCLUDED_PROJECT_TITLES = {
 }
 URL_PATTERN = re.compile(r'((?:https?://|www\.)[^\s<>"\']+)', re.IGNORECASE)
 
+TAILORED_SECTION_TITLES = [
+    'Professional Summary',
+    'Key Skills / Technical Skills',
+    'Professional Experience',
+    'Projects',
+    'Education',
+    'Certifications',
+    'Additional Information',
+]
+
+DEFAULT_TAILORED_TAGLINE = (
+    'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
+    'ACSC Essential Eight | Production Systems'
+)
+
 
 def normalize_text(text: str) -> str:
     # Fix common mojibake and replace non-ASCII punctuation with ASCII.
@@ -804,6 +819,186 @@ def build_sections_from_tailored_text(
     return sections, allowed_sections
 
 
+def _ensure_section(sections, title: str):
+    for section in sections:
+        if section.get('title', '').strip().lower() == title.lower():
+            return section
+    section = {
+        'title': title,
+        'entries': [],
+        'bullets': [],
+        'paragraphs': [],
+        'skills': [],
+    }
+    sections.append(section)
+    return section
+
+
+def _categorize_skills(skills: list[str]) -> list[str]:
+    categories = {
+        'Languages': [],
+        'Frameworks': [],
+        'Security': [],
+        'Cloud/DevOps': [],
+        'Testing': [],
+    }
+    skill_to_category = {
+        'html': 'Languages',
+        'css': 'Languages',
+        'javascript': 'Languages',
+        'typescript': 'Languages',
+        'php': 'Languages',
+        'java': 'Languages',
+        'c++': 'Languages',
+        'python': 'Languages',
+        'sql': 'Languages',
+        'pl/sql': 'Languages',
+        'nosql': 'Languages',
+        'react': 'Frameworks',
+        'react native': 'Frameworks',
+        'next.js': 'Frameworks',
+        'vite': 'Frameworks',
+        'tailwind css': 'Frameworks',
+        'framer motion': 'Frameworks',
+        'react router': 'Frameworks',
+        'firebase': 'Cloud/DevOps',
+        'cloud firestore': 'Cloud/DevOps',
+        'rest api integration': 'Frameworks',
+        'axios': 'Frameworks',
+        'cybersecurity': 'Security',
+        'networking': 'Security',
+        'aws': 'Cloud/DevOps',
+        'jest': 'Testing',
+        'react testing library': 'Testing',
+        'eslint': 'Testing',
+    }
+
+    for skill in skills:
+        category = skill_to_category.get(normalize_text(skill).strip().lower())
+        if category:
+            categories[category].append(skill)
+
+    out = []
+    for label in ('Languages', 'Frameworks', 'Security', 'Cloud/DevOps', 'Testing'):
+        values = []
+        seen = set()
+        for item in categories[label]:
+            key = item.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            values.append(item)
+        if values:
+            out.append(f'{label}: {", ".join(values)}')
+    return out
+
+
+def _is_driving_role(entry: dict) -> bool:
+    haystack = ' '.join([
+        normalize_text(str(entry.get('title', ''))).lower(),
+        normalize_text(str(entry.get('subtitle', ''))).lower(),
+        normalize_text(str(entry.get('date', ''))).lower(),
+        ' '.join(normalize_text(str(b)).lower() for b in entry.get('bullets', [])),
+    ])
+    return any(k in haystack for k in ('delivery driver', 'rideshare driver', 'driver'))
+
+
+def _prioritize_tailored_sections(sections):
+    title_map = {
+        'key skills': 'Key Skills / Technical Skills',
+        'technical skills': 'Key Skills / Technical Skills',
+        'skills': 'Key Skills / Technical Skills',
+        'certificates': 'Certifications',
+        'work experience': 'Professional Experience',
+        'experience': 'Professional Experience',
+    }
+    for section in sections:
+        key = normalize_text(section.get('title', '')).strip().lower()
+        if key in title_map:
+            section['title'] = title_map[key]
+
+    prof = _ensure_section(sections, 'Professional Experience')
+    additional = _ensure_section(sections, 'Additional Information')
+
+    kept_entries = []
+    moved_driving = []
+    for entry in prof.get('entries', []):
+        title_l = normalize_text(entry.get('title', '')).lower()
+        subtitle_l = normalize_text(entry.get('subtitle', '')).lower()
+        if _is_driving_role(entry):
+            moved_driving.append(entry)
+            continue
+        if ('catch a drive' in title_l or 'hentley' in title_l or
+                'catch a drive' in subtitle_l or 'hentley' in subtitle_l):
+            kept_entries.append(entry)
+    if kept_entries:
+        prof['entries'] = kept_entries
+
+    if moved_driving:
+        additional_note = 'Additional work experience during studies.'
+        if additional_note not in additional['paragraphs']:
+            additional['paragraphs'].append(additional_note)
+        for entry in moved_driving:
+            additional['entries'].append(entry)
+
+    projects = _ensure_section(sections, 'Projects')
+    if projects.get('entries'):
+        order = {
+            'bunkerify': 0,
+            'production support incident console': 1,
+            'job application assistant': 2,
+            'cancer awareness': 3,
+        }
+
+        def project_key(entry):
+            title_l = normalize_text(entry.get('title', '')).lower()
+            for k, rank in order.items():
+                if k in title_l:
+                    return (rank, title_l)
+            return (99, title_l)
+
+        projects['entries'] = sorted(projects['entries'], key=project_key)
+
+    education = _ensure_section(sections, 'Education')
+    if education.get('entries'):
+        def edu_key(entry):
+            title_l = normalize_text(entry.get('title', '')).lower()
+            if 'bachelor' in title_l:
+                return (0, title_l)
+            if 'master' in title_l:
+                return (1, title_l)
+            return (2, title_l)
+        education['entries'] = sorted(education['entries'], key=edu_key)
+
+    certs = _ensure_section(sections, 'Certifications')
+    cert_blob = ' '.join(certs.get('paragraphs', []) + certs.get('bullets', []))
+    for e in certs.get('entries', []):
+        cert_blob += ' ' + e.get('title', '') + ' ' + e.get('subtitle', '')
+    if 'aws academy cloud foundations' not in normalize_text(cert_blob).lower():
+        certs['bullets'].append('AWS Academy Graduate - AWS Academy Cloud Foundations award')
+
+    skills_section = _ensure_section(sections, 'Key Skills / Technical Skills')
+    has_grouped_bullets = any(':' in b for b in skills_section.get('bullets', []))
+    if skills_section.get('skills') and not has_grouped_bullets:
+        grouped = _categorize_skills(skills_section['skills'])
+        if grouped:
+            skills_section['bullets'] = grouped
+            skills_section['skills'] = []
+
+    # Keep only target section titles and return in exact order.
+    by_title = {}
+    for section in sections:
+        key = normalize_text(section.get('title', '')).strip().lower()
+        if key not in by_title and key in {t.lower() for t in TAILORED_SECTION_TITLES}:
+            by_title[key] = section
+    ordered = []
+    for title in TAILORED_SECTION_TITLES:
+        section = by_title.get(title.lower())
+        if section:
+            ordered.append(section)
+    return ordered
+
+
 def render_sections_to_html(sections, allowed_sections):
     html_parts = []
     preferred_order = allowed_sections[:]
@@ -829,8 +1024,6 @@ def render_sections_to_html(sections, allowed_sections):
         return (1, title)
 
     for section in sorted(sections, key=section_sort_key):
-        if section['title'].lower() == 'additional information':
-            continue
         html_parts.append('<div class="section">')
         html_parts.append(f'<div class="section-title">{section["title"]}</div>')
 
@@ -1464,14 +1657,23 @@ def tailor_resume_with_openai(
         "Improve bullet points to sound more achievement-based, but only using the same meaning and information already provided.\n\n"
         "Optimise the resume for ATS keyword matching using wording from the job description, but only when it truthfully matches my existing experience.\n\n"
         "Output requirements:\n\n"
-        "Return the updated resume in a clean professional format with these sections (only include sections that apply):\n\n"
-        "Professional Summary (tailored to the job)\n\n"
+        "Return the updated resume in a clean professional format using this exact order:\n\n"
+        "Professional Summary\n\n"
         "Key Skills / Technical Skills\n\n"
         "Professional Experience\n\n"
         "Projects\n\n"
         "Education\n\n"
         "Certifications\n\n"
-        "Additional Information (only if relevant)\n\n"
+        "Additional Information\n\n"
+        "Content requirements:\n\n"
+        "TAGLINE should be role-specific in this style: Cybersecurity-Focused Software Engineer | Full-Stack Development | ACSC Essential Eight | Production Systems.\n\n"
+        "Professional Summary must lead with Bunkerify as proof of production impact and mention current Master of Computer Science (Cybersecurity) studies at UOW.\n\n"
+        "Key Skills / Technical Skills must be grouped into these categories: Languages, Frameworks, Security, Cloud/DevOps, Testing.\n\n"
+        "Professional Experience must include only paid/volunteer tech roles: Catch a Drive and Hentley.\n\n"
+        "Projects must include Bunkerify first, then Production Support Incident Console, Job Application Assistant, and Cancer Awareness Mobile App.\n\n"
+        "Education should list Bachelor before Master. If Master courses are empty, remove the empty field.\n\n"
+        "Certifications should include AWS Academy Cloud Foundations.\n\n"
+        "Place driving roles only under Additional Information with a brief line: Additional work experience during studies.\n\n"
         "Additional formatting rules:\n\n"
         "Keep it concise, modern, and recruiter-friendly.\n\n"
         "Use bullet points.\n\n"
@@ -1558,6 +1760,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
 
     template_header_html = extract_template_header(template_text)
     template_sections = extract_template_sections(template_text)
+    tailored_sections = TAILORED_SECTION_TITLES[:]
 
     ai_sections = None
     ai_allowed_sections = None
@@ -1567,8 +1770,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         tagline, tailored_text = tailor_resume_with_openai(
             job_text=job_text,
             resume_text=resume_text,
-            allowed_sections=template_sections,
-            fallback_tagline=None,
+            allowed_sections=tailored_sections,
+            fallback_tagline=DEFAULT_TAILORED_TAGLINE,
         )
         header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
         if tagline:
@@ -1576,8 +1779,10 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         sections, allowed_sections = build_sections_from_tailored_text(
             tailored_text,
             name=name,
-            allowed_sections=template_sections,
+            allowed_sections=tailored_sections,
         )
+        sections = _prioritize_tailored_sections(sections)
+        allowed_sections = [s.lower() for s in tailored_sections]
         _filter_excluded_entries_in_sections(sections)
         for section in sections:
             if 'skill' in section['title'].lower() and section['skills']:
