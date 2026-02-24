@@ -1,0 +1,28 @@
+#!/bin/sh
+
+MSG_FILE="$1"
+SUBJECT="$(head -n 1 "$MSG_FILE" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+LOWER_SUBJECT="$(printf "%s" "$SUBJECT" | tr '[:upper:]' '[:lower:]')"
+
+# Reject empty or too-short summaries.
+if [ -z "$SUBJECT" ] || [ "${#SUBJECT}" -lt 12 ]; then
+  echo "Commit message subject is too short. Use a clear, specific summary."
+  exit 1
+fi
+
+# Reject vague one-word/low-information subjects.
+case "$LOWER_SUBJECT" in
+  "update"|"updates"|"fix"|"fixed"|"changes"|"misc"|"wip"|"stuff"|"test")
+    echo "Commit message is too vague: '$SUBJECT'"
+    echo "Use a professional, specific message (e.g., 'fix(deploy): validate required secrets')."
+    exit 1
+    ;;
+esac
+
+# Reject repetitive placeholders like 'fix fix fix' or 'update update'.
+if printf "%s" "$LOWER_SUBJECT" | grep -Eq '^(fix|update|change|misc)([[:space:]]+\1){1,}$'; then
+  echo "Commit message repeats a placeholder term: '$SUBJECT'"
+  exit 1
+fi
+
+exit 0
