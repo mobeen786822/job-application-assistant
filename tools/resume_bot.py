@@ -855,6 +855,65 @@ def _ensure_section(sections, title: str):
     return section
 
 
+def _categorize_skills(skills: list[str]) -> list[str]:
+    categories = {
+        'Languages': [],
+        'Frameworks': [],
+        'Security': [],
+        'Cloud/DevOps': [],
+        'Testing': [],
+    }
+    skill_to_category = {
+        'html': 'Languages',
+        'css': 'Languages',
+        'javascript': 'Languages',
+        'typescript': 'Languages',
+        'php': 'Languages',
+        'java': 'Languages',
+        'c++': 'Languages',
+        'python': 'Languages',
+        'sql': 'Languages',
+        'pl/sql': 'Languages',
+        'nosql': 'Languages',
+        'react': 'Frameworks',
+        'react native': 'Frameworks',
+        'next.js': 'Frameworks',
+        'vite': 'Frameworks',
+        'tailwind css': 'Frameworks',
+        'framer motion': 'Frameworks',
+        'react router': 'Frameworks',
+        'firebase': 'Cloud/DevOps',
+        'cloud firestore': 'Cloud/DevOps',
+        'rest api integration': 'Frameworks',
+        'axios': 'Frameworks',
+        'cybersecurity': 'Security',
+        'networking': 'Security',
+        'aws': 'Cloud/DevOps',
+        'jest': 'Testing',
+        'react testing library': 'Testing',
+        'eslint': 'Testing',
+    }
+
+    for skill in skills:
+        category = skill_to_category.get(normalize_text(skill).strip().lower())
+        if category:
+            categories[category].append(skill)
+
+    out = []
+    for label in ('Languages', 'Frameworks', 'Security', 'Cloud/DevOps', 'Testing'):
+        values = []
+        seen = set()
+        for item in categories[label]:
+            key = item.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            values.append(item)
+        if values:
+            out.append(f'{label}: {", ".join(values)}')
+    return out
+
+
 def _is_driving_role(entry: dict) -> bool:
     haystack = ' '.join([
         normalize_text(str(entry.get('title', ''))).lower(),
@@ -938,6 +997,14 @@ def _prioritize_tailored_sections(sections):
         cert_blob += ' ' + e.get('title', '') + ' ' + e.get('subtitle', '')
     if 'aws academy cloud foundations' not in normalize_text(cert_blob).lower():
         certs['bullets'].append('AWS Academy Graduate - AWS Academy Cloud Foundations award')
+
+    skills_section = _ensure_section(sections, 'Key Skills / Technical Skills')
+    has_grouped_bullets = any(':' in b for b in skills_section.get('bullets', []))
+    if skills_section.get('skills') and not has_grouped_bullets:
+        grouped = _categorize_skills(skills_section['skills'])
+        if grouped:
+            skills_section['bullets'] = grouped
+            skills_section['skills'] = []
 
     # Keep only target section titles and return in exact order.
     by_title = {}
@@ -1622,7 +1689,7 @@ def tailor_resume_with_openai(
         "Content requirements:\n\n"
         "TAGLINE should be role-specific in this style: Cybersecurity-Focused Software Engineer | Full-Stack Development | ACSC Essential Eight | Production Systems.\n\n"
         "Professional Summary must lead with Bunkerify as proof of production impact and mention current Master of Computer Science (Cybersecurity) studies at UOW.\n\n"
-        "Key Skills / Technical Skills should remain concise and ATS-friendly.\n\n"
+        "Key Skills / Technical Skills must be grouped into these categories: Languages, Frameworks, Security, Cloud/DevOps, Testing.\n\n"
         "Professional Experience must include only paid/volunteer tech roles: Catch a Drive and Hentley.\n\n"
         "Projects must include Bunkerify first, then Production Support Incident Console, Job Application Assistant, and Cancer Awareness Mobile App.\n\n"
         "Education should list Bachelor before Master. If Master courses are empty, remove the empty field.\n\n"
