@@ -924,7 +924,7 @@ def _is_driving_role(entry: dict) -> bool:
     return any(k in haystack for k in ('delivery driver', 'rideshare driver', 'driver'))
 
 
-def _prioritize_tailored_sections(sections):
+def _prioritize_tailored_sections(sections, fallback_driving_entries=None):
     title_map = {
         'key skills': 'Key Skills / Technical Skills',
         'technical skills': 'Key Skills / Technical Skills',
@@ -952,14 +952,30 @@ def _prioritize_tailored_sections(sections):
         if ('catch a drive' in title_l or 'hentley' in title_l or
                 'catch a drive' in subtitle_l or 'hentley' in subtitle_l):
             kept_entries.append(entry)
-    if kept_entries:
-        prof['entries'] = kept_entries
+    prof['entries'] = kept_entries
+
+    # If AI omitted driving roles entirely, recover them from source resume entries.
+    if not moved_driving and fallback_driving_entries:
+        moved_driving = [dict(e) for e in fallback_driving_entries if _is_driving_role(e)]
 
     if moved_driving:
         additional_note = 'Additional work experience during studies.'
         if additional_note not in additional['paragraphs']:
             additional['paragraphs'].append(additional_note)
+        seen = set()
+        for e in additional['entries']:
+            seen.add((
+                normalize_text(e.get('title', '')).lower(),
+                normalize_text(e.get('date', '')).lower(),
+            ))
         for entry in moved_driving:
+            key = (
+                normalize_text(entry.get('title', '')).lower(),
+                normalize_text(entry.get('date', '')).lower(),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
             additional['entries'].append(entry)
 
     projects = _ensure_section(sections, 'Projects')
@@ -1772,11 +1788,11 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     extra_pdf_css = "\n@media print { .page { padding-top: 6mm; } }\n"
     style_css = style_css + extra_pdf_css
 
-    header_lines, sections = split_sections(resume_text)
+    header_lines, source_sections = split_sections(resume_text)
     name, contact = parse_header(header_lines)
 
     headline = ''
-    if 'Software Engineer' in sections:
+    if 'Software Engineer' in source_sections:
         headline = 'Software Engineer'
 
     template_header_html = extract_template_header(template_text)
@@ -1802,7 +1818,12 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             name=name,
             allowed_sections=tailored_sections,
         )
-        sections = _prioritize_tailored_sections(sections)
+        source_work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
+        fallback_driving_entries = [e for e in source_work_entries if _is_driving_role(e)]
+        sections = _prioritize_tailored_sections(
+            sections,
+            fallback_driving_entries=fallback_driving_entries,
+        )
         allowed_sections = [s.lower() for s in tailored_sections]
         _filter_excluded_entries_in_sections(sections)
         for section in sections:
@@ -1846,6 +1867,7 @@ ul {{ margin: 6px 0 12px 18px; }}
         pdf_path = out_dir / f"{base}.pdf"
         html_path.write_text(html, encoding='utf-8')
     else:
+        sections = source_sections
         summary_lines = sections.get('Software Engineer', [])
         summary = ' '.join([l for l in summary_lines if l.strip()])
 
