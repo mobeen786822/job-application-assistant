@@ -108,16 +108,20 @@ def linkify_text_compact_links(text: str) -> str:
         href = raw if raw.lower().startswith(('http://', 'https://')) else f'https://{raw}'
         raw_l = raw.lower()
         if 'github.com/' in raw_l:
-            label = '🐙 Github Repo'
+            icon = '&#x1F419;'
+            label = 'Github Repo'
         elif 'github.com' in raw_l:
-            label = '🐙 Github'
+            icon = '&#x1F419;'
+            label = 'Github'
         elif 'linkedin.com' in raw_l:
-            label = '💼 LinkedIn'
+            icon = '&#x1F4BC;'
+            label = 'LinkedIn'
         else:
+            icon = ''
             label = raw
-        out.append(
-            f'<a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{html.escape(label)}</a>'
-        )
+        if icon:
+            out.append(f'{icon} ')
+        out.append(f'<a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{html.escape(label)}</a>')
         if trailing:
             out.append(html.escape(trailing))
         last = end
@@ -892,65 +896,6 @@ def _ensure_section(sections, title: str):
     return section
 
 
-def _categorize_skills(skills: list[str]) -> list[str]:
-    categories = {
-        'Languages': [],
-        'Frameworks': [],
-        'Security': [],
-        'Cloud/DevOps': [],
-        'Testing': [],
-    }
-    skill_to_category = {
-        'html': 'Languages',
-        'css': 'Languages',
-        'javascript': 'Languages',
-        'typescript': 'Languages',
-        'php': 'Languages',
-        'java': 'Languages',
-        'c++': 'Languages',
-        'python': 'Languages',
-        'sql': 'Languages',
-        'pl/sql': 'Languages',
-        'nosql': 'Languages',
-        'react': 'Frameworks',
-        'react native': 'Frameworks',
-        'next.js': 'Frameworks',
-        'vite': 'Frameworks',
-        'tailwind css': 'Frameworks',
-        'framer motion': 'Frameworks',
-        'react router': 'Frameworks',
-        'firebase': 'Cloud/DevOps',
-        'cloud firestore': 'Cloud/DevOps',
-        'rest api integration': 'Frameworks',
-        'axios': 'Frameworks',
-        'cybersecurity': 'Security',
-        'networking': 'Security',
-        'aws': 'Cloud/DevOps',
-        'jest': 'Testing',
-        'react testing library': 'Testing',
-        'eslint': 'Testing',
-    }
-
-    for skill in skills:
-        category = skill_to_category.get(normalize_text(skill).strip().lower())
-        if category:
-            categories[category].append(skill)
-
-    out = []
-    for label in ('Languages', 'Frameworks', 'Security', 'Cloud/DevOps', 'Testing'):
-        values = []
-        seen = set()
-        for item in categories[label]:
-            key = item.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            values.append(item)
-        if values:
-            out.append(f'{label}: {", ".join(values)}')
-    return out
-
-
 def _is_driving_role(entry: dict) -> bool:
     haystack = ' '.join([
         normalize_text(str(entry.get('title', ''))).lower(),
@@ -961,7 +906,21 @@ def _is_driving_role(entry: dict) -> bool:
     return any(k in haystack for k in ('delivery driver', 'rideshare driver', 'driver'))
 
 
-def _prioritize_tailored_sections(sections, fallback_driving_entries=None):
+def _project_rank(entry_title: str) -> int | None:
+    title_l = normalize_text(entry_title).lower()
+    order = {
+        'bunkerify': 0,
+        'production support incident console': 1,
+        'job application assistant': 2,
+        'cancer awareness': 3,
+    }
+    for key, rank in order.items():
+        if key in title_l:
+            return rank
+    return None
+
+
+def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallback_project_entries=None):
     title_map = {
         'key skills': 'Key Skills / Technical Skills',
         'technical skills': 'Key Skills / Technical Skills',
@@ -996,9 +955,6 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None):
         moved_driving = [dict(e) for e in fallback_driving_entries if _is_driving_role(e)]
 
     if moved_driving:
-        additional_note = 'Additional work experience during studies.'
-        if additional_note not in additional['paragraphs']:
-            additional['paragraphs'].append(additional_note)
         seen = set()
         for e in additional['entries']:
             seen.add((
@@ -1016,20 +972,25 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None):
             additional['entries'].append(entry)
 
     projects = _ensure_section(sections, 'Projects')
-    if projects.get('entries'):
-        order = {
-            'bunkerify': 0,
-            'production support incident console': 1,
-            'job application assistant': 2,
-            'cancer awareness': 3,
-        }
+    # If AI omitted expected projects, recover them from source resume entries.
+    if fallback_project_entries:
+        existing_project_keys = set()
+        for entry in projects.get('entries', []):
+            rank = _project_rank(entry.get('title', ''))
+            if rank is not None:
+                existing_project_keys.add(rank)
+        for entry in fallback_project_entries:
+            rank = _project_rank(entry.get('title', ''))
+            if rank is None or rank in existing_project_keys:
+                continue
+            projects['entries'].append(dict(entry))
+            existing_project_keys.add(rank)
 
+    if projects.get('entries'):
         def project_key(entry):
+            rank = _project_rank(entry.get('title', ''))
             title_l = normalize_text(entry.get('title', '')).lower()
-            for k, rank in order.items():
-                if k in title_l:
-                    return (rank, title_l)
-            return (99, title_l)
+            return (rank if rank is not None else 99, title_l)
 
         projects['entries'] = sorted(projects['entries'], key=project_key)
 
@@ -1050,14 +1011,6 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None):
         cert_blob += ' ' + e.get('title', '') + ' ' + e.get('subtitle', '')
     if 'aws academy cloud foundations' not in normalize_text(cert_blob).lower():
         certs['bullets'].append('AWS Academy Graduate - AWS Academy Cloud Foundations award')
-
-    skills_section = _ensure_section(sections, 'Key Skills / Technical Skills')
-    has_grouped_bullets = any(':' in b for b in skills_section.get('bullets', []))
-    if skills_section.get('skills') and not has_grouped_bullets:
-        grouped = _categorize_skills(skills_section['skills'])
-        if grouped:
-            skills_section['bullets'] = grouped
-            skills_section['skills'] = []
 
     # Keep only target section titles and return in exact order.
     by_title = {}
@@ -1742,12 +1695,12 @@ def tailor_resume_with_openai(
         "Content requirements:\n\n"
         "TAGLINE should be role-specific in this style: Cybersecurity-Focused Software Engineer | Full-Stack Development | ACSC Essential Eight | Production Systems.\n\n"
         "Professional Summary must lead with Bunkerify as proof of production impact and mention current Master of Computer Science (Cybersecurity) studies at UOW.\n\n"
-        "Key Skills / Technical Skills must be grouped into these categories: Languages, Frameworks, Security, Cloud/DevOps, Testing.\n\n"
+        "Key Skills / Technical Skills should be tailored to the job and include only relevant skills from my resume.\n\n"
         "Professional Experience must include only paid/volunteer tech roles: Catch a Drive and Hentley.\n\n"
         "Projects must include Bunkerify first, then Production Support Incident Console, Job Application Assistant, and Cancer Awareness Mobile App.\n\n"
         "Education should list Bachelor before Master. If Master courses are empty, remove the empty field.\n\n"
         "Certifications should include AWS Academy Cloud Foundations.\n\n"
-        "Place driving roles only under Additional Information with a brief line: Additional work experience during studies.\n\n"
+        "Place driving roles only under Additional Information.\n\n"
         "Additional formatting rules:\n\n"
         "Keep it concise, modern, and recruiter-friendly.\n\n"
         "Use bullet points.\n\n"
@@ -1857,9 +1810,11 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         )
         source_work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
         fallback_driving_entries = [e for e in source_work_entries if _is_driving_role(e)]
+        fallback_project_entries = [e for e in source_work_entries if _project_rank(e.get('title', '')) is not None]
         sections = _prioritize_tailored_sections(
             sections,
             fallback_driving_entries=fallback_driving_entries,
+            fallback_project_entries=fallback_project_entries,
         )
         allowed_sections = [s.lower() for s in tailored_sections]
         _filter_excluded_entries_in_sections(sections)
