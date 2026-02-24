@@ -504,16 +504,41 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
     return selected[:max_skills]
 
 
+def _format_contact_item(item: str) -> str:
+    raw = (item or '').strip()
+    if not raw:
+        return ''
+    low = raw.lower()
+
+    if low.startswith(('http://', 'https://', 'www.')):
+        href = raw if low.startswith(('http://', 'https://')) else f'https://{raw}'
+        label = 'Link'
+        if 'github.com' in low:
+            label = '🐙 Github'
+        elif 'linkedin.com' in low:
+            label = '💼 LinkedIn'
+        elif 'mobeenkhan.com' in low:
+            label = '🌐 Portfolio'
+        return f'<a href="{html.escape(href, quote=True)}">{label}</a>'
+
+    if '@' in raw and ' ' not in raw:
+        return f'📧 {html.escape(raw)}'
+
+    if re.search(r'^\+?[0-9][0-9\s\-]{6,}$', raw):
+        return f'📞 {html.escape(raw)}'
+
+    if 'sydney' in low:
+        return f'📍 {html.escape(raw)}'
+
+    return html.escape(raw)
+
+
 def render_html(name, headline, contact, summary, education, skills, projects, experience, volunteer, certificates, interests, keywords, style_css, header_html=None):
     contact_items = []
     for c in contact:
-        if c.startswith('http'):
-            label = c.replace('https://', '').replace('http://', '')
-            contact_items.append(f'<a href="{c}">{label}</a>')
-        elif '@' in c:
-            contact_items.append(c)
-        else:
-            contact_items.append(c)
+        formatted = _format_contact_item(c)
+        if formatted:
+            contact_items.append(formatted)
 
     tagline = headline
     if keywords:
@@ -532,7 +557,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
         parts = []
         for i, item in enumerate(items):
             parts.append(item)
-        return ' <span>-</span> '.join(parts)
+        return ' <span>|</span> '.join(parts)
 
     def render_entries(entries, with_subtitle=False):
         html = []
@@ -639,13 +664,9 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 def render_header_html(name: str, headline: str, contact):
     contact_items = []
     for c in contact:
-        if c.startswith('http'):
-            label = c.replace('https://', '').replace('http://', '')
-            contact_items.append(f'<a href="{c}">{label}</a>')
-        elif '@' in c:
-            contact_items.append(c)
-        else:
-            contact_items.append(c)
+        formatted = _format_contact_item(c)
+        if formatted:
+            contact_items.append(formatted)
 
     def join_contact(items):
         if not items:
@@ -653,7 +674,7 @@ def render_header_html(name: str, headline: str, contact):
         parts = []
         for item in items:
             parts.append(item)
-        return ' <span>·</span> '.join(parts)
+        return ' <span>|</span> '.join(parts)
 
     tagline = headline or ''
     return f"""
