@@ -44,7 +44,7 @@ Open:
 
 ## Screenshot
 
-![Resume Tailor web UI](assets/screenshots/resume-tailor-ui.png)
+![Resume Tailor web UI](assets/screenshots/resume-tailor-ui-20260225.png)
 
 ## Environment Variables
 
