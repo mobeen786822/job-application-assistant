@@ -60,6 +60,7 @@ Bunkerify (www.bunkerify.com)
 - Built Bunkerify, a free cyber health check platform based on the ACSC Essential Eight maturity model.
 - Designed and implemented a 19-question assessment with automated scoring and category-level risk breakdowns.
 - Delivered HTML email reports with clear CTAs, improving lead follow-up and conversion.
+- Integrated SendGrid transactional email delivery to send personalised HTML assessment reports to users automatically.
 - Integrated lead capture and booking workflow (Calendly) to turn assessments into consultations.
 - Deployed a live marketing funnel (landing page and LinkedIn launch assets) to drive inbound leads.
 
