@@ -388,7 +388,7 @@ def assess_job_fit_with_openai(job_text: str, resume_text: str) -> dict:
     except Exception as e:
         raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
 
-    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     prompt = (
         "Assess whether the candidate should apply for this role based only on the resume.\n"
         "Return strict JSON only with keys: recommendation, confidence, rationale, matched_requirements, missing_requirements.\n"
@@ -1323,7 +1323,7 @@ def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
     except Exception:
         return None
     client = OpenAI()
-    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     prompt = (
         "Create a very short, role-specific resume tagline based on the job description and the resume. "
         "Return a single line only, no quotes, no extra text. "
@@ -1394,7 +1394,7 @@ def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
 
-    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     client = OpenAI()
     response = client.responses.create(model=model, input=prompt)
 
@@ -1722,7 +1722,7 @@ def tailor_resume_with_openai(
         "Do not include notes, disclaimers, or meta commentary."
     )
 
-    model = os.environ.get('OPENAI_MODEL', 'gpt-5.2')
+    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     client = OpenAI()
     response = client.responses.create(
         model=model,
