@@ -15,6 +15,35 @@ STOPWORDS = {
     'should','could','would','role','position','team','work','working','experience','skills','ability','strong',
 }
 
+CYBER_TOOL_TERMS = [
+    'kali linux',
+    'nmap',
+    'metasploit',
+    'wireshark',
+    'burp suite',
+    'penetration testing',
+    'vulnerability assessment',
+    'incident response',
+    'threat intelligence',
+    'network segmentation',
+    'log analysis',
+    'firewall configuration',
+]
+
+CYBER_JOB_TERMS = [
+    'cyber',
+    'security',
+    'soc',
+    'siem',
+    'incident',
+    'threat',
+    'vulnerability',
+    'penetration',
+    'firewall',
+    'acsc',
+    'essential eight',
+]
+
 DASH_LINE = re.compile(r'^-\s*-\s*-\s*[-\s]*$')
 DATE_LINE = re.compile(r'\b\d{2}/\d{4}\s*-\s*(Present|\d{2}/\d{4})\b', re.IGNORECASE)
 EXCLUDED_PROJECT_TITLES = {
@@ -512,6 +541,12 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
         if len(w) >= 3 and w not in STOPWORDS
     )
 
+    cyber_focused_role = any(term in job_norm for term in CYBER_JOB_TERMS)
+
+    def is_cyber_tool_skill(skill_text: str) -> bool:
+        skill_norm = normalize_text(skill_text).lower()
+        return any(term in skill_norm for term in CYBER_TOOL_TERMS)
+
     scored = []
     for idx, skill in enumerate(skills):
         s_norm = normalize_text(skill).lower()
@@ -521,6 +556,8 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
         for token in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', s_norm):
             if token in job_words:
                 score += 1
+        if cyber_focused_role and is_cyber_tool_skill(skill):
+            score += 2
         scored.append((score, idx, skill))
 
     matches = [t for t in scored if t[0] > 0]
@@ -549,6 +586,18 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
         if len(selected) >= min_skills and matches:
             # If we already have matches, stop after reaching a healthy count.
             break
+
+    if cyber_focused_role:
+        prioritized_cyber = []
+        seen = set(s.lower() for s in selected)
+        for skill in skills:
+            if len(prioritized_cyber) >= 6:
+                break
+            if is_cyber_tool_skill(skill) and skill.lower() not in seen:
+                prioritized_cyber.append(skill)
+                seen.add(skill.lower())
+        if prioritized_cyber:
+            selected = prioritized_cyber + selected
 
     return selected[:max_skills]
 
