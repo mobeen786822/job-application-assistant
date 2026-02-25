@@ -153,6 +153,9 @@ def linkify_text_compact_links(text: str) -> str:
         elif 'linkedin.com' in raw_l:
             icon = '&#x1F4BC;'
             label = 'LinkedIn'
+        elif 'onrender.com' in raw_l:
+            icon = ''
+            label = 'Live demo'
         else:
             icon = ''
             label = raw

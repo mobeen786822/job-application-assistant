@@ -44,8 +44,7 @@ https://github.com/mobeen786822/job-application-assistant
 - Added UI preview, download actions, and loading feedback.
 
 Production Support Incident Console
-https://github.com/mobeen786822/Production-Support-Incident-Console
-https://incident-console-ui.onrender.com/
+https://github.com/mobeen786822/Production-Support-Incident-Console | https://incident-console-ui.onrender.com/
 - Built a web-based incident management console to simulate production support workflows end-to-end.
 - Implemented incident lifecycle tracking with severity, status transitions, ownership, and event timelines.
 - Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
