@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import time
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
 from tools.resume_bot import generate_resume, generate_cover_letter, assess_job_fit
@@ -30,6 +31,22 @@ def get_app_version() -> str:
     except Exception:
         pass
     return 'unknown'
+
+
+def cleanup_old_output_files(max_age_seconds: int = 24 * 60 * 60) -> None:
+    output_path = Path(OUTPUT_DIR)
+    if not output_path.exists():
+        return
+    cutoff = time.time() - max_age_seconds
+    for path in output_path.iterdir():
+        if not path.is_file():
+            continue
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except Exception:
+            logging.exception("Failed to delete old output file: %s", path)
+
 
 PAGE = """
 <!doctype html>
@@ -452,6 +469,7 @@ def index():
     error_msg = None
     if request.method == 'POST':
         try:
+            cleanup_old_output_files()
             job_text = request.form.get('job_text', '').strip()
             job_text_value = job_text
             label = 'Tailored'
