@@ -1300,7 +1300,7 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
         return None
     # Enforce short tagline (few words).
     words = re.findall(r'[A-Za-z0-9\+\#\-]+', tagline)
-    if len(words) > 6:
+    if len(words) > 20:
         return None
     resume_l = normalize_text(resume_text).lower()
     # Allow common separators and small words.
