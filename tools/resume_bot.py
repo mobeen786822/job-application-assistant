@@ -1104,15 +1104,6 @@ def _format_tailored_text_to_html(
     name: str | None = None,
     allowed_sections: list[str] | None = None,
 ) -> str:
-    sections, allowed_sections = build_sections_from_tailored_text(text, name, allowed_sections)
-    return render_sections_to_html(sections, allowed_sections)
-
-
-def _format_tailored_text_to_html(
-    text: str,
-    name: str | None = None,
-    allowed_sections: list[str] | None = None,
-) -> str:
     allowed_sections = [s.lower() for s in (allowed_sections or [])]
     allowed_set = set(allowed_sections)
     lines = [normalize_text(l.rstrip()) for l in text.splitlines()]
