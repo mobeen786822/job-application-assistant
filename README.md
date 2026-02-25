@@ -1,6 +1,6 @@
 # Job Application Assistant
 
-Tailors a resume and cover letter to a pasted job description, then renders recruiter-ready HTML and PDF outputs.
+AI-powered resume and cover letter tailoring tool that generates job-specific PDF/HTML outputs from a pasted job description.
 
 ## Features
 
@@ -42,6 +42,10 @@ Open:
 
 - `http://localhost:5055`
 
+## Screenshot
+
+![Resume Tailor web UI](assets/screenshots/resume-tailor-ui.png)
+
 ## Environment Variables
 
 - `RESUME_TXT` - path to source resume text  
@@ -54,7 +58,7 @@ Open:
   Default: `2`
 - `OPENAI_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters
 - `OPENAI_MODEL` - model name used by OpenAI calls  
-  Default: `gpt-5.2`
+  Default: `gpt-4o`
 - `APP_VERSION` - optional build/version label shown in UI
 
 ## CLI Usage
@@ -87,6 +91,10 @@ Generated in `outputs/` with timestamped names:
 - Without `OPENAI_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
 - PDF export depends on Playwright Chromium being installed.
 
+## Why I Built This
+
+Built as a personal productivity tool to automate the most tedious part of job hunting: tailoring a resume for every application. Deployed on a private cloud VM with VPN-only access via Tailscale.
+
 ## Auto Deploy (GitHub -> VM)
 
 This repo includes `.github/workflows/deploy-vm.yml` to auto-deploy on every push to `main`.
@@ -97,9 +105,9 @@ Required GitHub repository secret:
 
 Notes:
 
-- Current workflow has host/user/port hardcoded for this VM:
-  - host: `3.107.22.189`
-  - user: `ubuntu`
+- Configure workflow connection values via repository variables:
+  - host: `<your-vm-ip>` (`VM_HOST`)
+  - user: `<your-vm-user>` (`VM_USER`)
   - port: `22`
 - `VM_SSH_KEY` must be added under **Settings -> Secrets and variables -> Actions -> Repository secrets**.
 - If you put the key under Repository variables, deploy will fail.

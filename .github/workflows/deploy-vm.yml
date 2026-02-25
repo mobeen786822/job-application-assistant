@@ -22,13 +22,21 @@ jobs:
             echo "VM_SSH_KEY is missing (add as repo secret)."
             exit 1
           fi
+          if [ -z "${{ vars.VM_HOST }}" ]; then
+            echo "VM_HOST is missing (add as repo variable)."
+            exit 1
+          fi
+          if [ -z "${{ vars.VM_USER }}" ]; then
+            echo "VM_USER is missing (add as repo variable)."
+            exit 1
+          fi
           echo "Deploy config looks present."
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: 3.107.22.189
-          username: ubuntu
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           port: 22
           script_stop: true
