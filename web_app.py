@@ -1,4 +1,4 @@
-
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -488,8 +488,9 @@ def index():
                 cover_preview_url = url_for('preview_output', filename=cover_name)
             if cover_pdf_path:
                 cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
-        except Exception as e:
-            error_msg = f"Something went wrong. {e}"
+        except Exception:
+            logging.exception("Resume generation failed")
+            error_msg = "Something went wrong. Please try again or check your job description."
 
     return render_template_string(
         PAGE,
