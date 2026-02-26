@@ -50,8 +50,7 @@ https://github.com/mobeen786822/Production-Support-Incident-Console | https://in
 - Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
 - Implemented runbook and root-cause analysis capture to improve incident resolution consistency.
 
-Cancer Awareness Mobile App (321_Project_CancerAwareness1)
-- University coursework project.
+Cancer Awareness Mobile App
 - Built a cross-platform mobile app using React Native and TypeScript.
 - Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.
 - Added geolocation and media upload capabilities with structured in-app navigation.

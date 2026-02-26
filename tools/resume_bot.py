@@ -742,7 +742,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
   {exp_html}
 </div>
 
-<div class=\"section\">
+<div class=\"section section-projects\">
   <div class=\"section-title\">Projects</div>
   {proj_html}
 </div>
@@ -1112,7 +1112,8 @@ def render_sections_to_html(sections, allowed_sections):
         return (1, title)
 
     for section in sorted(sections, key=section_sort_key):
-        html_parts.append('<div class="section">')
+        section_class = 'section section-projects' if section['title'].lower() == 'projects' else 'section'
+        html_parts.append(f'<div class="{section_class}">')
         html_parts.append(f'<div class="section-title">{section["title"]}</div>')
 
         if section['skills']:
@@ -1299,7 +1300,8 @@ def _format_tailored_text_to_html(
         return (1, title)
 
     for section in sorted(sections, key=section_sort_key):
-        html_parts.append('<div class="section">')
+        section_class = 'section section-projects' if section['title'].lower() == 'projects' else 'section'
+        html_parts.append(f'<div class="{section_class}">')
         html_parts.append(f'<div class="section-title">{section["title"]}</div>')
 
         if section['skills']:

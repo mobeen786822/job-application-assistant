@@ -77,6 +77,13 @@
   .two-col { display: flex; gap: 40px; }
   .two-col > div { flex: 1; }
 
+  @media print {
+    .section-projects {
+      break-before: page;
+      page-break-before: always;
+    }
+  }
+
 </style>
 </head>
 
@@ -237,7 +244,7 @@
 
   <div class="entry">
     <div class="entry-header">
-      <span class="entry-title">Cancer Awareness Mobile App (321_Project_CancerAwareness1)</span>
+      <span class="entry-title">Cancer Awareness Mobile App</span>
       <span class="entry-date">University Coursework</span>
     </div>
     <ul>
