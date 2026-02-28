@@ -7,7 +7,16 @@ from datetime import datetime
 from pathlib import Path
 
 # Page limit for PDF output (defaults to 2 pages).
-MAX_PAGES = int(os.environ.get('RESUME_MAX_PAGES', '2'))
+def _read_max_pages() -> int:
+    raw = (os.environ.get('RESUME_MAX_PAGES', '2') or '2').strip()
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 2
+    return value if value > 0 else 2
+
+
+MAX_PAGES = _read_max_pages()
 
 STOPWORDS = {
     'the','and','a','an','to','of','in','for','with','on','at','by','from','as','is','are','be','this',
@@ -414,13 +423,74 @@ def _extract_response_text(response) -> str:
     return ''
 
 
-def assess_job_fit_with_openai(job_text: str, resume_text: str) -> dict:
-    try:
-        from openai import OpenAI
-    except Exception as e:
-        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+def _extract_anthropic_text(response) -> str:
+    content = getattr(response, 'content', []) or []
+    parts = []
+    for block in content:
+        b_type = getattr(block, 'type', None) or (block.get('type') if isinstance(block, dict) else None)
+        if b_type != 'text':
+            continue
+        text = getattr(block, 'text', None) or (block.get('text') if isinstance(block, dict) else None)
+        if text:
+            parts.append(text)
+    return '\n'.join(parts).strip()
 
-    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+
+def _get_ai_provider() -> str | None:
+    preferred = (os.environ.get('AI_PROVIDER', '') or '').strip().lower()
+    if preferred == 'openai' and os.environ.get('OPENAI_API_KEY'):
+        return 'openai'
+    if preferred == 'anthropic' and os.environ.get('ANTHROPIC_API_KEY'):
+        return 'anthropic'
+    if os.environ.get('OPENAI_API_KEY'):
+        return 'openai'
+    if os.environ.get('ANTHROPIC_API_KEY'):
+        return 'anthropic'
+    return None
+
+
+def _call_ai_text(prompt: str, instructions: str | None = None, max_tokens: int = 2400) -> str:
+    provider = _get_ai_provider()
+    if provider == 'openai':
+        try:
+            from openai import OpenAI
+        except Exception as e:
+            raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+        model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+        client = OpenAI()
+        kwargs = {'model': model, 'input': prompt}
+        if instructions:
+            kwargs['instructions'] = instructions
+        response = client.responses.create(**kwargs)
+        text = _extract_response_text(response)
+        if text:
+            return text
+        raise SystemExit('OpenAI response did not include text output.')
+
+    if provider == 'anthropic':
+        try:
+            from anthropic import Anthropic
+        except Exception as e:
+            raise SystemExit('Anthropic SDK required. Install with: python -m pip install anthropic') from e
+        model = os.environ.get('ANTHROPIC_MODEL', 'claude-3-5-sonnet-latest')
+        client = Anthropic()
+        kwargs = {
+            'model': model,
+            'max_tokens': max(256, int(max_tokens)),
+            'messages': [{'role': 'user', 'content': prompt}],
+        }
+        if instructions:
+            kwargs['system'] = instructions
+        response = client.messages.create(**kwargs)
+        text = _extract_anthropic_text(response)
+        if text:
+            return text
+        raise SystemExit('Anthropic response did not include text output.')
+
+    raise SystemExit('Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI features.')
+
+
+def assess_job_fit_with_ai(job_text: str, resume_text: str) -> dict:
     prompt = (
         "Assess whether the candidate should apply for this role based only on the resume.\n"
         "Return strict JSON only with keys: recommendation, confidence, rationale, matched_requirements, missing_requirements.\n"
@@ -435,11 +505,9 @@ def assess_job_fit_with_openai(job_text: str, resume_text: str) -> dict:
         f"Job description:\n{job_text}\n\n"
         f"Resume:\n{resume_text}\n"
     )
-    client = OpenAI()
-    response = client.responses.create(model=model, input=prompt)
-    raw = _extract_response_text(response)
+    raw = _call_ai_text(prompt=prompt, max_tokens=1400)
     if not raw:
-        raise SystemExit('OpenAI response did not include text output.')
+        raise SystemExit('AI response did not include text output.')
 
     # Model sometimes wraps JSON with prose; extract first JSON object.
     match = re.search(r'\{[\s\S]*\}', raw)
@@ -484,13 +552,13 @@ def assess_job_fit(job_text: str, resume_text: str) -> dict:
             'gaps': [],
         }
 
-    if os.environ.get('OPENAI_API_KEY'):
+    if _get_ai_provider():
         try:
-            return assess_job_fit_with_openai(job_text=job_text, resume_text=resume_text)
+            return assess_job_fit_with_ai(job_text=job_text, resume_text=resume_text)
         except Exception:
             pass
 
-    # Heuristic fallback when OpenAI is unavailable or fails.
+    # Heuristic fallback when AI provider is unavailable or fails.
     resume_norm = normalize_text(resume_text).lower()
     words = [
         w for w in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', normalize_text(job_text).lower())
@@ -1371,13 +1439,9 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
     return tagline
 
 
-def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
-    try:
-        from openai import OpenAI
-    except Exception:
+def generate_tagline_with_ai(job_text: str, resume_text: str) -> str | None:
+    if not _get_ai_provider():
         return None
-    client = OpenAI()
-    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
     prompt = (
         "Create a very short, role-specific resume tagline based on the job description and the resume. "
         "Return a single line only, no quotes, no extra text. "
@@ -1386,37 +1450,19 @@ def generate_tagline_with_openai(job_text: str, resume_text: str) -> str | None:
         "Do NOT invent or add new tools, skills, or roles.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
-    resp = client.responses.create(model=model, input=prompt)
-    text = getattr(resp, 'output_text', None)
+    try:
+        text = _call_ai_text(prompt=prompt, max_tokens=120)
+    except Exception:
+        return None
     if text:
         tagline = text.strip().splitlines()[0]
         return _validate_tagline(tagline, resume_text)
-    output = getattr(resp, 'output', [])
-    if output:
-        parts = []
-        for item in output:
-            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
-            for c in content:
-                if getattr(c, 'type', None) == 'output_text':
-                    parts.append(c.text)
-                elif isinstance(c, dict) and c.get('type') == 'output_text':
-                    parts.append(c.get('text', ''))
-        if parts:
-            tagline = parts[0].strip().splitlines()[0]
-            return _validate_tagline(tagline, resume_text)
     return None
 
 
-def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str) -> str:
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        raise SystemExit('OPENAI_API_KEY is required to use AI cover letters.')
-
-    try:
-        from openai import OpenAI
-    except Exception as e:
-        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
-
+def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) -> str:
+    if not _get_ai_provider():
+        raise SystemExit('OPENAI_API_KEY or ANTHROPIC_API_KEY is required to use AI cover letters.')
     prompt = (
         "You are a professional cover letter writer and recruitment specialist.\n\n"
         "I will provide you with:\n\n"
@@ -1447,27 +1493,10 @@ def generate_cover_letter_with_openai(job_text: str, resume_text: str, name: str
         "Return plain text only. Do not include a subject line.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
-
-    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
-    client = OpenAI()
-    response = client.responses.create(model=model, input=prompt)
-
-    text = getattr(response, 'output_text', None)
+    text = _call_ai_text(prompt=prompt, max_tokens=1400)
     if text:
         return text.strip()
-    output = getattr(response, 'output', [])
-    if output:
-        parts = []
-        for item in output:
-            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
-            for c in content:
-                if getattr(c, 'type', None) == 'output_text':
-                    parts.append(c.text)
-                elif isinstance(c, dict) and c.get('type') == 'output_text':
-                    parts.append(c.get('text', ''))
-        if parts:
-            return "\n".join(parts).strip()
-    raise SystemExit('OpenAI response did not include text output.')
+    raise SystemExit('AI response did not include text output.')
 
 
 def _parse_cover_letter_paragraphs(cover_text: str) -> list[tuple[str, str]]:
@@ -1553,7 +1582,7 @@ def generate_cover_letter(
     header_lines, _sections = split_sections(resume_text)
     name, _contact = parse_header(header_lines)
 
-    cover_text = generate_cover_letter_with_openai(
+    cover_text = generate_cover_letter_with_ai(
         job_text=job_text,
         resume_text=resume_text,
         name=name or 'Candidate',
@@ -1573,7 +1602,7 @@ def generate_cover_letter(
 
     header_html = template_header_html or render_header_html(name=name, headline='', contact='')
     if (job_text or '').strip():
-        tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text)
+        tagline = generate_tagline_with_ai(job_text=job_text, resume_text=resume_text)
         if tagline:
             header_html = _apply_tagline_to_header(header_html, tagline)
 
@@ -1707,20 +1736,14 @@ def _apply_tagline_to_header(header_html: str, tagline: str | None) -> str:
     return header_html[:start] + tagline + header_html[end:]
 
 
-def tailor_resume_with_openai(
+def tailor_resume_with_ai(
     job_text: str,
     resume_text: str,
     allowed_sections: list[str] | None = None,
     fallback_tagline: str | None = None,
 ):
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        raise SystemExit('OPENAI_API_KEY is required to use AI tailoring.')
-
-    try:
-        from openai import OpenAI
-    except Exception as e:
-        raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
+    if not _get_ai_provider():
+        raise SystemExit('OPENAI_API_KEY or ANTHROPIC_API_KEY is required to use AI tailoring.')
 
     allowed_section_text = "\\n".join(allowed_sections) + "\\n" if allowed_sections else ""
     instructions = (
@@ -1776,43 +1799,23 @@ def tailor_resume_with_openai(
         "Do not include notes, disclaimers, or meta commentary."
     )
 
-    model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
-    client = OpenAI()
-    response = client.responses.create(
-        model=model,
-        instructions=instructions,
-        input=(
+    text = _call_ai_text(
+        prompt=(
             "Job description:\n"
             f"{job_text}\n\n"
             "Current resume:\n"
             f"{resume_text}\n"
         ),
+        instructions=instructions,
+        max_tokens=3400,
     )
-
-    text = getattr(response, 'output_text', None)
     if text:
         text = text.strip()
         tagline, body = _extract_tagline(text)
         if not tagline:
-            tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text) or fallback_tagline
+            tagline = generate_tagline_with_ai(job_text=job_text, resume_text=resume_text) or fallback_tagline
         return tagline, body
-    output = getattr(response, 'output', [])
-    if output:
-        parts = []
-        for item in output:
-            content = getattr(item, 'content', []) or (item.get('content', []) if isinstance(item, dict) else [])
-            for c in content:
-                if getattr(c, 'type', None) == 'output_text':
-                    parts.append(c.text)
-                elif isinstance(c, dict) and c.get('type') == 'output_text':
-                    parts.append(c.get('text', ''))
-        text = '\n'.join([p for p in parts if p]).strip()
-        if text:
-            tagline, body = _extract_tagline(text)
-            if not tagline:
-                tagline = generate_tagline_with_openai(job_text=job_text, resume_text=resume_text) or fallback_tagline
-            return tagline, body
-    raise SystemExit('OpenAI response did not include text output.')
+    raise SystemExit('AI response did not include text output.')
 
 
 def generate_resume(resume_path, template_path, job_text=None, out_dir=None, label=None, job_label=None):
@@ -1848,8 +1851,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     ai_allowed_sections = None
     ai_header_html = None
 
-    if os.environ.get('OPENAI_API_KEY') and (job_text or '').strip():
-        tagline, tailored_text = tailor_resume_with_openai(
+    if _get_ai_provider() and (job_text or '').strip():
+        tagline, tailored_text = tailor_resume_with_ai(
             job_text=job_text,
             resume_text=resume_text,
             allowed_sections=tailored_sections,
