@@ -9,7 +9,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 - Resume generation from `assets/resume.txt` + `assets/template.html`
 - Cover letter generation with HTML preview (or text fallback)
 - CLI support for resume generation
-- Optional AI tailoring when `OPENAI_API_KEY` is set, with heuristic fallback when unavailable
+- Optional AI tailoring when `ANTHROPIC_API_KEY` is set, with heuristic fallback when unavailable
 
 ## Project Structure
 
@@ -28,7 +28,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 Install dependencies:
 
 ```powershell
-python -m pip install flask openai playwright PyPDF2
+python -m pip install flask anthropic playwright PyPDF2
 python -m playwright install chromium
 ```
 
@@ -56,9 +56,9 @@ Open:
   Default: `outputs`
 - `RESUME_MAX_PAGES` - max pages for AI-tailored resume PDF  
   Default: `2`
-- `OPENAI_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters
-- `OPENAI_MODEL` - model name used by OpenAI calls  
-  Default: `gpt-4o`
+- `ANTHROPIC_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters
+- `ANTHROPIC_MODEL` - model name used by Anthropic calls
+  Default: `claude-opus-4-6`
 - `APP_VERSION` - optional build/version label shown in UI
 
 ## CLI Usage
@@ -88,7 +88,7 @@ Generated in `outputs/` with timestamped names:
 
 ## Notes
 
-- Without `OPENAI_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
+- Without `ANTHROPIC_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
 - PDF export depends on Playwright Chromium being installed.
 
 ## Why I Built This
