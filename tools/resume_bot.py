@@ -472,7 +472,7 @@ def _call_ai_text(prompt: str, instructions: str | None = None, max_tokens: int 
             from anthropic import Anthropic
         except Exception as e:
             raise SystemExit('Anthropic SDK required. Install with: python -m pip install anthropic') from e
-        model = os.environ.get('ANTHROPIC_MODEL', 'claude-3-5-sonnet-latest')
+        model = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
         client = Anthropic()
         kwargs = {
             'model': model,
