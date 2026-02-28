@@ -1148,17 +1148,43 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
             seen.add(key)
             additional['entries'].append(entry)
 
-    # Final dedup of ALL Additional Information entries by (title, date)
-    seen_add: set[tuple[str, str]] = set()
+    # Final dedup of ALL Additional Information entries.
+    # Use title/subtitle/date plus bullet content to catch repeated entries even
+    # when one duplicate is missing a date.
+    seen_add: set[tuple[str, str, str, str]] = set()
+    seen_add_loose: set[tuple[str, str, str]] = set()
     deduped_add = []
     for e in additional['entries']:
+        bullets_norm = ' | '.join(
+            normalize_text(str(b)).strip().lower() for b in (e.get('bullets', []) or [])
+        )
         key = (
             normalize_text(e.get('title', '')).lower(),
+            normalize_text(e.get('subtitle', '')).lower(),
             normalize_text(e.get('date', '')).lower(),
+            bullets_norm,
         )
-        if key not in seen_add:
-            seen_add.add(key)
-            deduped_add.append(e)
+        loose_key = (
+            normalize_text(e.get('title', '')).lower(),
+            normalize_text(e.get('subtitle', '')).lower(),
+            bullets_norm,
+        )
+        if key in seen_add or loose_key in seen_add_loose:
+            continue
+        # Also dedupe bullets in each retained entry.
+        if e.get('bullets'):
+            seen_bullets = set()
+            unique_bullets = []
+            for b in e.get('bullets', []):
+                b_key = normalize_text(str(b)).strip().lower()
+                if b_key in seen_bullets:
+                    continue
+                seen_bullets.add(b_key)
+                unique_bullets.append(b)
+            e['bullets'] = unique_bullets
+        seen_add.add(key)
+        seen_add_loose.add(loose_key)
+        deduped_add.append(e)
     additional['entries'] = deduped_add
 
     projects = _ensure_section(sections, 'Projects')
@@ -1294,14 +1320,14 @@ def render_sections_to_html(sections, allowed_sections):
             if entry.get('bullets'):
                 html_parts.append('<ul>')
                 for b in entry['bullets']:
-                    html_parts.append(f'<li>{linkify_text(b)}</li>')
+                    html_parts.append(f'<li>{linkify_text_compact_links(b)}</li>')
                 html_parts.append('</ul>')
             html_parts.append('</div>')
 
         if section['bullets']:
             html_parts.append('<ul>')
             for b in section['bullets']:
-                html_parts.append(f'<li>{linkify_text(b)}</li>')
+                html_parts.append(f'<li>{linkify_text_compact_links(b)}</li>')
             html_parts.append('</ul>')
 
         html_parts.append('</div>')
@@ -1482,14 +1508,14 @@ def _format_tailored_text_to_html(
             if entry.get('bullets'):
                 html_parts.append('<ul>')
                 for b in entry['bullets']:
-                    html_parts.append(f'<li>{linkify_text(b)}</li>')
+                    html_parts.append(f'<li>{linkify_text_compact_links(b)}</li>')
                 html_parts.append('</ul>')
             html_parts.append('</div>')
 
         if section['bullets']:
             html_parts.append('<ul>')
             for b in section['bullets']:
-                html_parts.append(f'<li>{linkify_text(b)}</li>')
+                html_parts.append(f'<li>{linkify_text_compact_links(b)}</li>')
             html_parts.append('</ul>')
 
         html_parts.append('</div>')
