@@ -781,7 +781,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
         for e in entries:
             html.append('<div class="entry">')
             html.append('<div class="entry-header">')
-            html.append(f'<span class="entry-title">{e.get("title", "")}</span>')
+            html.append(f'<span class="entry-title">{linkify_text_compact_links(e.get("title", ""))}</span>')
             if e.get('date'):
                 html.append(f'<span class="entry-date">{e["date"]}</span>')
             html.append('</div>')
@@ -1097,6 +1097,24 @@ def _project_rank(entry_title: str) -> int | None:
     return None
 
 
+def _normalize_additional_entry_title(title: str) -> str:
+    t = normalize_text(title).strip().lower()
+    # Remove trailing date ranges when AI inlines them into the title.
+    t = re.sub(
+        r'\b(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|'
+        r'sep|sept|september|oct|october|nov|november|dec|december)\s+\d{4}\s*-\s*'
+        r'(?:present|'
+        r'(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|'
+        r'sep|sept|september|oct|october|nov|november|dec|december)\s+\d{4})\b',
+        '',
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(r'\b\d{2}/\d{4}\s*-\s*(?:present|\d{2}/\d{4})\b', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'\s+', ' ', t).strip(' -|')
+    return t
+
+
 def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallback_project_entries=None):
     title_map = {
         'key skills': 'Key Skills / Technical Skills',
@@ -1135,12 +1153,12 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
         seen = set()
         for e in additional['entries']:
             seen.add((
-                normalize_text(e.get('title', '')).lower(),
+                _normalize_additional_entry_title(e.get('title', '')),
                 normalize_text(e.get('date', '')).lower(),
             ))
         for entry in moved_driving:
             key = (
-                normalize_text(entry.get('title', '')).lower(),
+                _normalize_additional_entry_title(entry.get('title', '')),
                 normalize_text(entry.get('date', '')).lower(),
             )
             if key in seen:
@@ -1159,13 +1177,13 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
             normalize_text(str(b)).strip().lower() for b in (e.get('bullets', []) or [])
         )
         key = (
-            normalize_text(e.get('title', '')).lower(),
+            _normalize_additional_entry_title(e.get('title', '')),
             normalize_text(e.get('subtitle', '')).lower(),
             normalize_text(e.get('date', '')).lower(),
             bullets_norm,
         )
         loose_key = (
-            normalize_text(e.get('title', '')).lower(),
+            _normalize_additional_entry_title(e.get('title', '')),
             normalize_text(e.get('subtitle', '')).lower(),
             bullets_norm,
         )
@@ -1311,7 +1329,7 @@ def render_sections_to_html(sections, allowed_sections):
         for entry in section['entries']:
             html_parts.append('<div class="entry">')
             html_parts.append('<div class="entry-header">')
-            html_parts.append(f'<span class="entry-title">{entry.get("title", "")}</span>')
+            html_parts.append(f'<span class="entry-title">{linkify_text_compact_links(entry.get("title", ""))}</span>')
             if entry.get('date'):
                 html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
             html_parts.append('</div>')
@@ -1499,7 +1517,7 @@ def _format_tailored_text_to_html(
         for entry in section['entries']:
             html_parts.append('<div class="entry">')
             html_parts.append('<div class="entry-header">')
-            html_parts.append(f'<span class="entry-title">{entry.get("title", "")}</span>')
+            html_parts.append(f'<span class="entry-title">{linkify_text_compact_links(entry.get("title", ""))}</span>')
             if entry.get('date'):
                 html_parts.append(f'<span class="entry-date">{entry["date"]}</span>')
             html_parts.append('</div>')
