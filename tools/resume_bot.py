@@ -798,7 +798,25 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 
     proj_html = render_entries(projects)
     combined_experience = (experience or []) + (volunteer or [])
-    exp_html = render_entries(combined_experience)
+    professional_entries = []
+    additional_entries = []
+    for e in combined_experience:
+        title_l = normalize_text(e.get('title', '')).lower()
+        if _is_driving_role(e) or 'independent contractor' in title_l:
+            add_entry = dict(e)
+            add_entry['bullets'] = []
+            additional_entries.append(add_entry)
+        else:
+            professional_entries.append(e)
+    exp_html = render_entries(professional_entries)
+    additional_info_html = ''
+    if additional_entries:
+        additional_info_html = f"""
+<div class=\"section\">
+  <div class=\"section-title\">Additional Information</div>
+  {render_entries(additional_entries)}
+</div>
+"""
 
     cert_html = ''
     if certificates:
@@ -864,6 +882,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 </div>
 
 {cert_html}
+{additional_info_html}
 {interests_html}
 
 </div>
