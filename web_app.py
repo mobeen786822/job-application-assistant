@@ -493,20 +493,24 @@ def index():
             html_url = url_for('download_output', filename=Path(html_path).name)
             pdf_url = url_for('download_output', filename=Path(pdf_path).name)
             preview_url = url_for('preview_output', filename=Path(html_path).name)
-            cover_path, cover_pdf_path, cover_text = generate_cover_letter(
-                resume_path=DEFAULT_RESUME,
-                job_text=job_text,
-                out_dir=OUTPUT_DIR,
-                label=label,
-                template_path=DEFAULT_TEMPLATE,
-            )
-            cover_name = Path(cover_path).name
-            cover_url = url_for('download_output', filename=cover_name)
-            if cover_name.lower().endswith('.html'):
-                cover_preview_url = url_for('preview_output', filename=cover_name)
-            if cover_pdf_path:
-                cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
-        except Exception:
+            try:
+                cover_path, cover_pdf_path, cover_text = generate_cover_letter(
+                    resume_path=DEFAULT_RESUME,
+                    job_text=job_text,
+                    out_dir=OUTPUT_DIR,
+                    label=label,
+                    template_path=DEFAULT_TEMPLATE,
+                )
+                cover_name = Path(cover_path).name
+                cover_url = url_for('download_output', filename=cover_name)
+                if cover_name.lower().endswith('.html'):
+                    cover_preview_url = url_for('preview_output', filename=cover_name)
+                if cover_pdf_path:
+                    cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
+            except (Exception, SystemExit):
+                logging.exception("Cover letter generation skipped")
+                cover_text = "Cover letter unavailable. Resume generation completed."
+        except (Exception, SystemExit):
             logging.exception("Resume generation failed")
             error_msg = "Something went wrong. Please try again or check your job description."
 
