@@ -2250,6 +2250,13 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             experience.append(e)
         else:
             projects.append(e)
+    projects = sorted(
+        projects,
+        key=lambda e: (
+            _project_rank(e.get('title', '')) if _project_rank(e.get('title', '')) is not None else 99,
+            normalize_text(e.get('title', '')).lower(),
+        ),
+    )
 
     canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(sections.get('Skills', []))
     skills = filter_skills_for_job(
