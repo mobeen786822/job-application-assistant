@@ -937,6 +937,27 @@ def extract_template_sections(template_text: str) -> list[str]:
     return cleaned
 
 
+def extract_template_skill_tags(template_text: str) -> list[str]:
+    tags = re.findall(
+        r'<span\s+class="skill-tag"\s*>\s*(.*?)\s*</span>',
+        template_text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    out = []
+    seen = set()
+    for raw in tags:
+        text = re.sub(r'<.*?>', '', raw or '').strip()
+        skill = clean_skill_token(text)
+        if not skill:
+            continue
+        key = skill.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(skill)
+    return out
+
+
 def build_sections_from_tailored_text(
     text: str,
     name: str | None = None,
@@ -1088,8 +1109,11 @@ def _project_rank(entry_title: str) -> int | None:
     order = {
         'bunkerify': 0,
         'production support incident console': 1,
+        'incident console': 1,
         'job application assistant': 2,
+        'resume tailor': 2,
         'cancer awareness': 3,
+        'cancer awareness mobile app': 3,
     }
     for key, rank in order.items():
         if key in title_l:
@@ -1286,6 +1310,54 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
         if section:
             ordered.append(section)
     return ordered
+
+
+def _collect_required_project_entries(source_sections: dict) -> list[dict]:
+    candidates = []
+    for key in ('Work experience/Projects', 'Projects'):
+        candidates.extend(parse_experience(source_sections.get(key, [])))
+    seen = set()
+    ranked = []
+    for entry in candidates:
+        rank = _project_rank(entry.get('title', ''))
+        if rank is None:
+            continue
+        sig = (rank, normalize_text(entry.get('title', '')).lower())
+        if sig in seen:
+            continue
+        seen.add(sig)
+        ranked.append(dict(entry))
+    return ranked
+
+
+def _clamp_professional_summary(sections, max_words: int = 65) -> None:
+    section = _ensure_section(sections, 'Professional Summary')
+    if not section.get('paragraphs'):
+        return
+    text = ' '.join(p.strip() for p in section['paragraphs'] if p.strip())
+    if not text:
+        section['paragraphs'] = []
+        return
+    words = text.split()
+    if len(words) > max_words:
+        text = ' '.join(words[:max_words]).rstrip(' ,;:')
+        if text and text[-1] not in '.!?':
+            text += '.'
+    section['paragraphs'] = [text]
+
+
+def _apply_canonical_skills_to_sections(sections, canonical_skills: list[str], job_text: str) -> None:
+    if not canonical_skills:
+        return
+    filtered = filter_skills_for_job(
+        canonical_skills,
+        job_text=job_text or '',
+        max_skills=16,
+        min_skills=10,
+    )
+    for section in sections:
+        if 'skill' in section.get('title', '').lower():
+            section['skills'] = filtered[:]
 
 
 def render_sections_to_html(sections, allowed_sections):
@@ -2006,6 +2078,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
 
     template_header_html = extract_template_header(template_text)
     template_sections = extract_template_sections(template_text)
+    template_skill_tags = extract_template_skill_tags(template_text)
     tailored_sections = TAILORED_SECTION_TITLES[:]
 
     ai_sections = None
@@ -2030,7 +2103,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         )
         source_work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
         fallback_driving_entries = [e for e in source_work_entries if _is_driving_role(e)]
-        fallback_project_entries = [e for e in source_work_entries if _project_rank(e.get('title', '')) is not None]
+        fallback_project_entries = _collect_required_project_entries(source_sections)
         sections = _prioritize_tailored_sections(
             sections,
             fallback_driving_entries=fallback_driving_entries,
@@ -2038,14 +2111,9 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         )
         allowed_sections = [s.lower() for s in tailored_sections]
         _filter_excluded_entries_in_sections(sections)
-        for section in sections:
-            if 'skill' in section['title'].lower() and section['skills']:
-                section['skills'] = filter_skills_for_job(
-                    section['skills'],
-                    job_text=job_text or '',
-                    max_skills=16,
-                    min_skills=10,
-                )
+        canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(source_sections.get('Skills', []))
+        _apply_canonical_skills_to_sections(sections, canonical_skills=canonical_skills, job_text=job_text or '')
+        _clamp_professional_summary(sections, max_words=65)
         ai_sections = sections
         ai_allowed_sections = allowed_sections
         ai_header_html = header_html
