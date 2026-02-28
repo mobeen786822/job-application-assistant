@@ -97,6 +97,28 @@ def clean_skill_token(skill: str) -> str:
     return token.strip()
 
 
+def _split_skills_csv(text: str) -> list[str]:
+    """Split a comma-separated skill string, ignoring commas inside parentheses."""
+    parts = []
+    buf = []
+    depth = 0
+    for ch in text:
+        if ch == '(':
+            depth += 1
+            buf.append(ch)
+        elif ch == ')':
+            depth = max(0, depth - 1)
+            buf.append(ch)
+        elif ch == ',' and depth == 0:
+            parts.append(''.join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        parts.append(''.join(buf).strip())
+    return parts
+
+
 def linkify_text(text: str) -> str:
     if not text:
         return ''
@@ -326,10 +348,11 @@ def parse_skills(block_lines):
     for line in block_lines:
         if line.startswith('-'):
             line = line.lstrip('-').strip()
-        for part in re.split(r'[\|,]', line):
-            part = clean_skill_token(part)
-            if part:
-                skills.append(part)
+        for segment in line.split('|'):
+            for part in _split_skills_csv(segment):
+                part = clean_skill_token(part)
+                if part:
+                    skills.append(part)
     # De-dup preserve order
     seen = set()
     out = []
@@ -895,7 +918,7 @@ def build_sections_from_tailored_text(
             if current['title'].lower().find('skill') >= 0:
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
-                for part in [p.strip() for p in item.split(',')]:
+                for part in _split_skills_csv(item):
                     cleaned = clean_skill_token(part)
                     if cleaned:
                         current['skills'].append(cleaned)
@@ -1132,10 +1155,14 @@ def render_sections_to_html(sections, allowed_sections):
             html_parts.append('</div>')
 
         if section['bullets']:
-            html_parts.append('<ul>')
-            for b in section['bullets']:
-                html_parts.append(f'<li>{linkify_text(b)}</li>')
-            html_parts.append('</ul>')
+            if 'summary' in section['title'].lower():
+                for b in section['bullets']:
+                    html_parts.append(f'<p class="summary">{linkify_text(b)}</p>')
+            else:
+                html_parts.append('<ul>')
+                for b in section['bullets']:
+                    html_parts.append(f'<li>{linkify_text(b)}</li>')
+                html_parts.append('</ul>')
 
         html_parts.append('</div>')
 
@@ -1229,7 +1256,7 @@ def _format_tailored_text_to_html(
                 # Split skills by commas and ignore category labels.
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
-                for part in [p.strip() for p in item.split(',')]:
+                for part in _split_skills_csv(item):
                     cleaned = clean_skill_token(part)
                     if cleaned:
                         current['skills'].append(cleaned)
@@ -1320,10 +1347,14 @@ def _format_tailored_text_to_html(
             html_parts.append('</div>')
 
         if section['bullets']:
-            html_parts.append('<ul>')
-            for b in section['bullets']:
-                html_parts.append(f'<li>{linkify_text(b)}</li>')
-            html_parts.append('</ul>')
+            if 'summary' in section['title'].lower():
+                for b in section['bullets']:
+                    html_parts.append(f'<p class="summary">{linkify_text(b)}</p>')
+            else:
+                html_parts.append('<ul>')
+                for b in section['bullets']:
+                    html_parts.append(f'<li>{linkify_text(b)}</li>')
+                html_parts.append('</ul>')
 
         html_parts.append('</div>')
 
@@ -1343,7 +1374,7 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
     if not tagline:
         return None
     # Enforce short tagline (few words).
-    words = re.findall(r'[A-Za-z0-9\+\#\-]+', tagline)
+    words = tagline.split()
     if len(words) > 20:
         return None
     resume_l = normalize_text(resume_text).lower()
@@ -1352,11 +1383,17 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
         'and', 'or', 'for', 'with', 'in', 'on', 'to', 'of', 'the', 'a', 'an',
         'developer', 'engineer', 'analyst', 'specialist'
     }
-    tokens = re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', tagline.lower())
-    for t in tokens:
-        if t in stop or len(t) < 3:
+    # Split on whitespace and strip surrounding punctuation that is definitely
+    # not part of a tech name (preserve internal chars like #, +, ., - so that
+    # "C#", ".NET", "C++", "Node.js" are checked as complete tokens).
+    for word in tagline.split():
+        token = word.strip('!?,;:\'"[](){}|·')
+        if not token:
             continue
-        if t not in resume_l:
+        token_l = token.lower()
+        if token_l in stop or len(token_l) < 2:
+            continue
+        if token_l not in resume_l:
             return None
     return tagline
 
