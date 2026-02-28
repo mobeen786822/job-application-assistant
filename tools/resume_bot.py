@@ -100,10 +100,58 @@ def normalize_text(text: str) -> str:
 
 def clean_skill_token(skill: str) -> str:
     token = normalize_text(skill).strip()
-    token = re.sub(r'^[\(\[\{]+', '', token)
-    token = re.sub(r'[\)\]\}]+$', '', token)
+    # Strip outer-wrapping brackets ONLY when the whole token is wrapped:
+    # "(React Native)" -> "React Native", but "React Native (iOS)" stays unchanged.
+    if len(token) >= 2 and token[0] == '(' and token[-1] == ')':
+        inner = token[1:-1].strip()
+        if inner:
+            token = inner
+    elif len(token) >= 2 and token[0] == '[' and token[-1] == ']':
+        inner = token[1:-1].strip()
+        if inner:
+            token = inner
     token = token.strip(' -;:,.')
+    # Balance unmatched open parens: "AWS (EC2, S3" -> "AWS (EC2, S3)"
+    open_count = token.count('(')
+    close_count = token.count(')')
+    if open_count > close_count:
+        token = token + ')' * (open_count - close_count)
+    elif close_count > open_count:
+        # Strip excess trailing close parens: "CloudWatch)" -> "CloudWatch"
+        excess = close_count - open_count
+        while excess > 0 and token.endswith(')'):
+            token = token[:-1]
+            excess -= 1
     return token.strip()
+
+
+def _split_skills_csv(text: str) -> list[str]:
+    """Split a comma-separated skill list respecting parentheses.
+
+    'AWS (EC2, S3, IAM), TypeScript' -> ['AWS (EC2, S3, IAM)', 'TypeScript']
+    """
+    parts: list[str] = []
+    depth = 0
+    buf: list[str] = []
+    for ch in text:
+        if ch == '(':
+            depth += 1
+            buf.append(ch)
+        elif ch == ')':
+            depth = max(0, depth - 1)
+            buf.append(ch)
+        elif ch == ',' and depth == 0:
+            part = ''.join(buf).strip()
+            if part:
+                parts.append(part)
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        part = ''.join(buf).strip()
+        if part:
+            parts.append(part)
+    return parts
 
 
 def linkify_text(text: str) -> str:
@@ -973,7 +1021,7 @@ def build_sections_from_tailored_text(
             if current['title'].lower().find('skill') >= 0:
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
-                for part in [p.strip() for p in item.split(',')]:
+                for part in _split_skills_csv(item):
                     cleaned = clean_skill_token(part)
                     if cleaned:
                         current['skills'].append(cleaned)
@@ -1100,20 +1148,44 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
             seen.add(key)
             additional['entries'].append(entry)
 
+    # Final dedup of ALL Additional Information entries by (title, date)
+    seen_add: set[tuple[str, str]] = set()
+    deduped_add = []
+    for e in additional['entries']:
+        key = (
+            normalize_text(e.get('title', '')).lower(),
+            normalize_text(e.get('date', '')).lower(),
+        )
+        if key not in seen_add:
+            seen_add.add(key)
+            deduped_add.append(e)
+    additional['entries'] = deduped_add
+
     projects = _ensure_section(sections, 'Projects')
-    # If AI omitted expected projects, recover them from source resume entries.
+    # Build set of project ranks already present in AI output.
+    existing_project_keys: set[int] = set()
+    for entry in projects.get('entries', []):
+        rank = _project_rank(entry.get('title', ''))
+        if rank is not None:
+            existing_project_keys.add(rank)
+
+    # Inject any ranked projects the AI omitted.
     if fallback_project_entries:
-        existing_project_keys = set()
-        for entry in projects.get('entries', []):
-            rank = _project_rank(entry.get('title', ''))
-            if rank is not None:
-                existing_project_keys.add(rank)
         for entry in fallback_project_entries:
             rank = _project_rank(entry.get('title', ''))
             if rank is None or rank in existing_project_keys:
                 continue
             projects['entries'].append(dict(entry))
             existing_project_keys.add(rank)
+
+    # Unconditional: Job Application Assistant (rank=2) and Cancer Awareness
+    # (rank=3) must always appear — force-inject from fallback if still missing.
+    for must_rank in sorted({2, 3} - existing_project_keys):
+        for entry in (fallback_project_entries or []):
+            if _project_rank(entry.get('title', '')) == must_rank:
+                projects['entries'].append(dict(entry))
+                existing_project_keys.add(must_rank)
+                break
 
     if projects.get('entries'):
         def project_key(entry):
@@ -1125,6 +1197,15 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
 
     education = _ensure_section(sections, 'Education')
     if education.get('entries'):
+        seen_edu: set[str] = set()
+        deduped_edu = []
+        for e in education['entries']:
+            key = normalize_text(e.get('title', '')).lower()
+            if key not in seen_edu:
+                seen_edu.add(key)
+                deduped_edu.append(e)
+        education['entries'] = deduped_edu
+
         def edu_key(entry):
             title_l = normalize_text(entry.get('title', '')).lower()
             if 'bachelor' in title_l:
@@ -1135,8 +1216,16 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
         education['entries'] = sorted(education['entries'], key=edu_key)
 
     certs = _ensure_section(sections, 'Certifications')
-    cert_blob = ' '.join(certs.get('paragraphs', []) + certs.get('bullets', []))
+    seen_cert: set[str] = set()
+    deduped_certs = []
     for e in certs.get('entries', []):
+        key = normalize_text(e.get('title', '')).lower()
+        if key not in seen_cert:
+            seen_cert.add(key)
+            deduped_certs.append(e)
+    certs['entries'] = deduped_certs
+    cert_blob = ' '.join(certs.get('paragraphs', []) + certs.get('bullets', []))
+    for e in certs['entries']:
         cert_blob += ' ' + e.get('title', '') + ' ' + e.get('subtitle', '')
     if 'aws academy cloud foundations' not in normalize_text(cert_blob).lower():
         certs['bullets'].append('AWS Academy Graduate - AWS Academy Cloud Foundations award')
@@ -1307,7 +1396,7 @@ def _format_tailored_text_to_html(
                 # Split skills by commas and ignore category labels.
                 if ':' in item:
                     item = item.split(':', 1)[1].strip()
-                for part in [p.strip() for p in item.split(',')]:
+                for part in _split_skills_csv(item):
                     cleaned = clean_skill_token(part)
                     if cleaned:
                         current['skills'].append(cleaned)
@@ -1418,24 +1507,47 @@ def _extract_tagline(text: str):
 
 
 def _validate_tagline(tagline: str, resume_text: str) -> str | None:
+    """Validate every meaningful word in the tagline appears in the resume.
+
+    Dot-separated terms (ASP.NET, Node.js) are checked as complete strings to
+    prevent 'net' in 'ASP.NET' matching against URLs in the resume text.
+    Hyphenated compounds (Cybersecurity-Focused) are split and each part checked.
+    Returns the tagline if valid, or None to trigger fallback.
+    """
     if not tagline:
         return None
-    # Enforce short tagline (few words).
-    words = re.findall(r'[A-Za-z0-9\+\#\-]+', tagline)
-    if len(words) > 20:
+    if len(tagline.split()) > 20:
         return None
     resume_l = normalize_text(resume_text).lower()
-    # Allow common separators and small words.
     stop = {
         'and', 'or', 'for', 'with', 'in', 'on', 'to', 'of', 'the', 'a', 'an',
-        'developer', 'engineer', 'analyst', 'specialist'
+        'developer', 'engineer', 'analyst', 'specialist',
+        # Generic compound-word role modifiers that need not appear verbatim
+        'full', 'stack', 'focused', 'based', 'driven', 'oriented', 'led',
     }
-    tokens = re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', tagline.lower())
-    for t in tokens:
-        if t in stop or len(t) < 3:
+    for segment in tagline.split('|'):
+        seg = segment.strip()
+        if not seg:
             continue
-        if t not in resume_l:
-            return None
+        for word in seg.split():
+            w = word.strip('!?,;:\'"[](){}·')
+            if not w:
+                continue
+            w_l = w.lower()
+            # Dot-separated terms must match as a COMPLETE string (prevents
+            # 'net' in 'ASP.NET' matching against URLs in the resume).
+            if '.' in w_l:
+                if w_l not in resume_l:
+                    return None
+                continue
+            # Hyphenated compounds: check each part independently so
+            # 'Cybersecurity-Focused' checks 'cybersecurity' not the compound.
+            parts = w_l.split('-') if '-' in w_l else [w_l]
+            for part in parts:
+                if part in stop or len(part) < 3:
+                    continue
+                if part not in resume_l:
+                    return None
     return tagline
 
 
@@ -1443,11 +1555,11 @@ def generate_tagline_with_ai(job_text: str, resume_text: str) -> str | None:
     if not _get_ai_provider():
         return None
     prompt = (
-        "Create a very short, role-specific resume tagline based on the job description and the resume. "
+        "Create a role-specific resume tagline based on the job description and the resume. "
         "Return a single line only, no quotes, no extra text. "
-        "Use 3 to 6 words maximum. Avoid separators like '·' or '|'. "
-        "STRICT RULE: Use only roles/skills/terms that already appear in the resume text. "
-        "Do NOT invent or add new tools, skills, or roles.\n\n"
+        "Format: Role | Skill | Skill | Skill (pipe-separated, 3-4 segments). "
+        "STRICT RULE: Use only roles/skills/terms that already appear in the resume text provided. "
+        "Do NOT invent or add new tools, skills, technologies, or roles.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
     try:
@@ -1574,6 +1686,7 @@ def generate_cover_letter(
     out_dir,
     label: str | None = None,
     template_path=None,
+    tagline: str | None = None,
 ):
     resume_path = Path(resume_path)
     if not resume_path.exists():
@@ -1602,9 +1715,9 @@ def generate_cover_letter(
 
     header_html = template_header_html or render_header_html(name=name, headline='', contact='')
     if (job_text or '').strip():
-        tagline = generate_tagline_with_ai(job_text=job_text, resume_text=resume_text)
-        if tagline:
-            header_html = _apply_tagline_to_header(header_html, tagline)
+        cover_tagline = tagline or generate_tagline_with_ai(job_text=job_text, resume_text=resume_text)
+        if cover_tagline:
+            header_html = _apply_tagline_to_header(header_html, cover_tagline)
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1773,7 +1886,11 @@ def tailor_resume_with_ai(
         "Content requirements:\n\n"
         "TAGLINE should be role-specific in this style: Cybersecurity-Focused Software Engineer | Full-Stack Development | ACSC Essential Eight | Production Systems.\n\n"
         "Professional Summary must lead with Bunkerify as proof of production impact and mention current Master of Computer Science (Cybersecurity) studies at UOW.\n\n"
+        "Professional Summary must be written in first person without using the candidate's name. "
+        "Do not start with the candidate's name. Do not use third-person phrasing.\n\n"
         "Key Skills / Technical Skills should be tailored to the job and include only relevant skills from my resume.\n\n"
+        "Group all AWS services under a single tag formatted as 'AWS (EC2, S3, IAM, CloudWatch)'. "
+        "Do not emit EC2, S3, RDS, IAM, CloudWatch, CloudTrail, or any individual AWS service as a separate skill tag.\n\n"
         "Professional Experience must include only paid/volunteer tech roles: Catch a Drive and Hentley.\n\n"
         "Projects must include Bunkerify first, then Production Support Incident Console, Job Application Assistant, and Cancer Awareness Mobile App.\n\n"
         "Education should list Bachelor before Master. If Master courses are empty, remove the empty field.\n\n"
@@ -1850,6 +1967,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     ai_sections = None
     ai_allowed_sections = None
     ai_header_html = None
+    tagline = None
 
     if _get_ai_provider() and (job_text or '').strip():
         tagline, tailored_text = tailor_resume_with_ai(
@@ -2055,7 +2173,7 @@ ul {{ margin: 6px 0 12px 18px; }}
         })
         browser.close()
 
-    return html_path, pdf_path
+    return html_path, pdf_path, tagline
 
 
 
@@ -2075,7 +2193,7 @@ def main():
             raise SystemExit(f'Job description file not found: {job_path}')
         job_text = job_path.read_text(encoding='utf-8', errors='replace')
 
-    html_path, pdf_path = generate_resume(
+    html_path, pdf_path, _tagline = generate_resume(
         resume_path=args.resume,
         template_path=args.template,
         job_text=job_text,

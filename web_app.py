@@ -480,7 +480,7 @@ def index():
             else:
                 raise ValueError('Please paste a job description first.')
 
-            html_path, pdf_path = generate_resume(
+            html_path, pdf_path, resume_tagline = generate_resume(
                 resume_path=DEFAULT_RESUME,
                 template_path=DEFAULT_TEMPLATE,
                 job_text=job_text,
@@ -500,6 +500,7 @@ def index():
                     out_dir=OUTPUT_DIR,
                     label=label,
                     template_path=DEFAULT_TEMPLATE,
+                    tagline=resume_tagline,
                 )
                 cover_name = Path(cover_path).name
                 cover_url = url_for('download_output', filename=cover_name)
