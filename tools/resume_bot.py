@@ -758,15 +758,10 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
             contact_items.append(formatted)
 
     tagline = headline
-    if keywords:
-        extra = ', '.join(keywords[:3])
-        tagline = f'{headline} - {extra}' if headline else extra
 
     summary_text = summary
     if summary_text and summary_text[-1] not in '.!?':
         summary_text += '.'
-    if keywords:
-        summary_text = summary_text.rstrip('. ') + f". Relevant focus: {', '.join(keywords[:4])}."
 
     def join_contact(items):
         if not items:
@@ -1358,6 +1353,139 @@ def _apply_canonical_skills_to_sections(sections, canonical_skills: list[str], j
     for section in sections:
         if 'skill' in section.get('title', '').lower():
             section['skills'] = filtered[:]
+
+
+def _entry_match_key(text: str) -> str:
+    value = normalize_text(html.unescape(text or '')).lower()
+    value = re.sub(r'[^a-z0-9]+', ' ', value).strip()
+    return re.sub(r'\s+', ' ', value)
+
+
+def _sanitize_summary_text(summary: str, fallback: str, max_words: int = 65) -> str:
+    text = normalize_text(summary or '').strip()
+    if not text:
+        text = normalize_text(fallback or '').strip()
+    words = text.split()
+    if len(words) > max_words:
+        text = ' '.join(words[:max_words]).rstrip(' ,;:')
+    if text and text[-1] not in '.!?':
+        text += '.'
+    return text
+
+
+def _sanitize_skills_from_ai(ai_skills: list[str], canonical_skills: list[str], job_text: str) -> list[str]:
+    canonical = [clean_skill_token(s) for s in canonical_skills if clean_skill_token(s)]
+    if not canonical:
+        return []
+    canonical_map = {_entry_match_key(s): s for s in canonical}
+    selected = []
+    seen = set()
+    for raw in ai_skills or []:
+        key = _entry_match_key(raw)
+        if not key:
+            continue
+        skill = canonical_map.get(key)
+        if not skill:
+            continue
+        low = skill.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        selected.append(skill)
+    if not selected:
+        selected = canonical[:]
+    return filter_skills_for_job(selected, job_text=job_text or '', max_skills=16, min_skills=10)
+
+
+def _apply_bullet_updates(entries: list[dict], updates: list[dict]) -> None:
+    if not entries or not updates:
+        return
+    update_map = {}
+    for item in updates:
+        if not isinstance(item, dict):
+            continue
+        key = _entry_match_key(str(item.get('title', '')))
+        bullets = item.get('bullets', [])
+        if not key or not isinstance(bullets, list):
+            continue
+        cleaned = []
+        seen = set()
+        for b in bullets:
+            txt = normalize_text(str(b)).strip()
+            if not txt:
+                continue
+            k = txt.lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            cleaned.append(txt)
+        if cleaned:
+            update_map[key] = cleaned[:6]
+    for entry in entries:
+        key = _entry_match_key(entry.get('title', ''))
+        if key in update_map:
+            entry['bullets'] = update_map[key][:]
+
+
+def tailor_resume_selective_with_ai(
+    job_text: str,
+    resume_text: str,
+    summary: str,
+    skills: list[str],
+    experience_entries: list[dict],
+    project_entries: list[dict],
+) -> dict:
+    if not _get_ai_provider():
+        return {}
+    payload = {
+        'summary': summary,
+        'skills': skills,
+        'experience_roles': [
+            {'title': e.get('title', ''), 'subtitle': e.get('subtitle', ''), 'bullets': e.get('bullets', [])}
+            for e in experience_entries
+        ],
+        'project_roles': [
+            {'title': e.get('title', ''), 'subtitle': e.get('subtitle', ''), 'bullets': e.get('bullets', [])}
+            for e in project_entries
+        ],
+    }
+    instructions = (
+        "You are tailoring resume content for a specific job. Return STRICT JSON only.\n"
+        "Do not add or remove roles. Update ONLY:\n"
+        "1) professional summary text\n"
+        "2) skill tags\n"
+        "3) bullet points for provided project/work roles\n"
+        "Rules:\n"
+        "- No hallucinations; use only existing resume facts.\n"
+        "- Keep summary concise (45-65 words).\n"
+        "- Skills must come only from provided skill list.\n"
+        "- Keep each role title unchanged.\n"
+        "- Keep 3-6 bullets per role when possible.\n"
+        "Output JSON shape:\n"
+        "{"
+        "\"summary\": string, "
+        "\"skills\": [string], "
+        "\"experience_updates\": [{\"title\": string, \"bullets\": [string]}], "
+        "\"project_updates\": [{\"title\": string, \"bullets\": [string]}]"
+        "}"
+    )
+    text = _call_ai_text(
+        prompt=(
+            f"Job description:\n{job_text}\n\n"
+            f"Current resume content JSON:\n{json.dumps(payload, ensure_ascii=False)}\n"
+        ),
+        instructions=instructions,
+        max_tokens=2200,
+    )
+    match = re.search(r'\{[\s\S]*\}', text or '')
+    raw = match.group(0) if match else (text or '{}')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
 
 
 def render_sections_to_html(sections, allowed_sections):
@@ -2081,200 +2209,91 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     template_skill_tags = extract_template_skill_tags(template_text)
     tailored_sections = TAILORED_SECTION_TITLES[:]
 
-    ai_sections = None
-    ai_allowed_sections = None
-    ai_header_html = None
     tagline = None
 
+    sections = source_sections
+    summary_lines = sections.get('Software Engineer', [])
+    summary = ' '.join([l for l in summary_lines if l.strip()])
+    if not summary:
+        summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
+
+    education = parse_education(sections.get('Education', []))
+    work_entries = parse_experience(sections.get('Work experience/Projects', []))
+    work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
+    volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
+
+    # Keep original role/project structure fixed; AI can only update bullet text.
+    projects = []
+    experience = []
+    for e in work_entries:
+        title_l = e['title'].lower()
+        if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
+            experience.append(e)
+        else:
+            projects.append(e)
+
+    canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(sections.get('Skills', []))
+    skills = filter_skills_for_job(
+        canonical_skills,
+        job_text=job_text or '',
+        max_skills=16,
+        min_skills=10,
+    )
+
+    certificates = parse_list(sections.get('Certificates', []))
+    interests = parse_list(sections.get('Interests', []))
+    header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
+
     if _get_ai_provider() and (job_text or '').strip():
-        tagline, tailored_text = tailor_resume_with_ai(
-            job_text=job_text,
-            resume_text=resume_text,
-            allowed_sections=tailored_sections,
-            fallback_tagline=DEFAULT_TAILORED_TAGLINE,
-        )
-        header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
-        if tagline:
-            header_html = _apply_tagline_to_header(header_html, tagline)
-        sections, allowed_sections = build_sections_from_tailored_text(
-            tailored_text,
-            name=name,
-            allowed_sections=tailored_sections,
-        )
-        source_work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
-        fallback_driving_entries = [e for e in source_work_entries if _is_driving_role(e)]
-        fallback_project_entries = _collect_required_project_entries(source_sections)
-        sections = _prioritize_tailored_sections(
-            sections,
-            fallback_driving_entries=fallback_driving_entries,
-            fallback_project_entries=fallback_project_entries,
-        )
-        allowed_sections = [s.lower() for s in tailored_sections]
-        _filter_excluded_entries_in_sections(sections)
-        canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(source_sections.get('Skills', []))
-        _apply_canonical_skills_to_sections(sections, canonical_skills=canonical_skills, job_text=job_text or '')
-        _clamp_professional_summary(sections, max_words=65)
-        ai_sections = sections
-        ai_allowed_sections = allowed_sections
-        ai_header_html = header_html
-        html_body = header_html + render_sections_to_html(sections, allowed_sections)
-        html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tailored Resume</title>
-<style>
-{style_css}
-.section-title {{ font-weight: 700; margin-top: 16px; }}
-.summary {{ margin: 6px 0; }}
-ul {{ margin: 6px 0 12px 18px; }}
-</style>
-</head>
-<body>
-<div class="page">
-{html_body}
-</div>
-</body>
-</html>
-"""
-        out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
-        out_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
-        base = f"Resume_{safe_label}_{stamp}"
-        html_path = out_dir / f"{base}.html"
-        pdf_path = out_dir / f"{base}.pdf"
-        html_path.write_text(html, encoding='utf-8')
-    else:
-        sections = source_sections
-        summary_lines = sections.get('Software Engineer', [])
-        summary = ' '.join([l for l in summary_lines if l.strip()])
+        try:
+            selective = tailor_resume_selective_with_ai(
+                job_text=job_text,
+                resume_text=resume_text,
+                summary=summary,
+                skills=canonical_skills,
+                experience_entries=experience + volunteer_entries,
+                project_entries=projects,
+            )
+        except Exception:
+            selective = {}
+        summary = _sanitize_summary_text(str(selective.get('summary', '')), fallback=summary, max_words=65)
+        skills = _sanitize_skills_from_ai(selective.get('skills', []), canonical_skills=canonical_skills, job_text=job_text or '')
+        _apply_bullet_updates(experience, selective.get('experience_updates', []))
+        _apply_bullet_updates(volunteer_entries, selective.get('experience_updates', []))
+        _apply_bullet_updates(projects, selective.get('project_updates', []))
 
-        education = parse_education(sections.get('Education', []))
+    keywords = extract_keywords(job_text or '', skills)
+    html = render_html(
+        name=name,
+        headline=headline,
+        contact=contact,
+        summary=summary,
+        education=education,
+        skills=skills,
+        projects=projects,
+        experience=experience,
+        volunteer=volunteer_entries,
+        certificates=certificates,
+        interests=interests,
+        keywords=keywords,
+        style_css=style_css,
+        header_html=header_html,
+    )
 
-        skills = parse_skills(sections.get('Skills', []))
-        skills = filter_skills_for_job(
-            skills,
-            job_text=job_text or '',
-            max_skills=16,
-            min_skills=10,
-        )
+    out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
+    base = f"Resume_{safe_label}_{stamp}"
 
-        work_entries = parse_experience(sections.get('Work experience/Projects', []))
-        work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
-        volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
-
-        # Split projects vs experience based on title keywords
-        projects = []
-        experience = []
-        for e in work_entries:
-            title_l = e['title'].lower()
-            if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
-                experience.append(e)
-            else:
-                projects.append(e)
-
-        certificates = parse_list(sections.get('Certificates', []))
-        interests = parse_list(sections.get('Interests', []))
-
-        keywords = extract_keywords(job_text or '', skills)
-
-        # Reorder skills by relevance
-        if keywords:
-            skills = sorted(skills, key=lambda s: (s.lower() not in [k.lower() for k in keywords], s.lower()))
-
-            # Reorder projects and experience by relevance
-            projects = sorted(projects, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
-            experience = sorted(experience, key=lambda e: -relevance_score(e.get('raw', ''), keywords))
-
-        # Use first sentence as summary fallback
-        if not summary:
-            summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
-
-        header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
-        html = render_html(
-            name=name,
-            headline=headline,
-            contact=contact,
-            summary=summary,
-            education=education,
-            skills=skills,
-            projects=projects,
-            experience=experience,
-            volunteer=volunteer_entries,
-            certificates=certificates,
-            interests=interests,
-            keywords=keywords,
-            style_css=style_css,
-            header_html=header_html,
-        )
-
-        out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
-        out_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'
-        base = f"Resume_{safe_label}_{stamp}"
-
-        html_path = out_dir / f"{base}.html"
-        pdf_path = out_dir / f"{base}.pdf"
-
-        html_path.write_text(html, encoding='utf-8')
+    html_path = out_dir / f"{base}.html"
+    pdf_path = out_dir / f"{base}.pdf"
+    html_path.write_text(html, encoding='utf-8')
 
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
         raise SystemExit('Playwright is required. Install with: python -m pip install playwright && python -m playwright install chromium') from e
-
-    # If AI sections exist, trim to fit within MAX_PAGES (default 2).
-    if ai_sections is not None and MAX_PAGES > 0:
-        def build_html_from_sections():
-            body = ai_header_html + render_sections_to_html(ai_sections, ai_allowed_sections)
-            return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tailored Resume</title>
-<style>
-{style_css}
-.section-title {{ font-weight: 700; margin-top: 16px; }}
-.summary {{ margin: 6px 0; }}
-ul {{ margin: 6px 0 12px 18px; }}
-</style>
-</head>
-<body>
-<div class="page">
-{body}
-</div>
-</body>
-</html>
-"""
-
-        tmp_html = out_dir / f'{base}_tmp.html'
-        tmp_pdf = out_dir / f'{base}_tmp.pdf'
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            while True:
-                html = build_html_from_sections()
-                tmp_html.write_text(html, encoding='utf-8')
-                page = browser.new_page()
-                page.goto(tmp_html.resolve().as_uri(), wait_until='networkidle')
-                page.pdf(path=str(tmp_pdf), format='A4', print_background=True, margin={
-                    'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
-                })
-                page.close()
-                try:
-                    pages = count_pdf_pages(tmp_pdf)
-                except Exception:
-                    pages = MAX_PAGES
-                if pages <= MAX_PAGES:
-                    html_path.write_text(html, encoding='utf-8')
-                    break
-                if not trim_sections_once(ai_sections):
-                    html_path.write_text(html, encoding='utf-8')
-                    break
-            browser.close()
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
