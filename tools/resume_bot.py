@@ -1741,7 +1741,7 @@ def generate_cover_letter(
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
-            page.goto(html_path.as_uri(), wait_until='networkidle')
+            page.goto(html_path.resolve().as_uri(), wait_until='networkidle')
             page.pdf(path=str(pdf_path), format='A4', print_background=True, margin={
                 'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
             })
@@ -2147,7 +2147,7 @@ ul {{ margin: 6px 0 12px 18px; }}
                 html = build_html_from_sections()
                 tmp_html.write_text(html, encoding='utf-8')
                 page = browser.new_page()
-                page.goto(tmp_html.as_uri(), wait_until='networkidle')
+                page.goto(tmp_html.resolve().as_uri(), wait_until='networkidle')
                 page.pdf(path=str(tmp_pdf), format='A4', print_background=True, margin={
                     'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
                 })
@@ -2167,7 +2167,7 @@ ul {{ margin: 6px 0 12px 18px; }}
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
-        page.goto(html_path.as_uri(), wait_until='networkidle')
+        page.goto(html_path.resolve().as_uri(), wait_until='networkidle')
         page.pdf(path=str(pdf_path), format='A4', print_background=True, margin={
             'top': '0', 'right': '0', 'bottom': '0', 'left': '0'
         })
