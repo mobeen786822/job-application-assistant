@@ -1805,9 +1805,9 @@ def _format_contact_item(item: str) -> str:
         href = raw if low.startswith(('http://', 'https://')) else f'https://{raw}'
         label = 'Link'
         if 'github.com' in low:
-            label = 'Github'
+            label = '🐙 GitHub'
         elif 'linkedin.com' in low:
-            label = 'LinkedIn'
+            label = '💼 LinkedIn'
         elif 'mobeenkhan.com' in low:
             domain = re.sub(r'^https?://', '', raw, flags=re.IGNORECASE).strip('/')
             label = f'🌐 {domain or "mobeenkhan.com"}'
@@ -1818,7 +1818,7 @@ def _format_contact_item(item: str) -> str:
         return f'<a href="{html.escape(href, quote=True)}">{label}</a>'
 
     if '@' in raw and ' ' not in raw:
-        return html.escape(raw)
+        return f'📧 {html.escape(raw)}'
 
     if re.search(r'^\+?[0-9][0-9\s\-]{6,}$', raw):
         return html.escape(raw)
