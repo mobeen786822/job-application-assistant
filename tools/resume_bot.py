@@ -112,6 +112,26 @@ GENERIC_BULLET_TERMS = {
 }
 
 SKILL_GROUP_KEYS = ['languages', 'frontend', 'backend', 'testing', 'security', 'tools']
+KEYWORD_TIER_WEIGHTS = {
+    'cyber': 3,
+    'security': 3,
+    'soc': 3,
+    'siem': 3,
+    'incident': 3,
+    'essential eight': 3,
+    'validation': 2,
+    'openai': 2,
+    'api': 2,
+    'react': 2,
+    'typescript': 2,
+    'firebase': 2,
+    'rest': 2,
+    'frontend': 1,
+    'backend': 1,
+    'mobile': 1,
+    'testing': 1,
+    'cloud': 1,
+}
 
 
 def normalize_text(text: str) -> str:
@@ -158,6 +178,38 @@ def clean_skill_token(skill: str) -> str:
             token = token[:-1]
             excess -= 1
     return token.strip()
+
+
+def normalize_bullet_object(bullet) -> dict:
+    if isinstance(bullet, dict):
+        text = normalize_text(str(bullet.get('text', ''))).strip()
+        core = bool(bullet.get('core', False))
+        try:
+            importance = int(bullet.get('importance', 0))
+        except Exception:
+            importance = 0
+        importance = max(0, min(3, importance))
+        tags = []
+        for raw in bullet.get('tags', []) if isinstance(bullet.get('tags', []), list) else []:
+            tag = _normalize_term(str(raw))
+            if tag and tag not in tags:
+                tags.append(tag)
+        return {'text': text, 'core': core, 'importance': importance, 'tags': tags}
+    text = normalize_text(str(bullet or '')).strip()
+    return {'text': text, 'core': False, 'importance': 0, 'tags': []}
+
+
+def normalize_bullet_list(bullets) -> list[dict]:
+    out = []
+    for bullet in bullets or []:
+        item = normalize_bullet_object(bullet)
+        if item.get('text'):
+            out.append(item)
+    return out
+
+
+def bullet_texts(bullets) -> list[str]:
+    return [b.get('text', '') for b in normalize_bullet_list(bullets) if b.get('text', '')]
 
 
 def _split_skills_csv(text: str) -> list[str]:
@@ -1202,22 +1254,70 @@ def reorder_skill_groups(grouped_skills: dict, priority_groups: list[str]) -> tu
 
 def select_project_bullets_deterministic(projects: list[dict], job_text: str, max_bullets_per_project: int) -> list[dict]:
     max_bullets = max(1, int(max_bullets_per_project or 3))
+    jd_norm = _normalize_term(job_text or '')
     keywords = _clean_top_keywords(
         re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', normalize_text(job_text or '').lower()),
-        limit=12,
+        limit=16,
     )
+
+    def score_bullet(bullet_obj: dict) -> int:
+        text = bullet_obj.get('text', '')
+        text_norm = _normalize_term(text)
+
+        tiered_keyword_score = 0
+        for term, weight in KEYWORD_TIER_WEIGHTS.items():
+            term_n = _normalize_term(term)
+            if term_n and term_n in jd_norm and term_n in text_norm:
+                tiered_keyword_score += int(weight)
+        for kw in keywords:
+            k = _normalize_term(kw)
+            if k and k in text_norm:
+                tiered_keyword_score += 1
+
+        tag_matches = 0
+        for tag in bullet_obj.get('tags', []) or []:
+            t = _normalize_term(tag)
+            if t and t in jd_norm:
+                tag_matches += 1
+        tag_score = min(6, tag_matches * 2)
+
+        importance_score = max(0, min(3, int(bullet_obj.get('importance', 0)))) * 2
+        return tiered_keyword_score + tag_score + importance_score
+
     selected = []
     for project in projects or []:
-        bullets = project.get('bullets', []) or []
-        scored = []
-        for idx, bullet in enumerate(bullets):
-            score = _keyword_overlap_score(bullet, keywords)
-            scored.append((score, idx, bullet))
-        scored.sort(key=lambda t: (-t[0], t[1]))
-        top = sorted(scored[:max_bullets], key=lambda t: t[1])
-        chosen_bullets = [b for _, _, b in top] if top else bullets[:max_bullets]
+        bullet_objects = normalize_bullet_list(project.get('bullet_objects', project.get('bullets', [])))
+        if not bullet_objects:
+            updated = dict(project)
+            updated['bullets'] = []
+            updated['bullet_objects'] = []
+            selected.append(updated)
+            continue
+
+        core_items = [(idx, b) for idx, b in enumerate(bullet_objects) if b.get('core')]
+        non_core_items = [(idx, b) for idx, b in enumerate(bullet_objects) if not b.get('core')]
+
+        chosen_pairs = []
+        for idx, bullet_obj in core_items:
+            chosen_pairs.append((idx, bullet_obj))
+
+        if len(chosen_pairs) <= max_bullets:
+            scored_non_core = []
+            for idx, bullet_obj in non_core_items:
+                scored_non_core.append((score_bullet(bullet_obj), idx, bullet_obj))
+            scored_non_core.sort(key=lambda t: (-t[0], t[1]))
+            remaining = max_bullets - len(chosen_pairs)
+            for _, idx, bullet_obj in scored_non_core[:remaining]:
+                chosen_pairs.append((idx, bullet_obj))
+
+        # Keep output in original resume order while preserving core-inclusion rule.
+        chosen_pairs.sort(key=lambda t: t[0])
+        chosen_objects = [b for _, b in chosen_pairs]
+        chosen_bullets = [b.get('text', '') for b in chosen_objects if b.get('text', '')]
+
         updated = dict(project)
         updated['bullets'] = chosen_bullets
+        updated['bullet_objects'] = chosen_objects
         selected.append(updated)
     return selected
 
@@ -1284,12 +1384,34 @@ def validate_resume_schema(resume_dict: dict) -> None:
         for key in ('github', 'live', 'website'):
             if key not in item['links']:
                 raise SystemExit(f'Invalid resume schema: projects[{idx}].links missing "{key}".')
+        if not isinstance(item.get('bullets', []), list):
+            raise SystemExit(f'Invalid resume schema: projects[{idx}].bullets must be an array.')
+        for b_idx, bullet in enumerate(item.get('bullets', [])):
+            if isinstance(bullet, str):
+                continue
+            if not isinstance(bullet, dict):
+                raise SystemExit(f'Invalid resume schema: projects[{idx}].bullets[{b_idx}] must be a string or object.')
+            for key in ('text', 'core', 'importance', 'tags'):
+                if key not in bullet:
+                    raise SystemExit(f'Invalid resume schema: projects[{idx}].bullets[{b_idx}] missing "{key}".')
+            if not isinstance(bullet.get('tags', []), list):
+                raise SystemExit(f'Invalid resume schema: projects[{idx}].bullets[{b_idx}].tags must be an array.')
     for idx, item in enumerate(resume_dict.get('experience', [])):
         if not isinstance(item, dict):
             raise SystemExit(f'Invalid resume schema: experience[{idx}] must be an object.')
         for key in ('title', 'company', 'start', 'end', 'bullets'):
             if key not in item:
                 raise SystemExit(f'Invalid resume schema: experience[{idx}] missing "{key}".')
+        if not isinstance(item.get('bullets', []), list):
+            raise SystemExit(f'Invalid resume schema: experience[{idx}].bullets must be an array.')
+        for b_idx, bullet in enumerate(item.get('bullets', [])):
+            if isinstance(bullet, str):
+                continue
+            if not isinstance(bullet, dict):
+                raise SystemExit(f'Invalid resume schema: experience[{idx}].bullets[{b_idx}] must be a string or object.')
+            for key in ('text', 'core', 'importance', 'tags'):
+                if key not in bullet:
+                    raise SystemExit(f'Invalid resume schema: experience[{idx}].bullets[{b_idx}] missing "{key}".')
 
 
 def resume_json_to_text(resume_dict: dict) -> str:
@@ -1339,6 +1461,7 @@ def resume_json_to_internal(resume_dict: dict) -> dict:
     projects_by_name = {}
     for project in resume_dict.get('projects', []):
         links = project.get('links', {}) or {}
+        project_bullets = normalize_bullet_list(project.get('bullets', []) or [])
         subtitle_parts = []
         if links.get('github'):
             subtitle_parts.append(f'LINK: {links["github"]}')
@@ -1350,17 +1473,20 @@ def resume_json_to_internal(resume_dict: dict) -> dict:
             'title': project.get('name', ''),
             'subtitle': ' | '.join(subtitle_parts),
             'date': '',
-            'bullets': [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()],
+            'bullets': [b.get('text', '') for b in project_bullets if b.get('text', '')],
+            'bullet_objects': project_bullets,
             'technologies': [clean_skill_token(str(t)) for t in (project.get('technologies', []) or []) if clean_skill_token(str(t))],
         }
 
     experience = []
     for exp in resume_dict.get('experience', []):
+        exp_bullets = normalize_bullet_list(exp.get('bullets', []) or [])
         experience.append({
             'title': exp.get('title', ''),
             'subtitle': exp.get('company', ''),
             'date': f'{exp.get("start", "")} - {exp.get("end", "")}'.strip(' -'),
-            'bullets': [normalize_text(str(b)).strip() for b in (exp.get('bullets', []) or []) if normalize_text(str(b)).strip()],
+            'bullets': [b.get('text', '') for b in exp_bullets if b.get('text', '')],
+            'bullet_objects': exp_bullets,
             'raw': '',
         })
 
@@ -2534,7 +2660,8 @@ def _validate_project_bullets_constrained(
 
 def _extract_source_index_bullets(project: dict) -> list[dict]:
     rows = []
-    for idx, bullet in enumerate(project.get('bullets', []) or []):
+    texts = bullet_texts(project.get('bullet_objects', project.get('bullets', [])))
+    for idx, bullet in enumerate(texts):
         rows.append({'source_index': idx, 'text': normalize_text(str(bullet)).strip()})
     return rows
 
@@ -2745,7 +2872,7 @@ def validate_generated_resume(original_resume_json: dict, generated_resume_json:
     for key, project in gen_projects.items():
         orig_project = orig_projects[key]
         allowed_terms = _project_tech_allowlist_from_resume_json(orig_project)
-        orig_bullets = [normalize_text(str(b)).strip() for b in (orig_project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
+        orig_bullets = bullet_texts(orig_project.get('bullets', []) or [])
         gen_bullets = [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
         if len(gen_bullets) > len(orig_bullets):
             raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has new bullets.')
