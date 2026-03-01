@@ -1159,10 +1159,10 @@ def choose_resume_strategy(classification: dict) -> dict:
         'tagline': None,
         'section_order': DEFAULT_SECTION_ORDER[:],
         'project_priority': [
+            'Bunkerify',
             'Job Application Assistant',
             'Production Support Incident Console',
             'Cancer Awareness Mobile App',
-            'Bunkerify',
         ],
         'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
         'min_bullets_per_project': 2,
@@ -3921,6 +3921,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
                 fallback=summary,
                 max_words=65,
             )
+            if 'bunkerify' in _normalize_term(deterministic_summary) and 'bunkerify' not in _normalize_term(candidate_summary):
+                candidate_summary = deterministic_summary
             by_name = {_entry_match_key(p.get('title', '')): dict(p) for p in projects}
             for row in payload.get('projects', []):
                 key = _entry_match_key(row.get('name', ''))
