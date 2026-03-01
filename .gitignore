@@ -3,3 +3,6 @@ __pycache__/
 outputs/
 .claude/worktrees/
 tmp_job.txt
+.claude/settings.local.json
+.venv/
+.venv-1/
