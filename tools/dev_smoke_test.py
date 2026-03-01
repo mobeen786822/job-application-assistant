@@ -6,7 +6,12 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
-from tools.resume_bot import choose_resume_strategy, classify_job, generate_resume
+from tools.resume_bot import (
+    choose_resume_strategy,
+    classify_job,
+    generate_resume,
+    generate_summary_with_guard,
+)
 
 RESUME_PATH = APP_ROOT / 'assets' / 'resume.txt'
 TEMPLATE_PATH = APP_ROOT / 'assets' / 'template.html'
@@ -65,9 +70,29 @@ def run_case(label: str, job_text: str) -> None:
     print(f'[{label}] pdf={pdf_path}')
 
 
+def run_summary_guard_smoke(job_text: str) -> None:
+    resume_text = RESUME_PATH.read_text(encoding='utf-8', errors='replace')
+    classification = classify_job(job_text)
+    strategy = choose_resume_strategy(classification)
+    summary_data = generate_summary_with_guard(
+        job_text=job_text,
+        resume_text=resume_text,
+        fallback_summary='',
+        classification=classification,
+        strategy=strategy,
+    )
+    summary = str(summary_data.get('summary', ''))
+    summary_l = summary.lower()
+    for token in ('c#', '.net', 'asp.net', 'dotnet'):
+        assert token not in summary_l, f'Summary contains banned token: {token}'
+    print(f'[SUMMARY] summary={summary}')
+    print(f'[SUMMARY] tech_used={summary_data.get("tech_used", [])}')
+
+
 def main() -> None:
     run_case('SOFTWARE', SOFTWARE_JOB_TEXT)
     run_case('CYBER', CYBER_JOB_TEXT)
+    run_summary_guard_smoke(CYBER_JOB_TEXT)
 
 
 if __name__ == '__main__':

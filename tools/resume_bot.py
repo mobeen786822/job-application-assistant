@@ -103,6 +103,7 @@ DEFAULT_SECTION_ORDER = [
     'Interests',
     'Additional Information',
 ]
+SUMMARY_BANNED_RE = re.compile(r"\b(c#|c\s*sharp|\.net|asp\.?net|dotnet)\b", re.IGNORECASE)
 
 
 def normalize_text(text: str) -> str:
@@ -970,6 +971,222 @@ def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> l
         return (1, 99, title)
 
     return sorted(projects, key=project_key)
+
+
+def _normalize_term(value: str) -> str:
+    text = normalize_text(value or '').strip().lower()
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+
+def build_allowed_terms(resume_text: str) -> set[str]:
+    terms: set[str] = set()
+
+    def add(term: str) -> None:
+        t = _normalize_term(term)
+        if not t:
+            return
+        terms.add(t)
+
+    sections = split_sections(resume_text)[1]
+    skills = parse_skills(sections.get('Skills', []))
+    for skill in skills:
+        add(skill)
+        for part in re.split(r'[/|,]', skill):
+            add(part)
+        compact = _normalize_term(skill).replace(' ', '')
+        if compact and compact != _normalize_term(skill):
+            terms.add(compact)
+
+    seed_phrases = [
+        'javascript',
+        'typescript',
+        'react',
+        'react native',
+        'sql',
+        'nosql',
+        'rest api integration',
+        'rest api',
+        'jest',
+        'react testing library',
+        'bachelor of computer science',
+        'job application assistant',
+        'production support incident console',
+        'bunkerify',
+        'cancer awareness mobile app',
+    ]
+    for phrase in seed_phrases:
+        if phrase in _normalize_term(resume_text):
+            add(phrase)
+
+    for phrase in re.findall(r'[A-Za-z][A-Za-z0-9\+\#\.\-/ ]{1,45}', normalize_text(resume_text)):
+        cleaned = _normalize_term(phrase)
+        if len(cleaned) < 2:
+            continue
+        if cleaned in STOPWORDS:
+            continue
+        if any(ch.isdigit() for ch in cleaned):
+            continue
+        if cleaned.startswith('http'):
+            continue
+        if len(cleaned.split()) > 6:
+            continue
+        if re.search(r'[a-zA-Z]', cleaned):
+            add(cleaned)
+    return terms
+
+
+def _fallback_summary_from_resume(resume_text: str) -> dict:
+    summary = (
+        "Graduate Software Engineer with a Bachelor of Computer Science majoring in Software Engineering and Cybersecurity. "
+        "Hands-on experience building web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST API integration. "
+        "Built Job Application Assistant, Production Support Incident Console, Bunkerify, and a Cancer Awareness Mobile App, with application testing using Jest and React Testing Library."
+    )
+    return {
+        'summary': summary,
+        'tech_used': [
+            'javascript',
+            'typescript',
+            'react',
+            'react native',
+            'sql',
+            'nosql',
+            'rest api integration',
+            'jest',
+            'react testing library',
+        ],
+        'evidence_phrases': [
+            'Bachelor of Computer Science',
+            'JavaScript/TypeScript',
+            'React/React Native',
+            'SQL/NoSQL',
+            'REST API integrations',
+            'Job Application Assistant',
+            'Production Support Incident Console',
+            'Bunkerify',
+            'Cancer Awareness Mobile App',
+            'Jest/React Testing Library',
+        ],
+        'source': 'fallback',
+    }
+
+
+def _validate_summary_payload(payload: dict, resume_text: str, allowed_terms: set[str]) -> tuple[bool, str]:
+    if not isinstance(payload, dict):
+        return False, 'payload not a dict'
+    summary = normalize_text(str(payload.get('summary', ''))).strip()
+    if not summary:
+        return False, 'missing summary'
+    tech_used = payload.get('tech_used', [])
+    if not isinstance(tech_used, list):
+        return False, 'tech_used must be a list'
+    for item in tech_used:
+        term = _normalize_term(str(item))
+        if not term or term not in allowed_terms:
+            return False, f'tech term not allowed: {item}'
+    evidence = payload.get('evidence_phrases', [])
+    if not isinstance(evidence, list):
+        return False, 'evidence_phrases must be a list'
+    for phrase in evidence:
+        raw = str(phrase)
+        if not raw:
+            continue
+        if raw not in resume_text:
+            return False, f'evidence phrase not found in resume: {raw}'
+
+    if SUMMARY_BANNED_RE.search(summary):
+        banned_terms = {'c#', 'c sharp', '.net', 'asp.net', 'aspnet', 'dotnet'}
+        if not any(t in allowed_terms for t in banned_terms):
+            return False, 'summary contains banned technology term'
+    return True, ''
+
+
+def _generate_summary_with_ai(
+    job_text: str,
+    resume_text: str,
+    fallback_summary: str,
+    allowed_terms: set[str],
+    classification: dict,
+    strategy: dict,
+    stronger_warning: bool = False,
+) -> dict:
+    warning = ''
+    if stronger_warning:
+        warning = (
+            "CRITICAL: Previous output failed validation. "
+            "If any term is not in allowlist or any evidence phrase is not verbatim in resume_text, the output will be discarded.\n"
+        )
+    prompt = (
+        f"Job description:\n{_truncate(job_text or '', 2500)}\n\n"
+        f"Current summary:\n{_truncate(fallback_summary or '', 500)}\n\n"
+        f"Classification:\n{json.dumps(classification or {}, ensure_ascii=False)}\n\n"
+        f"Strategy:\n{json.dumps(strategy or {}, ensure_ascii=False)}\n\n"
+        f"Allowlist terms:\n{json.dumps(sorted(allowed_terms), ensure_ascii=False)}\n\n"
+        f"resume_text:\n{_truncate(resume_text, 6500)}\n"
+    )
+    instructions = (
+        "Return STRICT JSON only with this exact shape:\n"
+        "{"
+        "\"summary\": \"...\","
+        "\"tech_used\": [\"...\"],"
+        "\"evidence_phrases\": [\"...\"]"
+        "}\n"
+        "Rules:\n"
+        "- Do not make assumptions.\n"
+        "- tech_used must contain only terms from the provided allowlist.\n"
+        "- evidence_phrases must be exact substrings copied from resume_text.\n"
+        "- Do not introduce technologies not present in allowlist.\n"
+        "- Keep summary concise (45-65 words).\n"
+        "- Do not include markdown or extra keys.\n"
+        f"{warning}"
+    )
+    raw = _call_ai_text(prompt=prompt, instructions=instructions, max_tokens=700, model_tier='fast')
+    match = re.search(r'\{[\s\S]*\}', raw or '')
+    payload = match.group(0) if match else (raw or '{}')
+    data = json.loads(payload)
+    if not isinstance(data, dict):
+        raise ValueError('summary AI output is not a JSON object')
+    return data
+
+
+def generate_summary_with_guard(
+    job_text: str,
+    resume_text: str,
+    fallback_summary: str,
+    classification: dict,
+    strategy: dict,
+) -> dict:
+    allowed_terms = build_allowed_terms(resume_text)
+    if not _get_ai_provider() or not (job_text or '').strip():
+        fallback = _fallback_summary_from_resume(resume_text)
+        fallback['summary'] = _sanitize_summary_text(fallback['summary'], fallback=fallback_summary, max_words=65)
+        return fallback
+
+    for attempt in range(2):
+        try:
+            candidate = _generate_summary_with_ai(
+                job_text=job_text,
+                resume_text=resume_text,
+                fallback_summary=fallback_summary,
+                allowed_terms=allowed_terms,
+                classification=classification,
+                strategy=strategy,
+                stronger_warning=(attempt == 1),
+            )
+            ok, _reason = _validate_summary_payload(candidate, resume_text=resume_text, allowed_terms=allowed_terms)
+            if ok:
+                return {
+                    'summary': _sanitize_summary_text(str(candidate.get('summary', '')), fallback=fallback_summary, max_words=65),
+                    'tech_used': [_normalize_term(t) for t in candidate.get('tech_used', []) if _normalize_term(str(t))],
+                    'evidence_phrases': [str(p) for p in candidate.get('evidence_phrases', []) if str(p)],
+                    'source': 'ai',
+                }
+        except Exception:
+            pass
+
+    fallback = _fallback_summary_from_resume(resume_text)
+    fallback['summary'] = _sanitize_summary_text(fallback['summary'], fallback=fallback_summary, max_words=65)
+    return fallback
 
 
 def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10, prefer_cyber_terms=False):
@@ -2451,15 +2668,6 @@ def trim_sections_once(sections) -> bool:
     return False
 
 
-def count_pdf_pages(pdf_path: Path) -> int:
-    try:
-        from PyPDF2 import PdfReader
-    except Exception as e:
-        raise SystemExit('PyPDF2 is required. Install with: python -m pip install PyPDF2') from e
-    reader = PdfReader(str(pdf_path))
-    return len(reader.pages)
-
-
 def _apply_tagline_to_header(header_html: str, tagline: str | None) -> str:
     if not header_html or not tagline:
         return header_html
@@ -2609,6 +2817,18 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     summary = ' '.join([l for l in summary_lines if l.strip()])
     if not summary:
         summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
+    summary_result = generate_summary_with_guard(
+        job_text=job_text or '',
+        resume_text=resume_text,
+        fallback_summary=summary,
+        classification=classification,
+        strategy=strategy,
+    )
+    summary = _sanitize_summary_text(
+        str(summary_result.get('summary', '')),
+        fallback=summary,
+        max_words=65,
+    )
 
     education = parse_education(sections.get('Education', []))
     work_entries = parse_experience(sections.get('Work experience/Projects', []))
@@ -2653,7 +2873,6 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             )
         except Exception:
             selective = {}
-        summary = _sanitize_summary_text(str(selective.get('summary', '')), fallback=summary, max_words=65)
         skills = _sanitize_skills_from_ai(
             selective.get('skills', []),
             canonical_skills=canonical_skills,
