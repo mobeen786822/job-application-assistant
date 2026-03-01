@@ -121,7 +121,20 @@ def run_project_scope_validation_smoke() -> None:
     print(f'[PROJECT_SCOPE] cancer_contains_aws={"aws" in cancer_block.lower()} original_has_aws={original_has_aws}')
 
 
+def run_parser_counts_smoke() -> None:
+    resume_text = RESUME_PATH.read_text(encoding='utf-8', errors='replace')
+    parsed = parse_resume_sections(resume_text)
+    projects_count = len(parsed.get('projects', {}))
+    experience_count = len(parsed.get('experience', []))
+    education_count = len(parsed.get('education', []))
+    skills_count = len(parsed.get('skills', []))
+    print(f'[PARSE_COUNTS] projects={projects_count} experience={experience_count} education={education_count} skills={skills_count}')
+    assert projects_count > 0, 'Expected projects > 0'
+    assert education_count > 0, 'Expected education > 0'
+
+
 def main() -> None:
+    run_parser_counts_smoke()
     run_case('SOFTWARE', SOFTWARE_JOB_TEXT)
     run_case('CYBER', CYBER_JOB_TEXT)
     run_summary_guard_smoke(CYBER_JOB_TEXT)

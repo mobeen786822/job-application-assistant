@@ -55,7 +55,7 @@ CYBER_JOB_TERMS = [
     'essential eight',
 ]
 
-DASH_LINE = re.compile(r'^-\s*-\s*-\s*[-\s]*$')
+DASH_LINE = re.compile(r'^(?:-\s*-\s*-\s*[-\s]*|-{3,})$')
 DATE_LINE = re.compile(r'\b\d{2}/\d{4}\s*-\s*(Present|\d{2}/\d{4})\b', re.IGNORECASE)
 EXCLUDED_PROJECT_TITLES = {
     'seo-optimised blog posts for ecommerce',
@@ -260,6 +260,8 @@ def split_sections(text: str):
     header_block = []
     current = None
     i = 0
+    prev_was_dash = False
+    using_new_style_headers = False
 
     while i < len(lines):
         line = lines[i]
@@ -273,20 +275,34 @@ def split_sections(text: str):
             continue
 
         if DASH_LINE.match(stripped):
+            prev_was_dash = True
             i += 1
             continue
 
-        # Header is a non-empty line followed by a dashed line (ignoring blanks)
-        j = i + 1
-        while j < len(lines) and not lines[j].strip():
-            j += 1
-        is_header_candidate = not re.search(r'https?://|@', stripped)
-        if is_header_candidate and j < len(lines) and DASH_LINE.match(lines[j].strip()):
-            current = stripped
-            sections.setdefault(current, [])
-            i = j + 1
-            continue
+        if prev_was_dash:
+            is_header_candidate = not re.search(r'https?://|@', stripped)
+            if is_header_candidate:
+                current = stripped
+                sections.setdefault(current, [])
+                using_new_style_headers = True
+                prev_was_dash = False
+                i += 1
+                continue
 
+        # Header is a non-empty line followed by a dashed line (ignoring blanks)
+        if not using_new_style_headers:
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            is_header_candidate = not re.search(r'https?://|@', stripped)
+            if is_header_candidate and j < len(lines) and DASH_LINE.match(lines[j].strip()):
+                current = stripped
+                sections.setdefault(current, [])
+                prev_was_dash = False
+                i = j + 1
+                continue
+
+        prev_was_dash = False
         if current is None:
             header_block.append(stripped)
         else:
@@ -436,14 +452,126 @@ def parse_list(block_lines):
     return items
 
 
+def parse_summary_new(block_lines) -> str:
+    return ' '.join([l.strip() for l in (block_lines or []) if l.strip()])
+
+
+def parse_projects_new(block_lines) -> dict[str, dict]:
+    projects: dict[str, dict] = {}
+    current = None
+
+    def flush_project():
+        nonlocal current
+        if not current:
+            return
+        title = current.get('title', '').strip()
+        if not title:
+            current = None
+            return
+        subtitle_parts = []
+        if current.get('link'):
+            subtitle_parts.append(f'LINK: {current["link"]}')
+        if current.get('live'):
+            subtitle_parts.append(f'LIVE: {current["live"]}')
+        projects[title] = {
+            'title': title,
+            'subtitle': ' | '.join(subtitle_parts),
+            'date': '',
+            'bullets': current.get('bullets', [])[:],
+            'raw': '',
+        }
+        current = None
+
+    for raw in block_lines or []:
+        line = normalize_text(raw).strip()
+        if not line:
+            continue
+        if line.startswith('PROJECT:'):
+            flush_project()
+            current = {'title': line.split(':', 1)[1].strip(), 'link': '', 'live': '', 'bullets': []}
+            continue
+        if current is None:
+            continue
+        if line.startswith('LINK:'):
+            current['link'] = line.split(':', 1)[1].strip()
+            continue
+        if line.startswith('LIVE:'):
+            current['live'] = line.split(':', 1)[1].strip()
+            continue
+        if line.startswith('-'):
+            bullet = line.lstrip('-').strip()
+            if bullet:
+                current['bullets'].append(bullet)
+    flush_project()
+    return projects
+
+
+def parse_experience_new(block_lines):
+    # New format still uses title/subtitle/date/bullets with blank lines between roles.
+    return parse_experience(block_lines or [])
+
+
+def parse_skills_new(block_lines):
+    skills = []
+    for raw in block_lines or []:
+        line = normalize_text(raw).strip()
+        if not line:
+            continue
+        if line.endswith(':'):
+            continue
+        if ':' in line and not line.startswith(('http://', 'https://')):
+            line = line.split(':', 1)[1].strip()
+        for part in _split_skills_csv(line):
+            for sub in part.split(','):
+                token = clean_skill_token(sub)
+                if token:
+                    skills.append(token)
+    seen = set()
+    out = []
+    for skill in skills:
+        key = skill.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(skill)
+    return out
+
+
+def _get_section_case_insensitive(source_sections: dict, *names: str) -> list[str]:
+    lower_map = {normalize_text(k).strip().lower(): v for k, v in (source_sections or {}).items()}
+    for name in names:
+        value = lower_map.get(normalize_text(name).strip().lower())
+        if value is not None:
+            return value
+    return []
+
+
 def parse_resume_sections(resume_text: str) -> dict:
     _, source_sections = split_sections(resume_text)
-    summary_lines = source_sections.get('Software Engineer', [])
+    if _get_section_case_insensitive(source_sections, 'PROFESSIONAL SUMMARY'):
+        summary = parse_summary_new(_get_section_case_insensitive(source_sections, 'PROFESSIONAL SUMMARY'))
+        projects = parse_projects_new(_get_section_case_insensitive(source_sections, 'PROJECTS'))
+        experience = parse_experience_new(_get_section_case_insensitive(source_sections, 'PROFESSIONAL EXPERIENCE'))
+        education = parse_education(_get_section_case_insensitive(source_sections, 'EDUCATION'))
+        skills = parse_skills_new(_get_section_case_insensitive(source_sections, 'SKILLS'))
+        certificates = parse_list(_get_section_case_insensitive(source_sections, 'CERTIFICATES'))
+        return {
+            'summary': summary,
+            'projects': projects,
+            'skills': skills,
+            'certificates': certificates,
+            'experience': experience,
+            'education': education,
+            'interests': [],
+        }
+
+    # Backwards compatibility for old resume format.
+    summary_lines = _get_section_case_insensitive(source_sections, 'Software Engineer')
     summary = ' '.join([l for l in summary_lines if l.strip()])
 
-    work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
+    work_entries = parse_experience(_get_section_case_insensitive(source_sections, 'Work experience/Projects'))
     work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
-    volunteer_entries = parse_experience(source_sections.get('Volunteer Experience', []))
+    volunteer_entries = parse_experience(_get_section_case_insensitive(source_sections, 'Volunteer Experience'))
 
     projects = {}
     experience = []
@@ -457,9 +585,11 @@ def parse_resume_sections(resume_text: str) -> dict:
     return {
         'summary': summary,
         'projects': projects,
-        'skills': parse_skills(source_sections.get('Skills', [])),
-        'certificates': parse_list(source_sections.get('Certificates', [])),
+        'skills': parse_skills(_get_section_case_insensitive(source_sections, 'Skills')),
+        'certificates': parse_list(_get_section_case_insensitive(source_sections, 'Certificates')),
         'experience': experience + volunteer_entries,
+        'education': parse_education(_get_section_case_insensitive(source_sections, 'Education')),
+        'interests': parse_list(_get_section_case_insensitive(source_sections, 'Interests')),
     }
 
 
@@ -3122,24 +3252,14 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         max_words=65,
     )
 
-    education = parse_education(sections.get('Education', []))
-    work_entries = parse_experience(sections.get('Work experience/Projects', []))
-    work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
-    volunteer_entries = parse_experience(sections.get('Volunteer Experience', []))
-
-    # Keep original role/project structure fixed; AI can only update bullet text.
-    projects = []
-    experience = []
-    for e in work_entries:
-        title_l = e['title'].lower()
-        if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
-            experience.append(e)
-        else:
-            projects.append(e)
+    education = parsed_resume.get('education', [])
+    experience = [dict(e) for e in (parsed_resume.get('experience', []) or [])]
+    volunteer_entries = []
+    projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
     project_allowed_terms_by_title = build_project_allowed_terms(parsed_resume.get('projects', {}))
 
-    canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(sections.get('Skills', []))
+    canonical_skills = template_skill_tags[:] if template_skill_tags else (parsed_resume.get('skills', []) or [])
     skills = filter_skills_for_job(
         canonical_skills,
         job_text=job_text or '',
@@ -3148,8 +3268,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         prefer_cyber_terms=bool(strategy.get('prefer_cyber_terms', False)),
     )
 
-    certificates = parse_list(sections.get('Certificates', []))
-    interests = parse_list(sections.get('Interests', []))
+    certificates = parsed_resume.get('certificates', [])
+    interests = parsed_resume.get('interests', [])
     header_html = render_header_html(name=name, headline=headline, contact=contact)
 
     if _get_ai_provider() and (job_text or '').strip():
