@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import difflib
 import html
 import hashlib
@@ -135,10 +135,10 @@ KEYWORD_TIER_WEIGHTS = {
 def normalize_text(text: str) -> str:
     # Fix common mojibake and replace non-ASCII punctuation with ASCII.
     replacements = {
-        '–': '-',
-        '—': '-',
-        '·': '-',
-        '×': 'x',
+        'â€“': '-',
+        'â€”': '-',
+        'Â·': '-',
+        'Ã—': 'x',
         '\u2013': '-',
         '\u2014': '-',
         '\u2022': '-',
@@ -1805,21 +1805,26 @@ def _format_contact_item(item: str) -> str:
         href = raw if low.startswith(('http://', 'https://')) else f'https://{raw}'
         label = 'Link'
         if 'github.com' in low:
-            label = '🐙 Github'
+            label = 'Github'
         elif 'linkedin.com' in low:
-            label = '💼 LinkedIn'
+            label = 'LinkedIn'
         elif 'mobeenkhan.com' in low:
-            label = '🌐 Portfolio'
+            domain = re.sub(r'^https?://', '', raw, flags=re.IGNORECASE).strip('/')
+            label = f'🌐 {domain or "mobeenkhan.com"}'
+        else:
+            domain = re.sub(r'^https?://', '', raw, flags=re.IGNORECASE).strip('/')
+            if domain:
+                label = domain
         return f'<a href="{html.escape(href, quote=True)}">{label}</a>'
 
     if '@' in raw and ' ' not in raw:
-        return f'📧 {html.escape(raw)}'
+        return html.escape(raw)
 
     if re.search(r'^\+?[0-9][0-9\s\-]{6,}$', raw):
-        return f'📞 {html.escape(raw)}'
+        return html.escape(raw)
 
     if 'sydney' in low:
-        return f'📍 {html.escape(raw)}'
+        return html.escape(raw)
 
     return html.escape(raw)
 
@@ -1890,22 +1895,8 @@ def render_html(
                 html.append('</ul>')
             html.append('</div>')
         return '\n'.join(html)
-
-    edu_html = render_entries(education, with_subtitle=True)
-    skills_grouped = grouped_skills or {}
-    skill_order = skill_priority_groups[:] if skill_priority_groups else list(skills_grouped.keys())
-    for group in skills_grouped.keys():
-        if group not in skill_order:
-            skill_order.append(group)
-    skill_lines = []
-    for group in skill_order:
-        values = [clean_skill_token(str(v)) for v in (skills_grouped.get(group, []) or []) if clean_skill_token(str(v))]
-        if not values:
-            continue
-        group_label = normalize_text(str(group)).strip().replace('_', ' ').title()
-        joined = ', '.join([html.escape(v) for v in values])
-        skill_lines.append(f'<p class="summary"><strong>{html.escape(group_label)}:</strong> {joined}</p>')
-    skills_html = ''.join(skill_lines)
+    edu_html = render_entries(education, with_subtitle=True)
+    skills_html = ''.join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in (skills or []) if s])
     proj_html = render_entries(projects)
     combined_experience = (experience or []) + (volunteer or [])
     exp_html = render_entries(combined_experience)
@@ -1918,7 +1909,7 @@ def render_html(
         ),
         'Key Skills / Technical Skills': (
             '<div class="section"><div class="section-title">Key Skills</div>'
-            f'{skills_html}</div>'
+            f'<div class="skills-grid">{skills_html}</div></div>'
         ),
         'Professional Experience': (
             '<div class="section"><div class="section-title">Professional Experience</div>'
@@ -2131,7 +2122,7 @@ def build_sections_from_tailored_text(
             current['entries'].append(current_entry)
             continue
 
-        if line in ('---', '—', '--'):
+        if line in ('---', 'â€”', '--'):
             continue
 
         if line.startswith('- ') or line.startswith('* '):
@@ -2345,7 +2336,7 @@ def _prioritize_tailored_sections(sections, fallback_driving_entries=None, fallb
             existing_project_keys.add(rank)
 
     # Unconditional: Job Application Assistant (rank=2) and Cancer Awareness
-    # (rank=3) must always appear — force-inject from fallback if still missing.
+    # (rank=3) must always appear â€” force-inject from fallback if still missing.
     for must_rank in sorted({2, 3} - existing_project_keys):
         for entry in (fallback_project_entries or []):
             if _project_rank(entry.get('title', '')) == must_rank:
@@ -3161,7 +3152,7 @@ def _format_tailored_text_to_html(
             current['entries'].append(current_entry)
             continue
 
-        if line in ('---', '—', '--'):
+        if line in ('---', 'â€”', '--'):
             continue
 
         if line.startswith('- ') or line.startswith('* '):
@@ -3305,7 +3296,7 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
         if not seg:
             continue
         for word in seg.split():
-            w = word.strip('!?,;:\'"[](){}·')
+            w = word.strip('!?,;:\'"[](){}Â·')
             if not w:
                 continue
             w_l = w.lower()
@@ -3373,7 +3364,7 @@ def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) ->
         "Cover letter requirements:\n\n"
         "Tone must be confident, professional, and modern (not generic or robotic).\n\n"
         "It must sound like a real person wrote it, not AI.\n\n"
-        "Keep it concise: 300–450 words max.\n\n"
+        "Keep it concise: 300â€“450 words max.\n\n"
         "Structure it properly:\n\n"
         "Strong opening paragraph (role + excitement + value)\n\n"
         "Middle paragraph(s) linking my skills/projects to the job requirements\n\n"
@@ -3772,16 +3763,9 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     grouped_skills = parsed_resume.get('skills_grouped', {})
     ordered_grouped_skills, ordered_skills = reorder_skill_groups(
         grouped_skills=grouped_skills,
-        priority_groups=strategy.get('skill_priority_groups', []),
+        priority_groups=SKILL_GROUP_KEYS,
     )
-    canonical_skills = ordered_skills or (parsed_resume.get('skills', []) or [])
-    skills = filter_skills_for_job(
-        canonical_skills,
-        job_text=job_text or '',
-        max_skills=int(strategy.get('max_skills', 16)),
-        min_skills=int(strategy.get('min_skills', 10)),
-        prefer_cyber_terms=bool(strategy.get('prefer_cyber_terms', False)),
-    )
+    skills = ordered_skills or (parsed_resume.get('skills', []) or [])
 
     certificates = parsed_resume.get('certificates', [])
     interests = parsed_resume.get('interests', [])
@@ -3954,3 +3938,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
