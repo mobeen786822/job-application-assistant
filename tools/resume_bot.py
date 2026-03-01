@@ -1,5 +1,6 @@
 import argparse
 import html
+import hashlib
 import json
 import os
 import re
@@ -77,6 +78,9 @@ DEFAULT_TAILORED_TAGLINE = (
     'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
     'ACSC Essential Eight | Production Systems'
 )
+
+
+_JOB_FIT_CACHE: dict[str, dict] = {}
 
 
 def normalize_text(text: str) -> str:
@@ -497,14 +501,55 @@ def _get_ai_provider() -> str | None:
     return None
 
 
-def _call_ai_text(prompt: str, instructions: str | None = None, max_tokens: int = 2400) -> str:
+def _call_claude(
+    prompt: str,
+    instructions: str | None = None,
+    max_tokens: int = 2400,
+    model_tier: str = 'smart',
+) -> str:
+    try:
+        from anthropic import Anthropic
+    except Exception as e:
+        raise SystemExit('Anthropic SDK required. Install with: python -m pip install anthropic') from e
+    tier = (model_tier or 'smart').strip().lower()
+    if tier == 'fast':
+        model = os.environ.get('CLAUDE_MODEL_FAST', 'claude-haiku-4-5-20251001')
+    else:
+        model = os.environ.get('CLAUDE_MODEL_SMART', 'claude-sonnet-4-20250514')
+    # Backward compatibility for older env wiring.
+    model = (model or '').strip() or os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514')
+    client = Anthropic()
+    kwargs = {
+        'model': model,
+        'max_tokens': max(64, int(max_tokens)),
+        'messages': [{'role': 'user', 'content': prompt}],
+    }
+    if instructions:
+        kwargs['system'] = instructions
+    response = client.messages.create(**kwargs)
+    text = _extract_anthropic_text(response)
+    if text:
+        return text
+    raise SystemExit('Anthropic response did not include text output.')
+
+
+def _call_ai_text(
+    prompt: str,
+    instructions: str | None = None,
+    max_tokens: int = 2400,
+    model_tier: str = 'smart',
+) -> str:
     provider = _get_ai_provider()
     if provider == 'openai':
         try:
             from openai import OpenAI
         except Exception as e:
             raise SystemExit('OpenAI SDK required. Install with: python -m pip install openai') from e
-        model = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+        tier = (model_tier or 'smart').strip().lower()
+        if tier == 'fast':
+            model = os.environ.get('OPENAI_MODEL_FAST', os.environ.get('OPENAI_MODEL', 'gpt-4o-mini'))
+        else:
+            model = os.environ.get('OPENAI_MODEL_SMART', os.environ.get('OPENAI_MODEL', 'gpt-4o'))
         client = OpenAI()
         kwargs = {'model': model, 'input': prompt}
         if instructions:
@@ -516,29 +561,27 @@ def _call_ai_text(prompt: str, instructions: str | None = None, max_tokens: int 
         raise SystemExit('OpenAI response did not include text output.')
 
     if provider == 'anthropic':
-        try:
-            from anthropic import Anthropic
-        except Exception as e:
-            raise SystemExit('Anthropic SDK required. Install with: python -m pip install anthropic') from e
-        model = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
-        client = Anthropic()
-        kwargs = {
-            'model': model,
-            'max_tokens': max(256, int(max_tokens)),
-            'messages': [{'role': 'user', 'content': prompt}],
-        }
-        if instructions:
-            kwargs['system'] = instructions
-        response = client.messages.create(**kwargs)
-        text = _extract_anthropic_text(response)
-        if text:
-            return text
-        raise SystemExit('Anthropic response did not include text output.')
+        return _call_claude(
+            prompt=prompt,
+            instructions=instructions,
+            max_tokens=max_tokens,
+            model_tier=model_tier,
+        )
 
     raise SystemExit('Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable AI features.')
 
 
+def _truncate(text: str, max_chars: int) -> str:
+    if max_chars <= 0:
+        return ''
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars]
+
+
 def assess_job_fit_with_ai(job_text: str, resume_text: str) -> dict:
+    job_text = _truncate(job_text, 2000)
+    resume_text = _truncate(resume_text, 3000)
     prompt = (
         "Assess whether the candidate should apply for this role based only on the resume.\n"
         "Return strict JSON only with keys: recommendation, confidence, rationale, matched_requirements, missing_requirements.\n"
@@ -553,7 +596,7 @@ def assess_job_fit_with_ai(job_text: str, resume_text: str) -> dict:
         f"Job description:\n{job_text}\n\n"
         f"Resume:\n{resume_text}\n"
     )
-    raw = _call_ai_text(prompt=prompt, max_tokens=1400)
+    raw = _call_ai_text(prompt=prompt, max_tokens=512, model_tier='fast')
     if not raw:
         raise SystemExit('AI response did not include text output.')
 
@@ -589,6 +632,10 @@ def assess_job_fit_with_ai(job_text: str, resume_text: str) -> dict:
     }
 
 
+def assess_job_fit_with_claude(job_text: str, resume_text: str) -> dict:
+    return assess_job_fit_with_ai(job_text=job_text, resume_text=resume_text)
+
+
 def assess_job_fit(job_text: str, resume_text: str) -> dict:
     if not job_text.strip():
         return {
@@ -602,7 +649,13 @@ def assess_job_fit(job_text: str, resume_text: str) -> dict:
 
     if _get_ai_provider():
         try:
-            return assess_job_fit_with_ai(job_text=job_text, resume_text=resume_text)
+            cache_key = hashlib.sha256((job_text + resume_text).encode('utf-8', errors='replace')).hexdigest()
+            cached = _JOB_FIT_CACHE.get(cache_key)
+            if cached is not None:
+                return dict(cached)
+            fit = assess_job_fit_with_claude(job_text=job_text, resume_text=resume_text)
+            _JOB_FIT_CACHE[cache_key] = dict(fit)
+            return fit
         except Exception:
             pass
 
@@ -1817,22 +1870,28 @@ def _validate_tagline(tagline: str, resume_text: str) -> str | None:
 def generate_tagline_with_ai(job_text: str, resume_text: str) -> str | None:
     if not _get_ai_provider():
         return None
+    short_resume = _truncate(resume_text, 1500)
+    short_job = _truncate(job_text, 1000)
     prompt = (
         "Create a role-specific resume tagline based on the job description and the resume. "
         "Return a single line only, no quotes, no extra text. "
         "Format: Role | Skill | Skill | Skill (pipe-separated, 3-4 segments). "
         "STRICT RULE: Use only roles/skills/terms that already appear in the resume text provided. "
         "Do NOT invent or add new tools, skills, technologies, or roles.\n\n"
-        f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
+        f"Job description:\n{short_job}\n\nResume:\n{short_resume}\n"
     )
     try:
-        text = _call_ai_text(prompt=prompt, max_tokens=120)
+        text = _call_ai_text(prompt=prompt, max_tokens=64, model_tier='fast')
     except Exception:
         return None
     if text:
         tagline = text.strip().splitlines()[0]
         return _validate_tagline(tagline, resume_text)
     return None
+
+
+def generate_tagline_with_claude(job_text: str, resume_text: str) -> str | None:
+    return generate_tagline_with_ai(job_text=job_text, resume_text=resume_text)
 
 
 def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) -> str:
@@ -1868,10 +1927,14 @@ def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) ->
         "Return plain text only. Do not include a subject line.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
-    text = _call_ai_text(prompt=prompt, max_tokens=1400)
+    text = _call_ai_text(prompt=prompt, max_tokens=1024, model_tier='smart')
     if text:
         return text.strip()
     raise SystemExit('AI response did not include text output.')
+
+
+def generate_cover_letter_with_claude(job_text: str, resume_text: str, name: str) -> str:
+    return generate_cover_letter_with_ai(job_text=job_text, resume_text=resume_text, name=name)
 
 
 def _parse_cover_letter_paragraphs(cover_text: str) -> list[tuple[str, str]]:
@@ -2187,7 +2250,8 @@ def tailor_resume_with_ai(
             f"{resume_text}\n"
         ),
         instructions=instructions,
-        max_tokens=3400,
+        max_tokens=3072,
+        model_tier='smart',
     )
     if text:
         text = text.strip()
@@ -2196,6 +2260,20 @@ def tailor_resume_with_ai(
             tagline = generate_tagline_with_ai(job_text=job_text, resume_text=resume_text) or fallback_tagline
         return tagline, body
     raise SystemExit('AI response did not include text output.')
+
+
+def tailor_resume_with_claude(
+    job_text: str,
+    resume_text: str,
+    allowed_sections: list[str] | None = None,
+    fallback_tagline: str | None = None,
+):
+    return tailor_resume_with_ai(
+        job_text=job_text,
+        resume_text=resume_text,
+        allowed_sections=allowed_sections,
+        fallback_tagline=fallback_tagline,
+    )
 
 
 def generate_resume(resume_path, template_path, job_text=None, out_dir=None, label=None, job_label=None):

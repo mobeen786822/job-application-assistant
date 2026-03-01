@@ -1,0 +1,1 @@
+Sample role requiring Python, Flask, APIs, SQL, testing, and communication.
