@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
@@ -17,7 +18,7 @@ from tools.resume_bot import (
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_RESUME = os.environ.get('RESUME_JSON', str(APP_ROOT / 'assets' / 'resume.json'))
 DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', str(APP_ROOT / 'assets' / 'template.html'))
-OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(APP_ROOT / 'outputs'))
+OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(Path(tempfile.gettempdir()) / 'job-application-assistant'))
 
 app = Flask(__name__)
 

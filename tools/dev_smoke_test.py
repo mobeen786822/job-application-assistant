@@ -1,5 +1,6 @@
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +16,7 @@ from tools.resume_bot import (
 
 RESUME_PATH = APP_ROOT / 'assets' / 'resume.json'
 TEMPLATE_PATH = APP_ROOT / 'assets' / 'template.html'
-OUT_DIR = APP_ROOT / 'outputs'
+OUT_DIR = Path(tempfile.gettempdir()) / 'job-application-assistant'
 
 SOFTWARE_JOB_TEXT = """
 Graduate software engineer role focused on full stack delivery.

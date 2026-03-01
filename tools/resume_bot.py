@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -4013,7 +4014,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         skill_priority_groups=strategy.get('skill_priority_groups', []),
     )
 
-    out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
+    out_dir = Path(out_dir) if out_dir else (Path(tempfile.gettempdir()) / 'job-application-assistant')
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     safe_label = re.sub(r'[^A-Za-z0-9_-]+', '-', (label or 'Tailored')).strip('-') or 'Tailored'

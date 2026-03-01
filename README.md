@@ -58,7 +58,7 @@ Open:
 - `RESUME_TEMPLATE` - path to HTML template  
   Default: `assets/template.html`
 - `RESUME_OUTPUT_DIR` - output directory  
-  Default: `outputs`
+  Default: OS temp folder (`<temp>/job-application-assistant`)
 - `RESUME_MAX_PAGES` - max pages for AI-tailored resume PDF  
   Default: `2`
 - `OPENAI_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters via OpenAI
