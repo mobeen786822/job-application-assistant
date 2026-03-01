@@ -4,7 +4,13 @@ import subprocess
 import time
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
-from tools.resume_bot import generate_resume, generate_cover_letter, assess_job_fit
+from tools.resume_bot import (
+    assess_job_fit,
+    choose_resume_strategy,
+    classify_job,
+    generate_cover_letter,
+    generate_resume,
+)
 
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_RESUME = os.environ.get('RESUME_TXT', str(APP_ROOT / 'assets' / 'resume.txt'))
@@ -317,6 +323,11 @@ PAGE = """
             {% if fit.rationale %}
             <div class="fit-rationale">{{ fit.rationale }}</div>
             {% endif %}
+            {% if detected_focus and strategy_name %}
+            <div class="fit-meta">
+              Detected focus: {{ detected_focus.primary_category|replace('_', ' ')|title }} (confidence {{ detected_focus.confidence }}%). Strategy: {{ strategy_name }}.
+            </div>
+            {% endif %}
             {% if fit.gaps %}
             <ul class="fit-gaps">
               {% for gap in fit.gaps %}
@@ -465,6 +476,8 @@ def index():
     cover_preview_url = None
     cover_text = None
     fit = None
+    detected_focus = None
+    strategy_name = None
     job_text_value = ''
     error_msg = None
     if request.method == 'POST':
@@ -477,6 +490,10 @@ def index():
             if job_text:
                 resume_text = Path(DEFAULT_RESUME).read_text(encoding='utf-8', errors='replace')
                 fit = assess_job_fit(job_text=job_text, resume_text=resume_text)
+                classification = classify_job(job_text)
+                strategy = choose_resume_strategy(classification)
+                detected_focus = classification
+                strategy_name = strategy.get('name')
             else:
                 raise ValueError('Please paste a job description first.')
 
@@ -527,6 +544,8 @@ def index():
         cover_preview_url=cover_preview_url,
         cover_text=cover_text,
         fit=fit,
+        detected_focus=detected_focus,
+        strategy_name=strategy_name,
         job_text_value=job_text_value,
         error_msg=error_msg,
         app_version=get_app_version(),

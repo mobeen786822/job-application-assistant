@@ -81,6 +81,28 @@ DEFAULT_TAILORED_TAGLINE = (
 
 
 _JOB_FIT_CACHE: dict[str, dict] = {}
+_JOB_CLASSIFICATION_CACHE: dict[str, dict] = {}
+
+VALID_PRIMARY_CATEGORIES = {
+    'software_engineering',
+    'cybersecurity',
+    'frontend',
+    'backend',
+    'devops',
+    'unknown',
+}
+VALID_TONES = {'corporate', 'startup', 'security-heavy', 'unknown'}
+
+DEFAULT_SECTION_ORDER = [
+    'Professional Summary',
+    'Key Skills / Technical Skills',
+    'Professional Experience',
+    'Projects',
+    'Education',
+    'Certifications',
+    'Interests',
+    'Additional Information',
+]
 
 
 def normalize_text(text: str) -> str:
@@ -701,7 +723,256 @@ def assess_job_fit(job_text: str, resume_text: str) -> dict:
     }
 
 
-def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
+def _clean_top_keywords(values, limit: int = 10) -> list[str]:
+    out = []
+    seen = set()
+    for raw in values or []:
+        text = normalize_text(str(raw)).strip().lower()
+        text = re.sub(r'[^a-z0-9\+\#\-\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        if not text:
+            continue
+        if text in STOPWORDS:
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _sanitize_job_classification(raw: dict | None) -> dict:
+    data = raw if isinstance(raw, dict) else {}
+    primary = str(data.get('primary_category', 'unknown')).strip().lower()
+    if primary not in VALID_PRIMARY_CATEGORIES:
+        primary = 'unknown'
+    secondary_value = data.get('secondary_category')
+    secondary = normalize_text(str(secondary_value)).strip().lower() if secondary_value is not None else None
+    if not secondary:
+        secondary = None
+    tone = str(data.get('tone', 'unknown')).strip().lower()
+    if tone not in VALID_TONES:
+        tone = 'unknown'
+    try:
+        confidence = int(data.get('confidence', 0))
+    except Exception:
+        confidence = 0
+    confidence = max(0, min(100, confidence))
+    keywords = _clean_top_keywords(data.get('top_keywords', []), limit=10)
+    return {
+        'primary_category': primary,
+        'secondary_category': secondary,
+        'top_keywords': keywords,
+        'tone': tone,
+        'confidence': confidence,
+    }
+
+
+def classify_job_with_ai(job_text: str) -> dict:
+    payload = _truncate(job_text or '', 4000)
+    instructions = (
+        "Classify the job description and return STRICT JSON only.\n"
+        "Do not make assumptions beyond the provided text.\n"
+        "Do not infer candidate experience or add facts.\n"
+        "Output keys exactly:\n"
+        "{"
+        "\"primary_category\": \"software_engineering\"|\"cybersecurity\"|\"frontend\"|\"backend\"|\"devops\"|\"unknown\","
+        "\"secondary_category\": string|null,"
+        "\"top_keywords\": [string],"
+        "\"tone\": \"corporate\"|\"startup\"|\"security-heavy\"|\"unknown\","
+        "\"confidence\": integer 0-100"
+        "}\n"
+        "Rules:\n"
+        "- top_keywords must contain up to 10 concise keywords from the job text.\n"
+        "- If uncertain, choose unknown with lower confidence.\n"
+        "- No prose, markdown, or extra keys."
+    )
+    text = _call_ai_text(
+        prompt=f"Job description:\n{payload}\n",
+        instructions=instructions,
+        max_tokens=420,
+        model_tier='fast',
+    )
+    match = re.search(r'\{[\s\S]*\}', text or '')
+    raw = match.group(0) if match else (text or '{}')
+    data = json.loads(raw)
+    return _sanitize_job_classification(data)
+
+
+def classify_job_heuristic(job_text: str) -> dict:
+    text = normalize_text(job_text or '')
+    job_norm = text.lower()
+    tokens = [
+        w for w in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', job_norm)
+        if len(w) >= 3 and w not in STOPWORDS
+    ]
+    freq = {}
+    for token in tokens:
+        freq[token] = freq.get(token, 0) + 1
+
+    multi_terms = {
+        'cybersecurity': CYBER_JOB_TERMS + [
+            'incident response', 'threat hunting', 'security operations', 'essential eight',
+        ],
+        'frontend': [
+            'frontend', 'front-end', 'react', 'typescript', 'javascript', 'html', 'css',
+            'next.js', 'nextjs', 'ui', 'ux',
+        ],
+        'backend': [
+            'backend', 'back-end', 'api', 'rest', 'microservices', 'node', 'python', 'java',
+            'sql', 'postgres', 'database',
+        ],
+        'devops': [
+            'devops', 'sre', 'ci/cd', 'ci cd', 'kubernetes', 'docker', 'terraform', 'aws',
+            'azure', 'gcp', 'monitoring',
+        ],
+        'software_engineering': [
+            'software engineer', 'software engineering', 'full stack', 'full-stack',
+            'application development', 'agile',
+        ],
+    }
+    token_terms = {
+        'cybersecurity': ['cyber', 'security', 'soc', 'siem', 'incident', 'threat', 'vulnerability'],
+        'frontend': ['frontend', 'react', 'typescript', 'javascript', 'html', 'css', 'ui', 'ux'],
+        'backend': ['backend', 'api', 'rest', 'microservices', 'node', 'python', 'java', 'sql'],
+        'devops': ['devops', 'sre', 'kubernetes', 'docker', 'terraform', 'aws', 'azure', 'gcp'],
+        'software_engineering': ['engineer', 'software', 'development', 'coding'],
+    }
+
+    scores = {k: 0 for k in token_terms}
+    for category, terms in multi_terms.items():
+        for term in terms:
+            if term in job_norm:
+                scores[category] += 3
+    for category, terms in token_terms.items():
+        for term in terms:
+            scores[category] += freq.get(term, 0)
+
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    best_cat, best_score = ranked[0]
+    second_cat, second_score = ranked[1]
+    primary = 'unknown'
+    secondary = None
+    if best_score > 0:
+        primary = best_cat
+        if second_score > 0:
+            secondary = second_cat
+    if primary == 'software_engineering' and scores.get('cybersecurity', 0) >= best_score:
+        primary = 'cybersecurity'
+
+    tone = 'unknown'
+    if any(term in job_norm for term in ('startup', 'fast-paced', 'fast paced', 'scale-up', 'greenfield')):
+        tone = 'startup'
+    if any(term in job_norm for term in ('bank', 'enterprise', 'compliance', 'stakeholder', 'governance')):
+        tone = 'corporate'
+    if scores.get('cybersecurity', 0) >= 6 or any(
+        term in job_norm for term in ('essential eight', 'siem', 'soc', 'incident response')
+    ):
+        tone = 'security-heavy'
+
+    top_keywords = [w for w, _ in sorted(freq.items(), key=lambda kv: kv[1], reverse=True)[:10]]
+    confidence = 0
+    if best_score > 0:
+        margin = best_score - second_score
+        confidence = min(95, 45 + best_score * 4 + max(0, margin * 5))
+    elif tokens:
+        confidence = 20
+
+    return _sanitize_job_classification({
+        'primary_category': primary,
+        'secondary_category': secondary,
+        'top_keywords': top_keywords,
+        'tone': tone,
+        'confidence': confidence,
+    })
+
+
+def classify_job(job_text: str) -> dict:
+    key = hashlib.sha256(normalize_text(job_text or '').encode('utf-8', errors='replace')).hexdigest()
+    cached = _JOB_CLASSIFICATION_CACHE.get(key)
+    if cached is not None:
+        return dict(cached)
+
+    result = None
+    if (job_text or '').strip() and _get_ai_provider():
+        try:
+            result = classify_job_with_ai(job_text=job_text)
+        except Exception:
+            result = None
+    if result is None:
+        result = classify_job_heuristic(job_text=job_text)
+    _JOB_CLASSIFICATION_CACHE[key] = dict(result)
+    return result
+
+
+def choose_resume_strategy(classification: dict) -> dict:
+    category = str((classification or {}).get('primary_category', 'unknown')).lower()
+    is_cyber = category == 'cybersecurity'
+    if is_cyber:
+        return {
+            'name': 'CYBERSECURITY',
+            'tagline': (
+                'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
+                'ACSC Essential Eight | Incident Response'
+            ),
+            'section_order': [
+                'Professional Summary',
+                'Key Skills / Technical Skills',
+                'Projects',
+                'Professional Experience',
+                'Education',
+                'Certifications',
+                'Interests',
+                'Additional Information',
+            ],
+            'project_priority': [
+                'Bunkerify',
+                'Production Support Incident Console',
+                'Job Application Assistant',
+                'Cancer Awareness Mobile App',
+            ],
+            'max_skills': 16,
+            'min_skills': 10,
+            'prefer_cyber_terms': True,
+        }
+
+    return {
+        'name': 'SOFTWARE_GENERAL',
+        'tagline': (
+            'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
+            'Production Systems | ACSC Essential Eight'
+        ),
+        'section_order': DEFAULT_SECTION_ORDER[:],
+        'project_priority': [
+            'Job Application Assistant',
+            'Production Support Incident Console',
+            'Bunkerify',
+            'Cancer Awareness Mobile App',
+        ],
+        'max_skills': 16,
+        'min_skills': 10,
+        'prefer_cyber_terms': False,
+    }
+
+
+def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> list[dict]:
+    if not projects:
+        return []
+    priority_l = [normalize_text(p).lower() for p in (priority or []) if normalize_text(p).strip()]
+
+    def project_key(entry: dict):
+        title = normalize_text(entry.get('title', '')).lower()
+        for idx, marker in enumerate(priority_l):
+            if marker in title:
+                return (0, idx, title)
+        return (1, 99, title)
+
+    return sorted(projects, key=project_key)
+
+
+def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10, prefer_cyber_terms=False):
     if not skills:
         return skills
     if not job_text:
@@ -713,7 +984,7 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
         if len(w) >= 3 and w not in STOPWORDS
     )
 
-    cyber_focused_role = any(term in job_norm for term in CYBER_JOB_TERMS)
+    cyber_focused_role = any(term in job_norm for term in CYBER_JOB_TERMS) or bool(prefer_cyber_terms)
 
     def is_cyber_tool_skill(skill_text: str) -> bool:
         skill_norm = normalize_text(skill_text).lower()
@@ -730,6 +1001,8 @@ def filter_skills_for_job(skills, job_text, max_skills=16, min_skills=10):
                 score += 1
         if cyber_focused_role and is_cyber_tool_skill(skill):
             score += 2
+        if prefer_cyber_terms and is_cyber_tool_skill(skill):
+            score += 1
         scored.append((score, idx, skill))
 
     matches = [t for t in scored if t[0] > 0]
@@ -803,7 +1076,23 @@ def _format_contact_item(item: str) -> str:
     return html.escape(raw)
 
 
-def render_html(name, headline, contact, summary, education, skills, projects, experience, volunteer, certificates, interests, keywords, style_css, header_html=None):
+def render_html(
+    name,
+    headline,
+    contact,
+    summary,
+    education,
+    skills,
+    projects,
+    experience,
+    volunteer,
+    certificates,
+    interests,
+    keywords,
+    style_css,
+    header_html=None,
+    section_order=None,
+):
     contact_items = []
     for c in contact:
         formatted = _format_contact_item(c)
@@ -846,9 +1135,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
         return '\n'.join(html)
 
     edu_html = render_entries(education, with_subtitle=True)
-
     skills_html = ''.join([f'<span class="skill-tag">{s}</span>' for s in skills])
-
     proj_html = render_entries(projects)
     combined_experience = (experience or []) + (volunteer or [])
     professional_entries = []
@@ -862,28 +1149,49 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
         else:
             professional_entries.append(e)
     exp_html = render_entries(professional_entries)
-    additional_info_html = ''
-    if additional_entries:
-        additional_info_html = f"""
-<div class=\"section\">
-  <div class=\"section-title\">Additional Information</div>
-  {render_entries(additional_entries)}
-</div>
-"""
+    cert_items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates]) if certificates else ''
+    interests_text = linkify_text(' - '.join(interests)) if interests else ''
 
-    cert_html = ''
-    if certificates:
-        items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates])
-        cert_html = f"""
-<div class=\"section\">
-  <div class=\"section-title\">Certificates</div>
-  <ul>{items}</ul>
-</div>
-"""
-
-    interests_html = ''
-    if interests:
-        interests_html = '<div class="section"><div class="section-title">Interests</div><p class="summary">' + linkify_text(' - '.join(interests)) + '</p></div>'
+    section_html_map = {
+        'Professional Summary': (
+            '<div class="section"><div class="section-title">Professional Summary</div>'
+            f'<p class="summary">{linkify_text(summary_text)}</p></div>'
+        ),
+        'Key Skills / Technical Skills': (
+            '<div class="section"><div class="section-title">Key Skills</div>'
+            f'<div class="skills-grid">{skills_html}</div></div>'
+        ),
+        'Professional Experience': (
+            '<div class="section"><div class="section-title">Professional Experience</div>'
+            f'{exp_html}</div>'
+        ),
+        'Projects': (
+            '<div class="section section-projects"><div class="section-title">Projects</div>'
+            f'{proj_html}</div>'
+        ),
+        'Education': (
+            '<div class="section"><div class="section-title">Education</div>'
+            f'{edu_html}</div>'
+        ),
+        'Certifications': (
+            '<div class="section"><div class="section-title">Certificates</div>'
+            f'<ul>{cert_items}</ul></div>' if cert_items else ''
+        ),
+        'Interests': (
+            f'<div class="section"><div class="section-title">Interests</div><p class="summary">{interests_text}</p></div>'
+            if interests_text else ''
+        ),
+        'Additional Information': (
+            '<div class="section"><div class="section-title">Additional Information</div>'
+            f'{render_entries(additional_entries)}</div>' if additional_entries else ''
+        ),
+    }
+    ordered_titles = section_order[:] if section_order else DEFAULT_SECTION_ORDER[:]
+    body_sections = []
+    for title in ordered_titles:
+        block = section_html_map.get(title)
+        if block:
+            body_sections.append(block)
 
     header_block = header_html if header_html else f"""
 <div class="header">
@@ -908,35 +1216,7 @@ def render_html(name, headline, contact, summary, education, skills, projects, e
 <div class=\"page\">
 
 {header_block}
-
-<div class=\"section\">
-  <div class=\"section-title\">Professional Summary</div>
-  <p class=\"summary\">{linkify_text(summary_text)}</p>
-</div>
-
-<div class=\"section\">
-  <div class=\"section-title\">Key Skills</div>
-  <div class=\"skills-grid\">{skills_html}</div>
-</div>
-
-<div class=\"section\">
-  <div class=\"section-title\">Professional Experience</div>
-  {exp_html}
-</div>
-
-<div class=\"section section-projects\">
-  <div class=\"section-title\">Projects</div>
-  {proj_html}
-</div>
-
-<div class=\"section\">
-  <div class=\"section-title\">Education</div>
-  {edu_html}
-</div>
-
-{cert_html}
-{additional_info_html}
-{interests_html}
+{''.join(body_sections)}
 
 </div>
 </body>
@@ -1445,7 +1725,14 @@ def _sanitize_summary_text(summary: str, fallback: str, max_words: int = 65) -> 
     return text
 
 
-def _sanitize_skills_from_ai(ai_skills: list[str], canonical_skills: list[str], job_text: str) -> list[str]:
+def _sanitize_skills_from_ai(
+    ai_skills: list[str],
+    canonical_skills: list[str],
+    job_text: str,
+    max_skills: int = 16,
+    min_skills: int = 10,
+    prefer_cyber_terms: bool = False,
+) -> list[str]:
     canonical = [clean_skill_token(s) for s in canonical_skills if clean_skill_token(s)]
     if not canonical:
         return []
@@ -1466,7 +1753,13 @@ def _sanitize_skills_from_ai(ai_skills: list[str], canonical_skills: list[str], 
         selected.append(skill)
     if not selected:
         selected = canonical[:]
-    return filter_skills_for_job(selected, job_text=job_text or '', max_skills=16, min_skills=10)
+    return filter_skills_for_job(
+        selected,
+        job_text=job_text or '',
+        max_skills=max_skills,
+        min_skills=min_skills,
+        prefer_cyber_terms=prefer_cyber_terms,
+    )
 
 
 def _apply_bullet_updates(entries: list[dict], updates: list[dict]) -> None:
@@ -1506,10 +1799,14 @@ def tailor_resume_selective_with_ai(
     skills: list[str],
     experience_entries: list[dict],
     project_entries: list[dict],
+    classification: dict,
+    strategy: dict,
 ) -> dict:
     if not _get_ai_provider():
         return {}
     payload = {
+        'classification': classification,
+        'strategy': strategy,
         'summary': summary,
         'skills': skills,
         'experience_roles': [
@@ -1531,6 +1828,9 @@ def tailor_resume_selective_with_ai(
         "- No hallucinations; use only existing resume facts.\n"
         "- Keep summary concise (45-65 words).\n"
         "- Skills must come only from provided skill list.\n"
+        "- You may reorder bullet points to emphasize strategy priorities.\n"
+        "- You may NOT add new skills.\n"
+        "- You may NOT add new roles.\n"
         "- Keep each role title unchanged.\n"
         "- Keep 3-6 bullets per role when possible.\n"
         "Output JSON shape:\n"
@@ -2297,16 +2597,12 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     header_lines, source_sections = split_sections(resume_text)
     name, contact = parse_header(header_lines)
 
-    headline = ''
-    if 'Software Engineer' in source_sections:
-        headline = 'Software Engineer'
+    classification = classify_job(job_text or '')
+    strategy = choose_resume_strategy(classification)
+    tagline = strategy.get('tagline') or DEFAULT_TAILORED_TAGLINE
+    headline = tagline
 
-    template_header_html = extract_template_header(template_text)
-    template_sections = extract_template_sections(template_text)
     template_skill_tags = extract_template_skill_tags(template_text)
-    tailored_sections = TAILORED_SECTION_TITLES[:]
-
-    tagline = None
 
     sections = source_sections
     summary_lines = sections.get('Software Engineer', [])
@@ -2328,25 +2624,20 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             experience.append(e)
         else:
             projects.append(e)
-    projects = sorted(
-        projects,
-        key=lambda e: (
-            _project_rank(e.get('title', '')) if _project_rank(e.get('title', '')) is not None else 99,
-            normalize_text(e.get('title', '')).lower(),
-        ),
-    )
+    projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
 
     canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(sections.get('Skills', []))
     skills = filter_skills_for_job(
         canonical_skills,
         job_text=job_text or '',
-        max_skills=16,
-        min_skills=10,
+        max_skills=int(strategy.get('max_skills', 16)),
+        min_skills=int(strategy.get('min_skills', 10)),
+        prefer_cyber_terms=bool(strategy.get('prefer_cyber_terms', False)),
     )
 
     certificates = parse_list(sections.get('Certificates', []))
     interests = parse_list(sections.get('Interests', []))
-    header_html = template_header_html or render_header_html(name=name, headline=headline, contact=contact)
+    header_html = render_header_html(name=name, headline=headline, contact=contact)
 
     if _get_ai_provider() and (job_text or '').strip():
         try:
@@ -2357,14 +2648,24 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
                 skills=canonical_skills,
                 experience_entries=experience + volunteer_entries,
                 project_entries=projects,
+                classification=classification,
+                strategy=strategy,
             )
         except Exception:
             selective = {}
         summary = _sanitize_summary_text(str(selective.get('summary', '')), fallback=summary, max_words=65)
-        skills = _sanitize_skills_from_ai(selective.get('skills', []), canonical_skills=canonical_skills, job_text=job_text or '')
+        skills = _sanitize_skills_from_ai(
+            selective.get('skills', []),
+            canonical_skills=canonical_skills,
+            job_text=job_text or '',
+            max_skills=int(strategy.get('max_skills', 16)),
+            min_skills=int(strategy.get('min_skills', 10)),
+            prefer_cyber_terms=bool(strategy.get('prefer_cyber_terms', False)),
+        )
         _apply_bullet_updates(experience, selective.get('experience_updates', []))
         _apply_bullet_updates(volunteer_entries, selective.get('experience_updates', []))
         _apply_bullet_updates(projects, selective.get('project_updates', []))
+        projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
 
     keywords = extract_keywords(job_text or '', skills)
     html = render_html(
@@ -2382,6 +2683,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         keywords=keywords,
         style_css=style_css,
         header_html=header_html,
+        section_order=strategy.get('section_order', DEFAULT_SECTION_ORDER),
     )
 
     out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')
