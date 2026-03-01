@@ -1,0 +1,192 @@
+{
+  "schema_version": "1.0",
+  "basics": {
+    "name": "Mobeen Khan",
+    "email": "mobeenk89@gmail.com",
+    "portfolio": "https://www.mobeenkhan.com",
+    "github": "https://github.com/mobeen786822",
+    "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
+  },
+  "headline": "Software Engineer | Secure Full-Stack Applications & Production Systems",
+  "summary": "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), building secure full-stack web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. Designed and deployed production-style systems including an AI-assisted resume tailoring platform with strict content validation and an incident management console simulating real-world support workflows. Strong focus on system integrity, maintainability, and practical security principles aligned to the ACSC Essential Eight.",
+  "education": [
+    {
+      "degree": "Bachelor of Computer Science",
+      "institution": "University of Wollongong",
+      "start": "01/2021",
+      "end": "05/2024",
+      "details": "Major in Software Engineering and Cybersecurity"
+    },
+    {
+      "degree": "Masters of Computer Science (Cybersecurity)",
+      "institution": "University of Wollongong",
+      "start": "03/2025",
+      "end": "Present",
+      "details": ""
+    }
+  ],
+  "projects": [
+    {
+      "name": "Job Application Assistant",
+      "links": {
+        "github": "https://github.com/mobeen786822/job-application-assistant",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "OpenAI API",
+        "HTML",
+        "PDF",
+        "Tailscale",
+        "Cloud VM"
+      ],
+      "bullets": [
+        "Designed and developed a full-stack AI-assisted resume tailoring platform generating structured HTML and PDF outputs.",
+        "Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency.",
+        "Deployed via VPN-only access (Tailscale) on a cloud VM to restrict public exposure.",
+        "Built responsive UI with real-time preview and validation feedback mechanisms."
+      ]
+    },
+    {
+      "name": "Production Support Incident Console",
+      "links": {
+        "github": "https://github.com/mobeen786822/Production-Support-Incident-Console",
+        "live": "https://incident-console-ui.onrender.com/",
+        "website": ""
+      },
+      "technologies": [
+        "Web",
+        "SLA monitoring",
+        "Runbook documentation"
+      ],
+      "bullets": [
+        "Developed a web-based incident management console simulating production support workflows end-to-end.",
+        "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, and event timelines.",
+        "Added SLA-aware monitoring with breach indicators to support prioritisation and operational visibility.",
+        "Integrated runbook documentation and root-cause analysis capture."
+      ]
+    },
+    {
+      "name": "Bunkerify",
+      "links": {
+        "github": "",
+        "live": "",
+        "website": "https://www.bunkerify.com"
+      },
+      "technologies": [
+        "ACSC Essential Eight",
+        "SendGrid",
+        "HTML",
+        "Cybersecurity"
+      ],
+      "bullets": [
+        "Built a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model.",
+        "Designed a 19-question structured assessment with automated scoring and category-level risk breakdowns.",
+        "Integrated SendGrid transactional email delivery for automated HTML report generation.",
+        "Implemented lead capture and calendar booking workflow."
+      ]
+    },
+    {
+      "name": "Cancer Awareness Mobile App",
+      "links": {
+        "github": "",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "React Native",
+        "TypeScript",
+        "Firebase",
+        "Cloud Firestore",
+        "Geolocation"
+      ],
+      "bullets": [
+        "Built a cross-platform mobile application using React Native and TypeScript.",
+        "Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.",
+        "Added geolocation and media upload capabilities with structured navigation."
+      ]
+    }
+  ],
+  "experience": [
+    {
+      "title": "Web Developer (Volunteer)",
+      "company": "Catch A Drive",
+      "start": "11/2025",
+      "end": "01/2026",
+      "bullets": [
+        "Contributed to front-end and back-end development of the web platform.",
+        "Implemented responsive UI components and API-driven features.",
+        "Translated stakeholder requirements into maintainable code."
+      ]
+    },
+    {
+      "title": "Web Developer",
+      "company": "Hentley",
+      "start": "01/2018",
+      "end": "03/2019",
+      "bullets": [
+        "Implemented custom front-end features for an eCommerce website.",
+        "Supported server-side functionality for transactional workflows and content updates.",
+        "Enhanced responsiveness and cross-device consistency."
+      ]
+    }
+  ],
+  "skills": {
+    "languages": [
+      "JavaScript",
+      "TypeScript",
+      "Python",
+      "Java",
+      "C++",
+      "SQL",
+      "PL/SQL"
+    ],
+    "frontend": [
+      "React",
+      "React Native",
+      "Next.js",
+      "Vite",
+      "Tailwind CSS",
+      "Framer Motion",
+      "React Router",
+      "HTML",
+      "CSS"
+    ],
+    "backend": [
+      "REST API Integration",
+      "Axios",
+      "Firebase",
+      "Cloud Firestore",
+      "NoSQL",
+      "Database Management"
+    ],
+    "testing": [
+      "Jest",
+      "React Testing Library",
+      "ESLint",
+      "Git"
+    ],
+    "security": [
+      "Cybersecurity",
+      "System Security",
+      "Cloud Security (Foundational)",
+      "Networking",
+      "Kali Linux",
+      "Nmap",
+      "Metasploit",
+      "Wireshark",
+      "Burp Suite",
+      "Penetration Testing",
+      "Vulnerability Assessment",
+      "Incident Response",
+      "Threat Intelligence",
+      "Network Segmentation",
+      "Log Analysis",
+      "Firewall Configuration"
+    ],
+    "tools": []
+  },
+  "certifications": [
+    "AWS Academy Graduate - AWS Academy Cloud Foundations award"
+  ]
+}

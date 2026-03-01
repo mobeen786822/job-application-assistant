@@ -10,10 +10,12 @@ from tools.resume_bot import (
     classify_job,
     generate_cover_letter,
     generate_resume,
+    load_resume_json,
+    resume_json_to_text,
 )
 
 APP_ROOT = Path(__file__).resolve().parent
-DEFAULT_RESUME = os.environ.get('RESUME_TXT', str(APP_ROOT / 'assets' / 'resume.txt'))
+DEFAULT_RESUME = os.environ.get('RESUME_JSON', str(APP_ROOT / 'assets' / 'resume.json'))
 DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', str(APP_ROOT / 'assets' / 'template.html'))
 OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(APP_ROOT / 'outputs'))
 
@@ -488,7 +490,7 @@ def index():
             label = 'Tailored'
             job_label = None
             if job_text:
-                resume_text = Path(DEFAULT_RESUME).read_text(encoding='utf-8', errors='replace')
+                resume_text = resume_json_to_text(load_resume_json(DEFAULT_RESUME))
                 fit = assess_job_fit(job_text=job_text, resume_text=resume_text)
                 classification = classify_job(job_text)
                 strategy = choose_resume_strategy(classification)

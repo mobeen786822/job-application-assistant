@@ -105,6 +105,13 @@ DEFAULT_SECTION_ORDER = [
     'Additional Information',
 ]
 SUMMARY_BANNED_RE = re.compile(r"\b(c#|c\s*sharp|\.net|asp\.?net|dotnet)\b", re.IGNORECASE)
+GENERIC_BULLET_TERMS = {
+    'built', 'developed', 'implemented', 'designed', 'integrated', 'added', 'using', 'with',
+    'application', 'platform', 'system', 'workflow', 'features', 'support', 'project', 'web',
+    'mobile', 'frontend', 'backend', 'api', 'testing', 'security', 'monitoring', 'deployment',
+}
+
+SKILL_GROUP_KEYS = ['languages', 'frontend', 'backend', 'testing', 'security', 'tools']
 
 
 def normalize_text(text: str) -> str:
@@ -907,10 +914,6 @@ def _sanitize_job_classification(raw: dict | None) -> dict:
     primary = str(data.get('primary_category', 'unknown')).strip().lower()
     if primary not in VALID_PRIMARY_CATEGORIES:
         primary = 'unknown'
-    secondary_value = data.get('secondary_category')
-    secondary = normalize_text(str(secondary_value)).strip().lower() if secondary_value is not None else None
-    if not secondary:
-        secondary = None
     tone = str(data.get('tone', 'unknown')).strip().lower()
     if tone not in VALID_TONES:
         tone = 'unknown'
@@ -922,7 +925,6 @@ def _sanitize_job_classification(raw: dict | None) -> dict:
     keywords = _clean_top_keywords(data.get('top_keywords', []), limit=10)
     return {
         'primary_category': primary,
-        'secondary_category': secondary,
         'top_keywords': keywords,
         'tone': tone,
         'confidence': confidence,
@@ -938,7 +940,6 @@ def classify_job_with_ai(job_text: str) -> dict:
         "Output keys exactly:\n"
         "{"
         "\"primary_category\": \"software_engineering\"|\"cybersecurity\"|\"frontend\"|\"backend\"|\"devops\"|\"unknown\","
-        "\"secondary_category\": string|null,"
         "\"top_keywords\": [string],"
         "\"tone\": \"corporate\"|\"startup\"|\"security-heavy\"|\"unknown\","
         "\"confidence\": integer 0-100"
@@ -1013,11 +1014,8 @@ def classify_job_heuristic(job_text: str) -> dict:
     best_cat, best_score = ranked[0]
     second_cat, second_score = ranked[1]
     primary = 'unknown'
-    secondary = None
     if best_score > 0:
         primary = best_cat
-        if second_score > 0:
-            secondary = second_cat
     if primary == 'software_engineering' and scores.get('cybersecurity', 0) >= best_score:
         primary = 'cybersecurity'
 
@@ -1041,7 +1039,6 @@ def classify_job_heuristic(job_text: str) -> dict:
 
     return _sanitize_job_classification({
         'primary_category': primary,
-        'secondary_category': secondary,
         'top_keywords': top_keywords,
         'tone': tone,
         'confidence': confidence,
@@ -1092,6 +1089,8 @@ def choose_resume_strategy(classification: dict) -> dict:
                 'Job Application Assistant',
                 'Cancer Awareness Mobile App',
             ],
+            'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
+            'max_bullets_per_project': 3,
             'max_skills': 16,
             'min_skills': 10,
             'prefer_cyber_terms': True,
@@ -1110,6 +1109,8 @@ def choose_resume_strategy(classification: dict) -> dict:
             'Bunkerify',
             'Cancer Awareness Mobile App',
         ],
+        'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
+        'max_bullets_per_project': 3,
         'max_skills': 16,
         'min_skills': 10,
         'prefer_cyber_terms': False,
@@ -1164,10 +1165,233 @@ def apply_ai_project_selection_and_order(
     return [by_key[k] for k in ordered if k in by_key]
 
 
+def _keyword_overlap_score(text: str, keywords: list[str]) -> int:
+    norm = _normalize_term(text)
+    score = 0
+    for kw in keywords:
+        k = _normalize_term(kw)
+        if k and k in norm:
+            score += 1
+    return score
+
+
+def reorder_skill_groups(grouped_skills: dict, priority_groups: list[str]) -> tuple[dict, list[str]]:
+    grouped = grouped_skills or {}
+    ordered_group_names = []
+    for group in priority_groups or []:
+        if group in grouped and group not in ordered_group_names:
+            ordered_group_names.append(group)
+    for group in grouped.keys():
+        if group not in ordered_group_names:
+            ordered_group_names.append(group)
+    ordered_grouped = {k: grouped.get(k, []) for k in ordered_group_names}
+    flattened = []
+    seen = set()
+    for group in ordered_group_names:
+        for skill in ordered_grouped.get(group, []):
+            cleaned = clean_skill_token(str(skill))
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            flattened.append(cleaned)
+    return ordered_grouped, flattened
+
+
+def select_project_bullets_deterministic(projects: list[dict], job_text: str, max_bullets_per_project: int) -> list[dict]:
+    max_bullets = max(1, int(max_bullets_per_project or 3))
+    keywords = _clean_top_keywords(
+        re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', normalize_text(job_text or '').lower()),
+        limit=12,
+    )
+    selected = []
+    for project in projects or []:
+        bullets = project.get('bullets', []) or []
+        scored = []
+        for idx, bullet in enumerate(bullets):
+            score = _keyword_overlap_score(bullet, keywords)
+            scored.append((score, idx, bullet))
+        scored.sort(key=lambda t: (-t[0], t[1]))
+        top = sorted(scored[:max_bullets], key=lambda t: t[1])
+        chosen_bullets = [b for _, _, b in top] if top else bullets[:max_bullets]
+        updated = dict(project)
+        updated['bullets'] = chosen_bullets
+        selected.append(updated)
+    return selected
+
+
 def _normalize_term(value: str) -> str:
     text = normalize_text(value or '').strip().lower()
     text = re.sub(r'\s+', ' ', text)
     return text
+
+
+def load_resume_json(path) -> dict:
+    resume_path = Path(path)
+    if not resume_path.exists():
+        raise SystemExit(f'Resume JSON file not found: {resume_path}')
+    try:
+        data = json.loads(resume_path.read_text(encoding='utf-8', errors='replace'))
+    except Exception as exc:
+        raise SystemExit(f'Failed to parse resume JSON: {resume_path}') from exc
+    validate_resume_schema(data)
+    return data
+
+
+def validate_resume_schema(resume_dict: dict) -> None:
+    if not isinstance(resume_dict, dict):
+        raise SystemExit('Invalid resume schema: root must be a JSON object.')
+    required_root = [
+        'schema_version', 'basics', 'headline', 'summary', 'education',
+        'projects', 'experience', 'skills', 'certifications',
+    ]
+    for key in required_root:
+        if key not in resume_dict:
+            raise SystemExit(f'Invalid resume schema: missing root key "{key}".')
+    basics = resume_dict.get('basics')
+    if not isinstance(basics, dict):
+        raise SystemExit('Invalid resume schema: "basics" must be an object.')
+    for key in ('name', 'email', 'portfolio', 'github', 'linkedin'):
+        if key not in basics:
+            raise SystemExit(f'Invalid resume schema: missing basics key "{key}".')
+    for key in ('education', 'projects', 'experience', 'certifications'):
+        if not isinstance(resume_dict.get(key), list):
+            raise SystemExit(f'Invalid resume schema: "{key}" must be an array.')
+    skills = resume_dict.get('skills')
+    if not isinstance(skills, dict):
+        raise SystemExit('Invalid resume schema: "skills" must be an object.')
+    for group in SKILL_GROUP_KEYS:
+        if group not in skills:
+            raise SystemExit(f'Invalid resume schema: missing skills group "{group}".')
+        if not isinstance(skills[group], list):
+            raise SystemExit(f'Invalid resume schema: skills group "{group}" must be an array.')
+    for idx, item in enumerate(resume_dict.get('education', [])):
+        if not isinstance(item, dict):
+            raise SystemExit(f'Invalid resume schema: education[{idx}] must be an object.')
+        for key in ('degree', 'institution', 'start', 'end', 'details'):
+            if key not in item:
+                raise SystemExit(f'Invalid resume schema: education[{idx}] missing "{key}".')
+    for idx, item in enumerate(resume_dict.get('projects', [])):
+        if not isinstance(item, dict):
+            raise SystemExit(f'Invalid resume schema: projects[{idx}] must be an object.')
+        for key in ('name', 'links', 'technologies', 'bullets'):
+            if key not in item:
+                raise SystemExit(f'Invalid resume schema: projects[{idx}] missing "{key}".')
+        if not isinstance(item.get('links'), dict):
+            raise SystemExit(f'Invalid resume schema: projects[{idx}].links must be an object.')
+        for key in ('github', 'live', 'website'):
+            if key not in item['links']:
+                raise SystemExit(f'Invalid resume schema: projects[{idx}].links missing "{key}".')
+    for idx, item in enumerate(resume_dict.get('experience', [])):
+        if not isinstance(item, dict):
+            raise SystemExit(f'Invalid resume schema: experience[{idx}] must be an object.')
+        for key in ('title', 'company', 'start', 'end', 'bullets'):
+            if key not in item:
+                raise SystemExit(f'Invalid resume schema: experience[{idx}] missing "{key}".')
+
+
+def resume_json_to_text(resume_dict: dict) -> str:
+    parts = []
+    basics = resume_dict.get('basics', {})
+    parts.extend([
+        basics.get('name', ''),
+        basics.get('email', ''),
+        basics.get('portfolio', ''),
+        basics.get('github', ''),
+        basics.get('linkedin', ''),
+        resume_dict.get('headline', ''),
+        resume_dict.get('summary', ''),
+    ])
+    for edu in resume_dict.get('education', []):
+        parts.extend([edu.get('degree', ''), edu.get('institution', ''), edu.get('start', ''), edu.get('end', ''), edu.get('details', '')])
+    for proj in resume_dict.get('projects', []):
+        links = proj.get('links', {})
+        parts.extend([proj.get('name', ''), links.get('github', ''), links.get('live', ''), links.get('website', '')])
+        parts.extend(proj.get('technologies', []) or [])
+        parts.extend(proj.get('bullets', []) or [])
+    for exp in resume_dict.get('experience', []):
+        parts.extend([exp.get('title', ''), exp.get('company', ''), exp.get('start', ''), exp.get('end', '')])
+        parts.extend(exp.get('bullets', []) or [])
+    for values in (resume_dict.get('skills', {}) or {}).values():
+        parts.extend(values or [])
+    parts.extend(resume_dict.get('certifications', []) or [])
+    return '\n'.join([normalize_text(str(p)).strip() for p in parts if normalize_text(str(p)).strip()])
+
+
+def resume_json_to_internal(resume_dict: dict) -> dict:
+    skills = []
+    for group in SKILL_GROUP_KEYS:
+        for skill in resume_dict.get('skills', {}).get(group, []):
+            cleaned = clean_skill_token(skill)
+            if cleaned:
+                skills.append(cleaned)
+    dedup_skills = []
+    seen = set()
+    for s in skills:
+        key = s.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup_skills.append(s)
+
+    projects_by_name = {}
+    for project in resume_dict.get('projects', []):
+        links = project.get('links', {}) or {}
+        subtitle_parts = []
+        if links.get('github'):
+            subtitle_parts.append(f'LINK: {links["github"]}')
+        if links.get('live'):
+            subtitle_parts.append(f'LIVE: {links["live"]}')
+        if links.get('website'):
+            subtitle_parts.append(f'WEBSITE: {links["website"]}')
+        projects_by_name[project.get('name', '')] = {
+            'title': project.get('name', ''),
+            'subtitle': ' | '.join(subtitle_parts),
+            'date': '',
+            'bullets': [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()],
+            'technologies': [clean_skill_token(str(t)) for t in (project.get('technologies', []) or []) if clean_skill_token(str(t))],
+        }
+
+    experience = []
+    for exp in resume_dict.get('experience', []):
+        experience.append({
+            'title': exp.get('title', ''),
+            'subtitle': exp.get('company', ''),
+            'date': f'{exp.get("start", "")} - {exp.get("end", "")}'.strip(' -'),
+            'bullets': [normalize_text(str(b)).strip() for b in (exp.get('bullets', []) or []) if normalize_text(str(b)).strip()],
+            'raw': '',
+        })
+
+    education = []
+    for edu in resume_dict.get('education', []):
+        bullets = [normalize_text(edu.get('details', '')).strip()] if normalize_text(edu.get('details', '')).strip() else []
+        education.append({
+            'title': edu.get('degree', ''),
+            'school': edu.get('institution', ''),
+            'date': f'{edu.get("start", "")} - {edu.get("end", "")}'.strip(' -'),
+            'bullets': bullets,
+        })
+
+    return {
+        'summary': normalize_text(resume_dict.get('summary', '')).strip(),
+        'projects': projects_by_name,
+        'skills': dedup_skills,
+        'certificates': [normalize_text(str(c)).strip() for c in (resume_dict.get('certifications', []) or []) if normalize_text(str(c)).strip()],
+        'experience': experience,
+        'education': education,
+        'interests': [],
+        'name': normalize_text((resume_dict.get('basics', {}) or {}).get('name', '')).strip(),
+        'contact': [
+            normalize_text((resume_dict.get('basics', {}) or {}).get('email', '')).strip(),
+            normalize_text((resume_dict.get('basics', {}) or {}).get('portfolio', '')).strip(),
+            normalize_text((resume_dict.get('basics', {}) or {}).get('github', '')).strip(),
+            normalize_text((resume_dict.get('basics', {}) or {}).get('linkedin', '')).strip(),
+        ],
+        'headline': normalize_text(resume_dict.get('headline', '')).strip(),
+        'skills_grouped': resume_dict.get('skills', {}),
+    }
 
 
 def build_allowed_terms(resume_text: str) -> set[str]:
@@ -1501,6 +1725,13 @@ def render_html(
     header_html=None,
     section_order=None,
 ):
+    if not education:
+        raise SystemExit('Resume rendering error: Education section is empty.')
+    if not projects:
+        raise SystemExit('Resume rendering error: Projects section is empty.')
+    if not (experience or volunteer):
+        raise SystemExit('Resume rendering error: Professional Experience section is empty.')
+
     contact_items = []
     for c in contact:
         formatted = _format_contact_item(c)
@@ -2200,11 +2431,11 @@ def _extract_tech_terms(text: str) -> set[str]:
         if p and p in norm:
             found.add(p)
     for token in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\./-]{1,30}', norm):
-        token_n = _normalize_term(token)
+        token_n = _normalize_term(token).strip('.,;:!?')
         if not token_n:
             continue
         techy = (
-            any(ch in token_n for ch in ('+', '#', '.', '/')) or
+            any(ch in token_n for ch in ('+', '#', '/')) or
             token_n in {'api', 'sql', 'nosql', 'firebase', 'react', 'typescript', 'javascript', 'aws', 'azure', 'gcp'}
         )
         if techy:
@@ -2301,6 +2532,136 @@ def _validate_project_bullets_constrained(
     return True, ''
 
 
+def _extract_source_index_bullets(project: dict) -> list[dict]:
+    rows = []
+    for idx, bullet in enumerate(project.get('bullets', []) or []):
+        rows.append({'source_index': idx, 'text': normalize_text(str(bullet)).strip()})
+    return rows
+
+
+def _project_tech_allowlist_from_resume_json(project: dict) -> set[str]:
+    allowed = set()
+    for term in project.get('technologies', []) or []:
+        t = _normalize_term(str(term))
+        if t:
+            allowed.add(t)
+            allowed.add(t.replace(' ', ''))
+            for token in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\./-]+', t):
+                allowed.add(_normalize_term(token))
+            for inferred in _extract_tech_terms(t):
+                allowed.add(_normalize_term(inferred))
+    for generic in GENERIC_BULLET_TERMS:
+        allowed.add(_normalize_term(generic))
+    return allowed
+
+
+def _validate_light_rephrase_payload(payload: dict, selected_projects: list[dict]) -> tuple[bool, str]:
+    if not isinstance(payload, dict):
+        return False, 'AI payload is not an object'
+    projects_data = payload.get('projects', [])
+    if not isinstance(projects_data, list):
+        return False, 'AI payload projects must be an array'
+    by_name = {_entry_match_key(p.get('title', p.get('name', ''))): p for p in selected_projects}
+    for project_item in projects_data:
+        if not isinstance(project_item, dict):
+            return False, 'AI project payload item must be an object'
+        key = _entry_match_key(project_item.get('name', ''))
+        original_project = by_name.get(key)
+        if not original_project:
+            return False, f'AI returned unknown project: {project_item.get("name", "")}'
+        src_bullets = [normalize_text(str(b)).strip() for b in original_project.get('bullets', []) if normalize_text(str(b)).strip()]
+        returned = project_item.get('bullets', [])
+        if not isinstance(returned, list):
+            return False, f'AI bullets for {project_item.get("name", "")} must be an array'
+        if len(returned) > len(src_bullets):
+            return False, f'AI added bullets for {project_item.get("name", "")}'
+        seen_indexes = set()
+        rewritten_texts = []
+        for row in returned:
+            if not isinstance(row, dict):
+                return False, f'AI bullet row for {project_item.get("name", "")} must be an object'
+            src_idx = row.get('source_index')
+            if not isinstance(src_idx, int):
+                return False, f'AI source_index missing/int for {project_item.get("name", "")}'
+            if src_idx < 0 or src_idx >= len(src_bullets):
+                return False, f'AI source_index out of range for {project_item.get("name", "")}'
+            if src_idx in seen_indexes:
+                return False, f'AI duplicate source_index for {project_item.get("name", "")}'
+            seen_indexes.add(src_idx)
+            new_text = normalize_text(str(row.get('text', ''))).strip()
+            if not new_text:
+                return False, f'AI empty bullet text for {project_item.get("name", "")}'
+            sim = _bullet_similarity(new_text, src_bullets[src_idx])
+            if sim < BULLET_SIMILARITY_THRESHOLD:
+                return False, f'AI bullet drift too high for {project_item.get("name", "")}'
+            rewritten_texts.append(new_text)
+
+        allowed_terms = _project_tech_allowlist_from_resume_json(original_project)
+        tech_terms = _extract_tech_terms(' '.join(rewritten_texts))
+        disallowed = [t for t in tech_terms if t not in allowed_terms]
+        if disallowed:
+            return False, f'AI introduced non-allowed project technology terms in {project_item.get("name", "")}'
+
+        orig_terms = _extract_tech_terms(' '.join(src_bullets))
+        orig_providers = _cloud_providers_in_terms(orig_terms | allowed_terms)
+        gen_providers = _cloud_providers_in_terms(tech_terms)
+        substituted = [p for p in gen_providers if p not in orig_providers]
+        if substituted:
+            return False, f'AI cloud provider substitution in {project_item.get("name", "")}'
+    return True, ''
+
+
+def light_rephrase_selected_content_with_ai(job_text: str, summary: str, selected_projects: list[dict]) -> dict:
+    if not _get_ai_provider() or not (job_text or '').strip():
+        return {}
+    payload = {
+        'summary': summary,
+        'projects': [
+            {
+                'name': p.get('title', p.get('name', '')),
+                'technologies': p.get('technologies', []),
+                'bullets': _extract_source_index_bullets(p),
+            }
+            for p in selected_projects
+        ],
+    }
+    instructions = (
+        "Return STRICT JSON only:\n"
+        "{"
+        "\"summary\":\"...\","
+        "\"projects\":[{\"name\":\"...\",\"bullets\":[{\"source_index\":0,\"text\":\"...\"}]}]"
+        "}\n"
+        "Rules:\n"
+        "- You may only lightly rephrase provided summary and bullets.\n"
+        "- You may reorder bullets by returning source_index entries in any order.\n"
+        "- You may remove bullets by omitting source_index rows.\n"
+        "- You may NOT create new bullets.\n"
+        "- You may NOT introduce new claims, technologies, metrics, or providers.\n"
+        "- Each bullet must map to an existing bullet via source_index.\n"
+    )
+    text = _call_ai_text(
+        prompt=(
+            f"Job description:\n{job_text}\n\n"
+            f"Selected resume content:\n{json.dumps(payload, ensure_ascii=False)}\n"
+        ),
+        instructions=instructions,
+        max_tokens=1600,
+        model_tier='fast',
+    )
+    match = re.search(r'\{[\s\S]*\}', text or '')
+    raw = match.group(0) if match else (text or '{}')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    ok, _reason = _validate_light_rephrase_payload(data, selected_projects=selected_projects)
+    if not ok:
+        return {}
+    return data
+
+
 def build_project_allowed_terms(projects_by_name: dict[str, dict]) -> dict[str, set[str]]:
     out: dict[str, set[str]] = {}
     for project_name, entry in (projects_by_name or {}).items():
@@ -2352,6 +2713,52 @@ def _validate_project_updates_section_scoped(
 
         cleaned_updates.append({'title': title, 'bullets': normalized_bullets[:6]})
     return True, cleaned_updates, ''
+
+
+def validate_generated_resume(original_resume_json: dict, generated_resume_json: dict) -> None:
+    def names(items, key):
+        out = set()
+        for item in items or []:
+            out.add(_entry_match_key(str(item.get(key, ''))))
+        return out
+
+    orig_projects = { _entry_match_key(p.get('name', '')): p for p in original_resume_json.get('projects', []) }
+    gen_projects = { _entry_match_key(p.get('name', '')): p for p in generated_resume_json.get('projects', []) }
+    if not set(gen_projects).issubset(set(orig_projects)):
+        raise SystemExit('Generated resume invalid: contains projects not present in original resume.json.')
+
+    orig_exp = names(original_resume_json.get('experience', []), 'title')
+    gen_exp = names(generated_resume_json.get('experience', []), 'title')
+    if not gen_exp.issubset(orig_exp):
+        raise SystemExit('Generated resume invalid: contains experience entries not present in original resume.json.')
+
+    orig_edu = names(original_resume_json.get('education', []), 'degree')
+    gen_edu = names(generated_resume_json.get('education', []), 'degree')
+    if not gen_edu.issubset(orig_edu):
+        raise SystemExit('Generated resume invalid: contains education entries not present in original resume.json.')
+
+    orig_certs = {_normalize_term(c) for c in original_resume_json.get('certifications', [])}
+    gen_certs = {_normalize_term(c) for c in generated_resume_json.get('certifications', [])}
+    if not gen_certs.issubset(orig_certs):
+        raise SystemExit('Generated resume invalid: contains certifications not present in original resume.json.')
+
+    for key, project in gen_projects.items():
+        orig_project = orig_projects[key]
+        allowed_terms = _project_tech_allowlist_from_resume_json(orig_project)
+        orig_bullets = [normalize_text(str(b)).strip() for b in (orig_project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
+        gen_bullets = [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
+        if len(gen_bullets) > len(orig_bullets):
+            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has new bullets.')
+        tech_terms = _extract_tech_terms(' '.join(gen_bullets))
+        disallowed = [t for t in tech_terms if t not in allowed_terms]
+        if disallowed:
+            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" includes non-allowed tech terms.')
+        orig_terms = _extract_tech_terms(' '.join(orig_bullets))
+        orig_providers = _cloud_providers_in_terms(orig_terms | allowed_terms)
+        gen_providers = _cloud_providers_in_terms(tech_terms)
+        substituted = [p for p in gen_providers if p not in orig_providers]
+        if substituted:
+            raise SystemExit(f'Generated resume invalid: provider substitution in project "{project.get("name", "")}".')
 
 
 def _apply_bullet_updates(entries: list[dict], updates: list[dict]) -> None:
@@ -2956,9 +3363,9 @@ def generate_cover_letter(
     resume_path = Path(resume_path)
     if not resume_path.exists():
         raise SystemExit(f'Resume file not found: {resume_path}')
-    resume_text = resume_path.read_text(encoding='utf-8', errors='replace')
-    header_lines, _sections = split_sections(resume_text)
-    name, _contact = parse_header(header_lines)
+    resume_json = load_resume_json(resume_path)
+    resume_text = resume_json_to_text(resume_json)
+    name = normalize_text((resume_json.get('basics', {}) or {}).get('name', '')).strip()
 
     cover_text = generate_cover_letter_with_ai(
         job_text=job_text,
@@ -3214,7 +3621,9 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     if not template_path.exists():
         raise SystemExit(f'Template file not found: {template_path}')
 
-    resume_text = resume_path.read_text(encoding='utf-8', errors='replace')
+    resume_json = load_resume_json(resume_path)
+    resume_text = resume_json_to_text(resume_json)
+    parsed_resume = resume_json_to_internal(resume_json)
     template_text = template_path.read_text(encoding='utf-8', errors='replace')
     style_match = re.search(r'<style>(.*?)</style>', template_text, re.DOTALL | re.IGNORECASE)
     if style_match:
@@ -3224,42 +3633,35 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     extra_pdf_css = "\n@media print { .page { padding-top: 6mm; } }\n"
     style_css = style_css + extra_pdf_css
 
-    header_lines, source_sections = split_sections(resume_text)
-    name, contact = parse_header(header_lines)
+    name = parsed_resume.get('name', '')
+    contact = [c for c in (parsed_resume.get('contact', []) or []) if c]
 
     classification = classify_job(job_text or '')
     strategy = choose_resume_strategy(classification)
-    tagline = strategy.get('tagline') or DEFAULT_TAILORED_TAGLINE
-    headline = tagline
+    tagline = strategy.get('tagline') or parsed_resume.get('headline') or DEFAULT_TAILORED_TAGLINE
+    headline = tagline or parsed_resume.get('headline', '')
 
-    template_skill_tags = extract_template_skill_tags(template_text)
-
-    parsed_resume = parse_resume_sections(resume_text)
-    sections = source_sections
     summary = parsed_resume.get('summary', '')
     if not summary:
         summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
-    summary_result = generate_summary_with_guard(
-        job_text=job_text or '',
-        resume_text=resume_text,
-        fallback_summary=summary,
-        classification=classification,
-        strategy=strategy,
-    )
-    summary = _sanitize_summary_text(
-        str(summary_result.get('summary', '')),
-        fallback=summary,
-        max_words=65,
-    )
 
     education = parsed_resume.get('education', [])
     experience = [dict(e) for e in (parsed_resume.get('experience', []) or [])]
     volunteer_entries = []
     projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
-    project_allowed_terms_by_title = build_project_allowed_terms(parsed_resume.get('projects', {}))
+    projects = select_project_bullets_deterministic(
+        projects=projects,
+        job_text=job_text or '',
+        max_bullets_per_project=int(strategy.get('max_bullets_per_project', 3)),
+    )
 
-    canonical_skills = template_skill_tags[:] if template_skill_tags else (parsed_resume.get('skills', []) or [])
+    grouped_skills = parsed_resume.get('skills_grouped', {})
+    ordered_grouped_skills, ordered_skills = reorder_skill_groups(
+        grouped_skills=grouped_skills,
+        priority_groups=strategy.get('skill_priority_groups', []),
+    )
+    canonical_skills = ordered_skills or (parsed_resume.get('skills', []) or [])
     skills = filter_skills_for_job(
         canonical_skills,
         job_text=job_text or '',
@@ -3272,39 +3674,93 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     interests = parsed_resume.get('interests', [])
     header_html = render_header_html(name=name, headline=headline, contact=contact)
 
+    deterministic_projects = [dict(p) for p in projects]
+    deterministic_summary = summary
+
     if _get_ai_provider() and (job_text or '').strip():
-        try:
-            selective = tailor_resume_selective_with_ai(
-                job_text=job_text,
-                resume_text=resume_text,
-                summary=summary,
-                skills=canonical_skills,
-                experience_entries=experience + volunteer_entries,
-                project_entries=projects,
-                classification=classification,
-                strategy=strategy,
-                project_allowed_terms_by_title=project_allowed_terms_by_title,
+        payload = light_rephrase_selected_content_with_ai(
+            job_text=job_text,
+            summary=summary,
+            selected_projects=projects,
+        )
+        if payload:
+            candidate_summary = _sanitize_summary_text(
+                str(payload.get('summary', '')),
+                fallback=summary,
+                max_words=65,
             )
-        except Exception:
-            selective = {}
-        skills = _sanitize_skills_from_ai(
-            selective.get('skills', []),
-            canonical_skills=canonical_skills,
-            job_text=job_text or '',
-            max_skills=int(strategy.get('max_skills', 16)),
-            min_skills=int(strategy.get('min_skills', 10)),
-            prefer_cyber_terms=bool(strategy.get('prefer_cyber_terms', False)),
-        )
-        _apply_bullet_updates(experience, selective.get('experience_updates', []))
-        _apply_bullet_updates(volunteer_entries, selective.get('experience_updates', []))
-        _apply_bullet_updates(projects, selective.get('project_updates', []))
-        projects = apply_ai_project_selection_and_order(
-            projects=projects,
-            selected_projects=selective.get('selected_projects', []),
-            project_order=selective.get('project_order', []),
-        )
-        if not selective.get('project_order'):
-            projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
+            by_name = {_entry_match_key(p.get('title', '')): dict(p) for p in projects}
+            for row in payload.get('projects', []):
+                key = _entry_match_key(row.get('name', ''))
+                if key not in by_name:
+                    continue
+                source_bullets = projects[[_entry_match_key(p.get('title', '')) for p in projects].index(key)].get('bullets', [])
+                rewritten = []
+                for bullet in row.get('bullets', []):
+                    idx = bullet.get('source_index')
+                    text = normalize_text(str(bullet.get('text', ''))).strip()
+                    if isinstance(idx, int) and 0 <= idx < len(source_bullets) and text:
+                        rewritten.append(text)
+                if rewritten:
+                    by_name[key]['bullets'] = rewritten
+            ai_projects = [by_name[_entry_match_key(p.get('title', ''))] for p in projects if _entry_match_key(p.get('title', '')) in by_name]
+            candidate_generated_json = {
+                'basics': resume_json.get('basics', {}),
+                'headline': headline,
+                'summary': candidate_summary,
+                'education': resume_json.get('education', []),
+                'projects': [
+                    {
+                        'name': p.get('title', ''),
+                        'links': next(
+                            (proj.get('links', {}) for proj in resume_json.get('projects', []) if _entry_match_key(proj.get('name', '')) == _entry_match_key(p.get('title', ''))),
+                            {},
+                        ),
+                        'technologies': next(
+                            (proj.get('technologies', []) for proj in resume_json.get('projects', []) if _entry_match_key(proj.get('name', '')) == _entry_match_key(p.get('title', ''))),
+                            [],
+                        ),
+                        'bullets': p.get('bullets', []),
+                    }
+                    for p in ai_projects
+                ],
+                'experience': resume_json.get('experience', []),
+                'skills': ordered_grouped_skills,
+                'certifications': resume_json.get('certifications', []),
+            }
+            try:
+                validate_generated_resume(original_resume_json=resume_json, generated_resume_json=candidate_generated_json)
+                summary = candidate_summary
+                projects = ai_projects
+            except Exception:
+                summary = deterministic_summary
+                projects = [dict(p) for p in deterministic_projects]
+
+    deterministic_generated_json = {
+        'basics': resume_json.get('basics', {}),
+        'headline': headline,
+        'summary': summary,
+        'education': resume_json.get('education', []),
+        'projects': [
+            {
+                'name': p.get('title', ''),
+                'links': next(
+                    (proj.get('links', {}) for proj in resume_json.get('projects', []) if _entry_match_key(proj.get('name', '')) == _entry_match_key(p.get('title', ''))),
+                    {},
+                ),
+                'technologies': next(
+                    (proj.get('technologies', []) for proj in resume_json.get('projects', []) if _entry_match_key(proj.get('name', '')) == _entry_match_key(p.get('title', ''))),
+                    [],
+                ),
+                'bullets': p.get('bullets', []),
+            }
+            for p in projects
+        ],
+        'experience': resume_json.get('experience', []),
+        'skills': ordered_grouped_skills,
+        'certifications': resume_json.get('certifications', []),
+    }
+    validate_generated_resume(original_resume_json=resume_json, generated_resume_json=deterministic_generated_json)
 
     keywords = extract_keywords(job_text or '', skills)
     html = render_html(
