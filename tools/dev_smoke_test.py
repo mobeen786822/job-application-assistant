@@ -97,6 +97,7 @@ def run_case(label: str, job_text: str) -> None:
     )
     html_text = Path(html_path).read_text(encoding='utf-8', errors='replace')
     assert_non_empty_sections(html_text)
+    assert 'LINK:' not in html_text and 'LIVE:' not in html_text and 'WEBSITE:' not in html_text, 'Project link labels should not include LINK/LIVE/WEBSITE prefixes'
 
     project_order = [re.sub(r'<.*?>', '', t).strip() for t in extract_project_titles_from_html(html_text)]
     first_bullets = extract_project_first_bullets(html_text)

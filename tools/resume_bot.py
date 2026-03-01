@@ -132,6 +132,15 @@ KEYWORD_TIER_WEIGHTS = {
     'preview': 1,
     'export': 1,
 }
+SKILL_SYNONYM_MAP = {
+    'rest api': 'REST API Integration',
+    'react.js': 'React',
+    'react native': 'React Native',
+    'unit testing': 'Jest',
+    'testing library': 'React Testing Library',
+    'nosql': 'NoSQL',
+    'firestore': 'Cloud Firestore',
+}
 
 
 def normalize_text(text: str) -> str:
@@ -1246,6 +1255,76 @@ def reorder_skill_groups(grouped_skills: dict, priority_groups: list[str]) -> tu
     return ordered_grouped, flattened
 
 
+def select_skills_deterministic(job_text: str, grouped_skills: dict, max_skills: int = 22) -> list[str]:
+    ordered_grouped, ordered_skills = reorder_skill_groups(grouped_skills=grouped_skills or {}, priority_groups=SKILL_GROUP_KEYS)
+    if not ordered_skills:
+        return []
+
+    job_norm = _normalize_term(job_text or '')
+
+    def score_skill(skill: str) -> int:
+        s_norm = _normalize_term(skill)
+        score = 0
+        if s_norm and s_norm in job_norm:
+            score += 3
+        for phrase, mapped_skill in SKILL_SYNONYM_MAP.items():
+            if _normalize_term(mapped_skill) == s_norm and _normalize_term(phrase) in job_norm:
+                score += 2
+        return score
+
+    scored = []
+    for idx, skill in enumerate(ordered_skills):
+        scored.append((score_skill(skill), idx, skill))
+    scored.sort(key=lambda t: (-t[0], t[1]))
+
+    selected = []
+    selected_keys = set()
+    for score, _, skill in scored:
+        if score <= 0:
+            continue
+        key = skill.lower()
+        if key in selected_keys:
+            continue
+        selected.append(skill)
+        selected_keys.add(key)
+        if len(selected) >= max_skills:
+            break
+
+    # Baseline core skills
+    for must_have in ('JavaScript', 'TypeScript', 'React'):
+        if len(selected) >= max_skills:
+            break
+        for candidate in ordered_skills:
+            if _normalize_term(candidate) == _normalize_term(must_have):
+                key = candidate.lower()
+                if key not in selected_keys:
+                    selected.append(candidate)
+                    selected_keys.add(key)
+                break
+    mobile_terms = ('mobile', 'ios', 'android', 'react native', 'flutter', 'xamarin')
+    if any(t in job_norm for t in mobile_terms):
+        for candidate in ordered_skills:
+            if _normalize_term(candidate) == 'react native':
+                key = candidate.lower()
+                if key not in selected_keys and len(selected) < max_skills:
+                    selected.append(candidate)
+                    selected_keys.add(key)
+                break
+
+    # If too sparse, fill from stable order.
+    for skill in ordered_skills:
+        if len(selected) >= max_skills:
+            break
+        key = skill.lower()
+        if key in selected_keys:
+            continue
+        selected.append(skill)
+        selected_keys.add(key)
+        if len(selected) >= 12 and any(s for s, _, _ in scored if s > 0):
+            break
+    return selected[:max_skills]
+
+
 def select_project_bullets_deterministic(
     projects: list[dict],
     job_text: str,
@@ -1477,16 +1556,14 @@ def resume_json_to_internal(resume_dict: dict) -> dict:
     for project in resume_dict.get('projects', []):
         links = project.get('links', {}) or {}
         project_bullets = normalize_bullet_list(project.get('bullets', []) or [])
-        subtitle_parts = []
-        if links.get('github'):
-            subtitle_parts.append(f'LINK: {links["github"]}')
-        if links.get('live'):
-            subtitle_parts.append(f'LIVE: {links["live"]}')
-        if links.get('website'):
-            subtitle_parts.append(f'WEBSITE: {links["website"]}')
         projects_by_name[project.get('name', '')] = {
             'title': project.get('name', ''),
-            'subtitle': ' | '.join(subtitle_parts),
+            'subtitle': '',
+            'links': {
+                'github': normalize_text(str(links.get('github', ''))).strip(),
+                'live': normalize_text(str(links.get('live', ''))).strip(),
+                'website': normalize_text(str(links.get('website', ''))).strip(),
+            },
             'date': '',
             'bullets': [b.get('text', '') for b in project_bullets if b.get('text', '')],
             'bullet_objects': project_bullets,
@@ -1901,25 +1978,44 @@ def render_html(
         return ' <span>|</span> '.join(parts)
 
     def render_entries(entries, with_subtitle=False):
-        html = []
+        def render_project_links(links: dict) -> str:
+            if not isinstance(links, dict):
+                return ''
+            parts = []
+            for key, icon, label in (
+                ('github', '🐙', 'GitHub'),
+                ('live', '🌐', 'Live'),
+                ('website', '🔗', 'Website'),
+            ):
+                url = normalize_text(str(links.get(key, ''))).strip()
+                if not url:
+                    continue
+                href = url if url.lower().startswith(('http://', 'https://')) else f'https://{url}'
+                parts.append(f'{icon} <a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{label}</a>')
+            return ' | '.join(parts)
+
+        html_parts = []
         for e in entries:
-            html.append('<div class="entry">')
-            html.append('<div class="entry-header">')
-            html.append(f'<span class="entry-title">{linkify_text_compact_links(e.get("title", ""))}</span>')
+            html_parts.append('<div class="entry">')
+            html_parts.append('<div class="entry-header">')
+            html_parts.append(f'<span class="entry-title">{linkify_text_compact_links(e.get("title", ""))}</span>')
             if e.get('date'):
-                html.append(f'<span class="entry-date">{e["date"]}</span>')
-            html.append('</div>')
+                html_parts.append(f'<span class="entry-date">{e["date"]}</span>')
+            html_parts.append('</div>')
+            links_html = render_project_links(e.get('links', {}))
+            if links_html:
+                html_parts.append(f'<div class="entry-subtitle">{links_html}</div>')
             if with_subtitle and e.get('school'):
-                html.append(f'<div class="entry-subtitle">{linkify_text(e["school"])}</div>')
+                html_parts.append(f'<div class="entry-subtitle">{linkify_text(e["school"])}</div>')
             elif e.get('subtitle'):
-                html.append(f'<div class="entry-subtitle">{linkify_text_compact_links(e["subtitle"])}</div>')
+                html_parts.append(f'<div class="entry-subtitle">{linkify_text_compact_links(e["subtitle"])}</div>')
             if e.get('bullets'):
-                html.append('<ul>')
+                html_parts.append('<ul>')
                 for b in e['bullets']:
-                    html.append(f'<li>{linkify_text(b)}</li>')
-                html.append('</ul>')
-            html.append('</div>')
-        return '\n'.join(html)
+                    html_parts.append(f'<li>{linkify_text(b)}</li>')
+                html_parts.append('</ul>')
+            html_parts.append('</div>')
+        return '\n'.join(html_parts)
     edu_html = render_entries(education, with_subtitle=True)
     skills_html = ''.join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in (skills or []) if s])
     proj_html = render_entries(projects)
@@ -2536,7 +2632,7 @@ _TECH_PHRASE_HINTS = [
     'kali linux', 'nmap', 'metasploit', 'wireshark', 'burp suite',
     'incident response', 'threat intelligence', 'vulnerability assessment',
     'penetration testing', 'network segmentation', 'firewall configuration',
-    'jest', 'react testing library', 'axios', 'vite', 'sendgrid', 'calendly',
+    'jest', 'react testing library', 'axios', 'vite', 'sendgrid',
     'aws', 'amazon web services', 'azure', 'gcp', 'google cloud', 'asp.net', '.net', 'dotnet', 'c#',
 ]
 
@@ -3792,19 +3888,18 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     volunteer_entries = []
     projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
-    projects = select_project_bullets_deterministic(
-        projects=projects,
-        job_text=job_text or '',
-        max_bullets_per_project=int(strategy.get('max_bullets_per_project', 3)),
-        min_bullets_per_project=int(strategy.get('min_bullets_per_project', 2)),
-    )
+    # Keep all source bullets; no project bullet pruning.
 
     grouped_skills = parsed_resume.get('skills_grouped', {})
-    ordered_grouped_skills, ordered_skills = reorder_skill_groups(
+    ordered_grouped_skills, _ordered_skills = reorder_skill_groups(
         grouped_skills=grouped_skills,
         priority_groups=SKILL_GROUP_KEYS,
     )
-    skills = ordered_skills or (parsed_resume.get('skills', []) or [])
+    skills = select_skills_deterministic(
+        job_text=job_text or '',
+        grouped_skills=ordered_grouped_skills,
+        max_skills=int(strategy.get('max_selected_skills', 22)),
+    )
 
     certificates = parsed_resume.get('certificates', [])
     interests = parsed_resume.get('interests', [])
@@ -3831,14 +3926,13 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
                 if key not in by_name:
                     continue
                 source_bullets = projects[[_entry_match_key(p.get('title', '')) for p in projects].index(key)].get('bullets', [])
-                rewritten = []
+                rewritten = [normalize_text(str(b)).strip() for b in source_bullets]
                 for bullet in row.get('bullets', []):
                     idx = bullet.get('source_index')
                     text = normalize_text(str(bullet.get('text', ''))).strip()
                     if isinstance(idx, int) and 0 <= idx < len(source_bullets) and text:
-                        rewritten.append(text)
-                if rewritten:
-                    by_name[key]['bullets'] = rewritten
+                        rewritten[idx] = text
+                by_name[key]['bullets'] = rewritten
             ai_projects = [by_name[_entry_match_key(p.get('title', ''))] for p in projects if _entry_match_key(p.get('title', '')) in by_name]
             candidate_generated_json = {
                 'basics': resume_json.get('basics', {}),
