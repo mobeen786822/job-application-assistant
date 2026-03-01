@@ -1,4 +1,5 @@
 import argparse
+import difflib
 import html
 import hashlib
 import json
@@ -998,6 +999,39 @@ def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> l
         return (1, 99, title)
 
     return sorted(projects, key=project_key)
+
+
+def apply_ai_project_selection_and_order(
+    projects: list[dict],
+    selected_projects,
+    project_order,
+) -> list[dict]:
+    if not projects:
+        return []
+    by_key = {_entry_match_key(p.get('title', '')): p for p in projects}
+    keys = list(by_key.keys())
+
+    selected_keys = []
+    if isinstance(selected_projects, list) and selected_projects:
+        for title in selected_projects:
+            key = _entry_match_key(str(title))
+            if key in by_key and key not in selected_keys:
+                selected_keys.append(key)
+        if not selected_keys:
+            selected_keys = keys[:]
+    else:
+        selected_keys = keys[:]
+
+    ordered = []
+    if isinstance(project_order, list) and project_order:
+        for title in project_order:
+            key = _entry_match_key(str(title))
+            if key in selected_keys and key not in ordered:
+                ordered.append(key)
+    for key in selected_keys:
+        if key not in ordered:
+            ordered.append(key)
+    return [by_key[k] for k in ordered if k in by_key]
 
 
 def _normalize_term(value: str) -> str:
@@ -2023,6 +2057,7 @@ _CLOUD_PROVIDER_VARIANTS = {
     'gcp': {'gcp', 'google cloud', 'google cloud platform'},
     'firebase': {'firebase', 'cloud firestore'},
 }
+BULLET_SIMILARITY_THRESHOLD = 0.55
 
 
 def _extract_tech_terms(text: str) -> set[str]:
@@ -2047,6 +2082,95 @@ def _extract_tech_terms(text: str) -> set[str]:
     return found
 
 
+def _tokenize_similarity(text: str) -> set[str]:
+    return {
+        t for t in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\./-]+', _normalize_term(text))
+        if len(t) >= 2 and t not in STOPWORDS
+    }
+
+
+def _bullet_similarity(a: str, b: str) -> float:
+    a_n = _normalize_term(a)
+    b_n = _normalize_term(b)
+    if not a_n or not b_n:
+        return 0.0
+    seq = difflib.SequenceMatcher(None, a_n, b_n).ratio()
+    a_t = _tokenize_similarity(a_n)
+    b_t = _tokenize_similarity(b_n)
+    inter = len(a_t & b_t)
+    union = len(a_t | b_t)
+    jaccard = (inter / union) if union else 0.0
+    return max(seq, jaccard)
+
+
+def _extract_capitalized_tech_candidates(lines: list[str]) -> set[str]:
+    out = set()
+    ignore = {
+        'built', 'implemented', 'added', 'delivered', 'managed', 'designed', 'developed',
+        'created', 'enhanced', 'supported', 'ensured', 'collaborated', 'maintained',
+    }
+    for line in lines:
+        for token in re.findall(r'\b[A-Z][A-Za-z0-9\+#\.-]{1,}\b', normalize_text(line or '')):
+            t = token.strip()
+            low = t.lower()
+            if low in ignore:
+                continue
+            looks_techy = any(ch in t for ch in '+#.-') or len(t) >= 3
+            if looks_techy:
+                out.add(low)
+    return out
+
+
+def _numeric_tokens(text: str) -> set[str]:
+    return set(re.findall(r'\b\d+(?:\.\d+)?%?\b', normalize_text(text or '')))
+
+
+def _validate_project_bullets_constrained(
+    generated_bullets: list[str],
+    original_bullets: list[str],
+    allowed_terms: set[str],
+) -> tuple[bool, str]:
+    if not generated_bullets:
+        return True, ''
+    if len(generated_bullets) > len(original_bullets):
+        return False, 'project update added new bullet points'
+
+    gen_terms = _extract_tech_terms(' '.join(generated_bullets))
+    disallowed = sorted(t for t in gen_terms if t not in allowed_terms)
+    if disallowed:
+        return False, f'project tech terms not in project allowlist: {", ".join(disallowed[:5])}'
+
+    orig_caps = _extract_capitalized_tech_candidates(original_bullets)
+    gen_caps = _extract_capitalized_tech_candidates(generated_bullets)
+    new_caps = sorted(c for c in gen_caps if c not in orig_caps)
+    if new_caps:
+        return False, f'new capitalized tech terms detected: {", ".join(new_caps[:5])}'
+
+    unmatched = list(range(len(original_bullets)))
+    for bullet in generated_bullets:
+        best_idx = None
+        best_score = 0.0
+        for idx in unmatched:
+            score = _bullet_similarity(bullet, original_bullets[idx])
+            if score > best_score:
+                best_score = score
+                best_idx = idx
+        if best_idx is None or best_score < BULLET_SIMILARITY_THRESHOLD:
+            return False, f'bullet semantic drift (score={best_score:.2f})'
+        gen_nums = _numeric_tokens(bullet)
+        orig_nums = _numeric_tokens(original_bullets[best_idx])
+        if gen_nums - orig_nums:
+            return False, 'new metrics or numeric claims introduced'
+        unmatched.remove(best_idx)
+
+    orig_providers = _cloud_providers_in_terms(_extract_tech_terms(' '.join(original_bullets)))
+    gen_providers = _cloud_providers_in_terms(gen_terms)
+    substituted = sorted(p for p in gen_providers if p not in orig_providers)
+    if substituted:
+        return False, f'cloud provider substitution: {", ".join(substituted)}'
+    return True, ''
+
+
 def build_project_allowed_terms(projects_by_name: dict[str, dict]) -> dict[str, set[str]]:
     out: dict[str, set[str]] = {}
     for project_name, entry in (projects_by_name or {}).items():
@@ -2068,6 +2192,7 @@ def _cloud_providers_in_terms(terms: set[str]) -> set[str]:
 def _validate_project_updates_section_scoped(
     project_updates,
     project_allowed_terms_by_title: dict[str, set[str]],
+    original_project_entries_by_key: dict[str, dict],
     original_project_keys: set[str],
 ) -> tuple[bool, list[dict], str]:
     if not isinstance(project_updates, list):
@@ -2084,17 +2209,16 @@ def _validate_project_updates_section_scoped(
         if not isinstance(bullets, list):
             return False, [], f'invalid bullets for project: {title}'
         normalized_bullets = [normalize_text(str(b)).strip() for b in bullets if normalize_text(str(b)).strip()]
-        generated_terms = _extract_tech_terms(' '.join(normalized_bullets))
         allowed_terms = project_allowed_terms_by_title.get(key, set())
-        disallowed = sorted(t for t in generated_terms if t not in allowed_terms)
-        if disallowed:
-            return False, [], f'project tech terms not in project allowlist for {title}: {", ".join(disallowed[:5])}'
-
-        original_providers = _cloud_providers_in_terms(allowed_terms)
-        generated_providers = _cloud_providers_in_terms(generated_terms)
-        substituted = sorted(p for p in generated_providers if p not in original_providers)
-        if substituted:
-            return False, [], f'cloud provider substitution in {title}: {", ".join(substituted)}'
+        original_entry = original_project_entries_by_key.get(key, {})
+        original_bullets = [normalize_text(str(b)).strip() for b in original_entry.get('bullets', []) if normalize_text(str(b)).strip()]
+        valid, reason = _validate_project_bullets_constrained(
+            generated_bullets=normalized_bullets,
+            original_bullets=original_bullets,
+            allowed_terms=allowed_terms,
+        )
+        if not valid:
+            return False, [], f'{title}: {reason}'
 
         cleaned_updates.append({'title': title, 'bullets': normalized_bullets[:6]})
     return True, cleaned_updates, ''
@@ -2143,6 +2267,19 @@ def tailor_resume_selective_with_ai(
 ) -> dict:
     if not _get_ai_provider():
         return {}
+    structured_project_blocks = []
+    for e in project_entries:
+        title = e.get('title', '')
+        key = _entry_match_key(title)
+        structured_project_blocks.append({
+            'title': title,
+            'subtitle': e.get('subtitle', ''),
+            'source_bullets': [
+                {'id': idx + 1, 'text': b} for idx, b in enumerate(e.get('bullets', []) or [])
+            ],
+            'allowed_project_terms': sorted(list((project_allowed_terms_by_title or {}).get(key, set()))),
+        })
+
     payload = {
         'classification': classification,
         'strategy': strategy,
@@ -2152,16 +2289,10 @@ def tailor_resume_selective_with_ai(
             {'title': e.get('title', ''), 'subtitle': e.get('subtitle', ''), 'bullets': e.get('bullets', [])}
             for e in experience_entries
         ],
-        'project_roles': [
-            {'title': e.get('title', ''), 'subtitle': e.get('subtitle', ''), 'bullets': e.get('bullets', [])}
-            for e in project_entries
-        ],
-        'project_term_constraints': {
-            entry.get('title', ''): sorted(list(project_allowed_terms_by_title.get(_entry_match_key(entry.get('title', '')), set())))
-            for entry in project_entries
-        } if project_allowed_terms_by_title else {},
+        'project_blocks': structured_project_blocks,
     }
     original_project_keys = {_entry_match_key(e.get('title', '')) for e in project_entries}
+    original_project_entries_by_key = {_entry_match_key(e.get('title', '')): dict(e) for e in project_entries}
     last_data = {}
 
     for attempt in range(2):
@@ -2181,19 +2312,27 @@ def tailor_resume_selective_with_ai(
             "- No hallucinations; use only existing resume facts.\n"
             "- Keep summary concise (45-65 words).\n"
             "- Skills must come only from provided skill list.\n"
+            "- For projects, you must only use and lightly rephrase the provided bullet points. Do not invent.\n"
+            "- You may remove irrelevant bullets.\n"
             "- You may reorder bullet points to emphasize strategy priorities.\n"
+            "- You may choose which projects to include and project order, but only from provided project blocks.\n"
             "- You may NOT add new skills.\n"
             "- You may NOT add new roles.\n"
+            "- You may NOT create new bullet points.\n"
+            "- You may NOT introduce new technologies or replace one technology with another.\n"
+            "- You may NOT add metrics or new claims.\n"
             "- Keep each role title unchanged.\n"
             "- Keep 3-6 bullets per role when possible.\n"
-            "- Project updates must obey project_term_constraints for that same project.\n"
+            "- Project updates must obey allowed_project_terms for that same project.\n"
             "- Do not substitute cloud providers (example: Firebase cannot become AWS unless that project already used AWS).\n"
             "Output JSON shape:\n"
             "{"
             "\"summary\": string, "
             "\"skills\": [string], "
             "\"experience_updates\": [{\"title\": string, \"bullets\": [string]}], "
-            "\"project_updates\": [{\"title\": string, \"bullets\": [string]}]"
+            "\"project_updates\": [{\"title\": string, \"bullets\": [string]}], "
+            "\"selected_projects\": [string], "
+            "\"project_order\": [string]"
             "}\n"
             f"{strict_warning}"
         )
@@ -2217,6 +2356,7 @@ def tailor_resume_selective_with_ai(
         ok, cleaned_project_updates, _reason = _validate_project_updates_section_scoped(
             data.get('project_updates', []),
             project_allowed_terms_by_title=project_allowed_terms_by_title or {},
+            original_project_entries_by_key=original_project_entries_by_key,
             original_project_keys=original_project_keys,
         )
         if ok:
@@ -3038,7 +3178,13 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         _apply_bullet_updates(experience, selective.get('experience_updates', []))
         _apply_bullet_updates(volunteer_entries, selective.get('experience_updates', []))
         _apply_bullet_updates(projects, selective.get('project_updates', []))
-        projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
+        projects = apply_ai_project_selection_and_order(
+            projects=projects,
+            selected_projects=selective.get('selected_projects', []),
+            project_order=selective.get('project_order', []),
+        )
+        if not selective.get('project_order'):
+            projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
 
     keywords = extract_keywords(job_text or '', skills)
     html = render_html(
