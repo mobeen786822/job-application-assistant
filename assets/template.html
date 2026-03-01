@@ -58,6 +58,16 @@
   .summary { font-size: 10.5pt; line-height: 1.6; }
 
   .entry { margin-bottom: 14px; }
+  .project{
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .project + .project{
+    margin-top: 8px;
+  }
+  .project:nth-of-type(2){
+    margin-top: 14px;
+  }
   .entry-header { display: flex; justify-content: space-between; }
   .entry-title { font-weight: 700; }
   .entry-date { font-size: 9.5pt; color: #666; }

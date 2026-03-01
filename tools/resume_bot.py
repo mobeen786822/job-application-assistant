@@ -1977,7 +1977,7 @@ def render_html(
             parts.append(item)
         return ' <span>|</span> '.join(parts)
 
-    def render_entries(entries, with_subtitle=False):
+    def render_entries(entries, with_subtitle=False, entry_class='entry'):
         def render_project_links(links: dict) -> str:
             if not isinstance(links, dict):
                 return ''
@@ -1996,7 +1996,7 @@ def render_html(
 
         html_parts = []
         for e in entries:
-            html_parts.append('<div class="entry">')
+            html_parts.append(f'<div class="{entry_class}">')
             html_parts.append('<div class="entry-header">')
             html_parts.append(f'<span class="entry-title">{linkify_text_compact_links(e.get("title", ""))}</span>')
             if e.get('date'):
@@ -2016,9 +2016,9 @@ def render_html(
                 html_parts.append('</ul>')
             html_parts.append('</div>')
         return '\n'.join(html_parts)
-    edu_html = render_entries(education, with_subtitle=True)
+    edu_html = render_entries(education, with_subtitle=True)
     skills_html = ''.join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in (skills or []) if s])
-    proj_html = render_entries(projects)
+    proj_html = render_entries(projects, entry_class='entry project')
     combined_experience = (experience or []) + (volunteer or [])
     exp_html = render_entries(combined_experience)
     cert_items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates]) if certificates else ''
