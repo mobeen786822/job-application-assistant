@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "basics": {
     "name": "Mobeen Khan",
     "email": "mobeenk89@gmail.com",
@@ -33,25 +33,31 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["JavaScript", "OpenAI API", "Tailscale", "Cloud VM"],
+      "technologies": ["JavaScript", "OpenAI API", "Tailscale", "Cloud VM", "HTML", "PDF"],
       "bullets": [
         {
-          "text": "Designed and developed a full-stack AI-assisted resume tailoring platform generating structured HTML and PDF outputs.",
+          "text": "Designed and developed a full-stack AI-assisted resume tailoring platform that generates structured HTML and PDF outputs from job descriptions.",
           "core": false,
           "importance": 2,
           "tags": ["full-stack", "ai", "architecture"]
         },
         {
-          "text": "Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency.",
+          "text": "Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency and prevent unsupported claims.",
           "core": true,
           "importance": 3,
           "tags": ["ai", "validation", "integrity", "api"]
         },
         {
-          "text": "Built responsive UI with real-time preview and validation feedback mechanisms.",
+          "text": "Built a responsive UI with real-time preview, export actions, and validation feedback to improve usability and output reliability.",
           "core": false,
-          "importance": 1,
-          "tags": ["ui", "frontend"]
+          "importance": 2,
+          "tags": ["ui", "frontend", "workflow"]
+        },
+        {
+          "text": "Deployed the application with VPN-only access (Tailscale) on a cloud VM to restrict public exposure and protect user data.",
+          "core": false,
+          "importance": 2,
+          "tags": ["deployment", "security", "vpn"]
         }
       ]
     },
@@ -75,6 +81,18 @@
           "core": true,
           "importance": 3,
           "tags": ["lifecycle", "incident", "systems"]
+        },
+        {
+          "text": "Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.",
+          "core": false,
+          "importance": 2,
+          "tags": ["sla", "monitoring", "ops"]
+        },
+        {
+          "text": "Included runbook and root-cause analysis capture to improve incident resolution consistency and documentation quality.",
+          "core": false,
+          "importance": 2,
+          "tags": ["runbook", "rca", "documentation"]
         }
       ]
     },
@@ -85,7 +103,7 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": ["JavaScript", "SendGrid"],
+      "technologies": ["JavaScript", "SendGrid", "ACSC Essential Eight"],
       "bullets": [
         {
           "text": "Built a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model.",
@@ -100,10 +118,16 @@
           "tags": ["risk", "assessment"]
         },
         {
-          "text": "Integrated SendGrid transactional email delivery for automated HTML report generation.",
+          "text": "Automated HTML report delivery using SendGrid transactional email for consistent user feedback and follow-up.",
+          "core": false,
+          "importance": 2,
+          "tags": ["integration", "email"]
+        },
+        {
+          "text": "Integrated lead capture and booking workflow (Calendly) to convert assessments into consultations.",
           "core": false,
           "importance": 1,
-          "tags": ["integration"]
+          "tags": ["workflow"]
         }
       ]
     },
@@ -127,6 +151,12 @@
           "core": true,
           "importance": 3,
           "tags": ["firebase", "authentication", "backend"]
+        },
+        {
+          "text": "Added geolocation and media upload capabilities with structured in-app navigation.",
+          "core": false,
+          "importance": 1,
+          "tags": ["mobile", "features"]
         }
       ]
     }
@@ -139,19 +169,19 @@
       "end": "01/2026",
       "bullets": [
         {
-          "text": "Contributed to front-end and back-end development of the web platform.",
+          "text": "Contributed to front-end and back-end feature development for a dynamic web platform.",
           "core": false,
           "importance": 1,
           "tags": ["frontend", "backend"]
         },
         {
-          "text": "Implemented responsive UI components and API-driven features.",
+          "text": "Implemented responsive UI components and API-driven features to enhance usability and data interaction.",
           "core": false,
           "importance": 1,
           "tags": ["ui", "api"]
         },
         {
-          "text": "Translated stakeholder requirements into maintainable code.",
+          "text": "Collaborated with stakeholders to translate functional requirements into maintainable code.",
           "core": false,
           "importance": 1,
           "tags": ["collaboration"]
@@ -165,66 +195,33 @@
       "end": "03/2019",
       "bullets": [
         {
-          "text": "Implemented custom front-end features for an eCommerce website.",
+          "text": "Implemented custom front-end features for an eCommerce website with focus on clean layout and responsiveness.",
           "core": false,
           "importance": 1,
-          "tags": ["frontend"]
+          "tags": ["frontend", "responsive"]
         },
         {
-          "text": "Supported server-side functionality for transactional workflows and content updates.",
+          "text": "Supported server-side functionality for product displays, transactional workflows, and content updates.",
           "core": false,
           "importance": 1,
           "tags": ["backend"]
         },
         {
-          "text": "Enhanced responsiveness and cross-device consistency.",
+          "text": "Enhanced mobile usability and cross-device consistency across the platform.",
           "core": false,
           "importance": 1,
-          "tags": ["responsive"]
+          "tags": ["mobile", "ux"]
         }
       ]
     }
   ],
   "skills": {
-    "languages": [
-      "JavaScript",
-      "TypeScript",
-      "Python",
-      "Java",
-      "C++",
-      "SQL",
-      "PL/SQL"
-    ],
-    "frontend": [
-      "React",
-      "React Native",
-      "Next.js",
-      "Vite",
-      "Tailwind CSS",
-      "Framer Motion",
-      "React Router",
-      "HTML",
-      "CSS"
-    ],
-    "backend": [
-      "REST API Integration",
-      "Axios",
-      "Firebase",
-      "Cloud Firestore",
-      "NoSQL",
-      "Database Management"
-    ],
-    "testing": [
-      "React Testing Library"
-    ],
-    "security": [
-      "System Security"
-    ],
-    "tools": [
-      "Git"
-    ]
+    "languages": ["JavaScript", "TypeScript", "Python", "Java", "C++", "SQL", "PL/SQL"],
+    "frontend": ["React", "React Native", "Next.js", "Vite", "Tailwind CSS", "Framer Motion", "React Router", "HTML", "CSS"],
+    "backend": ["REST API Integration", "Axios", "Firebase", "Cloud Firestore", "NoSQL", "Database Management"],
+    "testing": ["Jest", "React Testing Library", "ESLint"],
+    "security": ["Cybersecurity", "System Security", "Cloud Security (Foundational)", "Networking", "Kali Linux", "Nmap", "Metasploit", "Wireshark", "Burp Suite", "Penetration Testing", "Vulnerability Assessment", "Incident Response", "Threat Intelligence", "Network Segmentation", "Log Analysis", "Firewall Configuration"],
+    "tools": ["Git"]
   },
-  "certifications": [
-    "AWS Academy Graduate – AWS Academy Cloud Foundations award"
-  ]
+  "certifications": ["AWS Academy Graduate – AWS Academy Cloud Foundations award"]
 }

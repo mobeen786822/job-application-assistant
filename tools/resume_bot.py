@@ -111,24 +111,26 @@ GENERIC_BULLET_TERMS = {
 
 SKILL_GROUP_KEYS = ['languages', 'frontend', 'backend', 'testing', 'security', 'tools']
 KEYWORD_TIER_WEIGHTS = {
-    'cyber': 3,
+    # Tier 1 (+3)
+    'react': 3,
+    'typescript': 3,
+    'api': 3,
     'security': 3,
-    'soc': 3,
-    'siem': 3,
     'incident': 3,
-    'essential eight': 3,
+    'monitoring': 3,
+    # Tier 2 (+2)
     'validation': 2,
-    'openai': 2,
-    'api': 2,
-    'react': 2,
-    'typescript': 2,
-    'firebase': 2,
-    'rest': 2,
-    'frontend': 1,
-    'backend': 1,
-    'mobile': 1,
+    'lifecycle': 2,
+    'deployment': 2,
+    'authentication': 2,
+    'sla': 2,
+    'runbook': 2,
+    # Tier 3 (+1)
+    'ui': 1,
+    'responsive': 1,
     'testing': 1,
-    'cloud': 1,
+    'preview': 1,
+    'export': 1,
 }
 
 
@@ -1115,8 +1117,7 @@ def classify_job(job_text: str) -> dict:
 
 def choose_resume_strategy(classification: dict) -> dict:
     category = str((classification or {}).get('primary_category', 'unknown')).lower()
-    is_cyber = category == 'cybersecurity'
-    if is_cyber:
+    if category == 'cybersecurity':
         return {
             'name': 'CYBERSECURITY',
             'tagline': None,
@@ -1135,12 +1136,14 @@ def choose_resume_strategy(classification: dict) -> dict:
                 'Cancer Awareness Mobile App',
             ],
             'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
+            'min_bullets_per_project': 2,
             'max_bullets_per_project': 3,
             'max_skills': 16,
             'min_skills': 10,
             'prefer_cyber_terms': True,
         }
 
+    # Default to software/general ordering for software_engineering, frontend, backend, devops, and unknown.
     return {
         'name': 'SOFTWARE_GENERAL',
         'tagline': None,
@@ -1148,10 +1151,11 @@ def choose_resume_strategy(classification: dict) -> dict:
         'project_priority': [
             'Job Application Assistant',
             'Production Support Incident Console',
-            'Bunkerify',
             'Cancer Awareness Mobile App',
+            'Bunkerify',
         ],
         'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
+        'min_bullets_per_project': 2,
         'max_bullets_per_project': 3,
         'max_skills': 16,
         'min_skills': 10,
@@ -1242,13 +1246,16 @@ def reorder_skill_groups(grouped_skills: dict, priority_groups: list[str]) -> tu
     return ordered_grouped, flattened
 
 
-def select_project_bullets_deterministic(projects: list[dict], job_text: str, max_bullets_per_project: int) -> list[dict]:
+def select_project_bullets_deterministic(
+    projects: list[dict],
+    job_text: str,
+    max_bullets_per_project: int,
+    min_bullets_per_project: int = 2,
+) -> list[dict]:
     max_bullets = max(1, int(max_bullets_per_project or 3))
+    min_bullets = max(2, int(min_bullets_per_project or 2))
     jd_norm = _normalize_term(job_text or '')
-    keywords = _clean_top_keywords(
-        re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', normalize_text(job_text or '').lower()),
-        limit=16,
-    )
+    jd_words = set(re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', jd_norm))
 
     def score_bullet(bullet_obj: dict) -> int:
         text = bullet_obj.get('text', '')
@@ -1257,12 +1264,9 @@ def select_project_bullets_deterministic(projects: list[dict], job_text: str, ma
         tiered_keyword_score = 0
         for term, weight in KEYWORD_TIER_WEIGHTS.items():
             term_n = _normalize_term(term)
-            if term_n and term_n in jd_norm and term_n in text_norm:
+            term_match_in_jd = term_n in jd_norm or term_n in jd_words
+            if term_n and term_match_in_jd and term_n in text_norm:
                 tiered_keyword_score += int(weight)
-        for kw in keywords:
-            k = _normalize_term(kw)
-            if k and k in text_norm:
-                tiered_keyword_score += 1
 
         tag_matches = 0
         for tag in bullet_obj.get('tags', []) or []:
@@ -1291,14 +1295,35 @@ def select_project_bullets_deterministic(projects: list[dict], job_text: str, ma
         for idx, bullet_obj in core_items:
             chosen_pairs.append((idx, bullet_obj))
 
-        if len(chosen_pairs) <= max_bullets:
-            scored_non_core = []
-            for idx, bullet_obj in non_core_items:
-                scored_non_core.append((score_bullet(bullet_obj), idx, bullet_obj))
-            scored_non_core.sort(key=lambda t: (-t[0], t[1]))
+        scored_non_core = []
+        for idx, bullet_obj in non_core_items:
+            scored_non_core.append((score_bullet(bullet_obj), idx, bullet_obj))
+        scored_non_core.sort(key=lambda t: (-t[0], t[1]))
+
+        # Never drop core bullets. If cores exceed max, keep all core.
+        if len(chosen_pairs) < max_bullets:
             remaining = max_bullets - len(chosen_pairs)
             for _, idx, bullet_obj in scored_non_core[:remaining]:
                 chosen_pairs.append((idx, bullet_obj))
+
+        # Never output only 1 bullet for a selected project.
+        if len(chosen_pairs) < min_bullets:
+            already = {i for i, _ in chosen_pairs}
+            for _, idx, bullet_obj in scored_non_core:
+                if idx in already:
+                    continue
+                chosen_pairs.append((idx, bullet_obj))
+                already.add(idx)
+                if len(chosen_pairs) >= min_bullets:
+                    break
+            if len(chosen_pairs) < min_bullets:
+                for idx, bullet_obj in enumerate(bullet_objects):
+                    if idx in already:
+                        continue
+                    chosen_pairs.append((idx, bullet_obj))
+                    already.add(idx)
+                    if len(chosen_pairs) >= min_bullets:
+                        break
 
         # Keep output in original resume order while preserving core-inclusion rule.
         chosen_pairs.sort(key=lambda t: t[0])
@@ -2846,11 +2871,24 @@ def validate_generated_resume(original_resume_json: dict, generated_resume_json:
     if not gen_certs.issubset(orig_certs):
         raise SystemExit('Generated resume invalid: contains certifications not present in original resume.json.')
 
+    skills_allowlist = set()
+    for values in (original_resume_json.get('skills', {}) or {}).values():
+        for skill in values or []:
+            s = _normalize_term(str(skill))
+            if not s:
+                continue
+            skills_allowlist.add(s)
+            skills_allowlist.add(s.replace(' ', ''))
+
     for key, project in gen_projects.items():
         orig_project = orig_projects[key]
-        allowed_terms = _project_tech_allowlist_from_resume_json(orig_project)
+        allowed_terms = _project_tech_allowlist_from_resume_json(orig_project) | skills_allowlist
         orig_bullets = bullet_texts(orig_project.get('bullets', []) or [])
         gen_bullets = [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
+        if len(gen_bullets) == 1:
+            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has only 1 bullet.')
+        if len(gen_bullets) < 2 and len(orig_bullets) >= 2:
+            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has fewer than 2 bullets.')
         if len(gen_bullets) > len(orig_bullets):
             raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has new bullets.')
         tech_terms = _extract_tech_terms(' '.join(gen_bullets))
@@ -3758,6 +3796,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         projects=projects,
         job_text=job_text or '',
         max_bullets_per_project=int(strategy.get('max_bullets_per_project', 3)),
+        min_bullets_per_project=int(strategy.get('min_bullets_per_project', 2)),
     )
 
     grouped_skills = parsed_resume.get('skills_grouped', {})
@@ -3829,7 +3868,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
                 validate_generated_resume(original_resume_json=resume_json, generated_resume_json=candidate_generated_json)
                 summary = candidate_summary
                 projects = ai_projects
-            except Exception:
+            except (Exception, SystemExit):
                 summary = deterministic_summary
                 projects = [dict(p) for p in deterministic_projects]
 

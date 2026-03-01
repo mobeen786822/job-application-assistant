@@ -108,6 +108,9 @@ def run_case(label: str, job_text: str) -> None:
     if cancer_block:
         assert 'firebase' in cancer_block, 'Cancer Awareness project lost Firebase reference'
         assert 'aws' not in cancer_block, 'Cancer Awareness project incorrectly contains AWS'
+    for project_title in project_order:
+        bullets = extract_project_bullets(html_text, project_title)
+        assert len(bullets) >= 2, f'{project_title} has fewer than 2 bullets'
 
 
 def extract_project_block(html_text: str, project_title: str) -> str:
@@ -149,8 +152,10 @@ def run_bullet_priority_smoke() -> None:
     )
     html_text = Path(html_path).read_text(encoding='utf-8', errors='replace')
     jaa_bullets = ' '.join(extract_project_bullets(html_text, 'Job Application Assistant')).lower()
+    incident_bullets = ' '.join(extract_project_bullets(html_text, 'Production Support Incident Console')).lower()
     cancer_bullets = ' '.join(extract_project_bullets(html_text, 'Cancer Awareness Mobile App')).lower()
     assert 'no-fabrication validation logic' in jaa_bullets, 'Core validation bullet was dropped from Job Application Assistant'
+    assert 'incident lifecycle tracking' in incident_bullets, 'Core lifecycle bullet was dropped from Incident Console'
     assert 'firebase integration' in cancer_bullets, 'Firebase bullet was dropped from Cancer Awareness Mobile App'
     print('[PRIORITY] core/importance bullets retained')
 
