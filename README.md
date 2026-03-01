@@ -6,16 +6,21 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 
 - Web UI (`Flask`) for pasting a job description and generating tailored documents
 - Job-fit assessment with recommendation (`APPLY`, `MAYBE`, `NO`) and gap breakdown
-- Resume generation from `assets/resume.txt` + `assets/template.html`
+- Resume generation from `assets/resume.json` + `assets/template.html`
 - Cover letter generation with HTML preview (or text fallback)
 - CLI support for resume generation
-- Optional AI tailoring when `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is set, with heuristic fallback when unavailable
+- Deterministic role-aware strategy engine (software vs cybersecurity emphasis)
+- Strict hallucination guards:
+  - no new bullets
+  - no new technologies
+  - no cloud-provider substitution (for example `Firebase -> AWS`)
+- Optional AI "light rephrase" layer with hard validation and deterministic fallback
 
 ## Project Structure
 
 - `web_app.py` - Flask web app (default port `5055`)
-- `tools/resume_bot.py` - core parsing, fit scoring, tailoring, and rendering logic
-- `assets/resume.txt` - source resume text
+- `tools/resume_bot.py` - classification, strategy selection, deterministic ranking, validation, rendering
+- `assets/resume.json` - canonical resume data source
 - `assets/template.html` - base visual template/style
 - `outputs/` - generated files (created automatically)
 
@@ -28,7 +33,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 Install dependencies:
 
 ```powershell
-python -m pip install flask openai anthropic playwright PyPDF2
+python -m pip install flask openai anthropic playwright
 python -m playwright install chromium
 ```
 
@@ -48,8 +53,8 @@ Open:
 
 ## Environment Variables
 
-- `RESUME_TXT` - path to source resume text  
-  Default: `assets/resume.txt`
+- `RESUME_JSON` - path to source resume JSON  
+  Default: `assets/resume.json`
 - `RESUME_TEMPLATE` - path to HTML template  
   Default: `assets/template.html`
 - `RESUME_OUTPUT_DIR` - output directory  
@@ -57,11 +62,9 @@ Open:
 - `RESUME_MAX_PAGES` - max pages for AI-tailored resume PDF  
   Default: `2`
 - `OPENAI_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters via OpenAI
-- `OPENAI_MODEL` - model name used by OpenAI calls  
-  Default: `gpt-4o`
+- `OPENAI_MODEL` - optional model name override used by OpenAI calls
 - `ANTHROPIC_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters via Anthropic
-- `ANTHROPIC_MODEL` - model name used by Anthropic calls  
-  Default: `claude-3-5-sonnet-latest`
+- `ANTHROPIC_MODEL` - optional model name override used by Anthropic calls
 - `AI_PROVIDER` - optional provider override (`openai` or `anthropic`); otherwise auto-selects based on available keys
 - `APP_VERSION` - optional build/version label shown in UI
 
@@ -70,16 +73,24 @@ Open:
 Generate a tailored resume from files:
 
 ```powershell
-python tools/resume_bot.py --resume assets/resume.txt --template assets/template.html --job job.txt --out-dir outputs
+python tools/resume_bot.py --resume assets/resume.json --template assets/template.html --job job.txt --out-dir outputs
 ```
 
 Arguments:
 
-- `--resume` (required): path to resume `.txt`
+- `--resume` (required): path to resume `.json`
 - `--template` (required): path to template `.html`
 - `--job` (optional): path to job description text file
 - `--out-dir` (optional): output folder
 - `--label` (optional): filename label
+
+## Development Smoke Test
+
+Run quick regression checks (strategy order, bullet safety, link formatting):
+
+```powershell
+python tools/dev_smoke_test.py
+```
 
 ## Output Files
 
@@ -92,7 +103,8 @@ Generated in `outputs/` with timestamped names:
 
 ## Notes
 
-- Without `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`, the app still works using heuristic fit scoring and non-AI resume tailoring.
+- Without `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`, the app still works with deterministic classification, ranking, and rendering.
+- `assets/resume.json` is the single source of truth for resume facts.
 - PDF export depends on Playwright Chromium being installed.
 
 ## Why I Built This
