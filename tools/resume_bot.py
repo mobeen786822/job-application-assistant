@@ -101,8 +101,6 @@ DEFAULT_SECTION_ORDER = [
     'Projects',
     'Education',
     'Certifications',
-    'Interests',
-    'Additional Information',
 ]
 SUMMARY_BANNED_RE = re.compile(r"\b(c#|c\s*sharp|\.net|asp\.?net|dotnet)\b", re.IGNORECASE)
 GENERIC_BULLET_TERMS = {
@@ -1121,10 +1119,7 @@ def choose_resume_strategy(classification: dict) -> dict:
     if is_cyber:
         return {
             'name': 'CYBERSECURITY',
-            'tagline': (
-                'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
-                'ACSC Essential Eight | Incident Response'
-            ),
+            'tagline': None,
             'section_order': [
                 'Professional Summary',
                 'Key Skills / Technical Skills',
@@ -1132,8 +1127,6 @@ def choose_resume_strategy(classification: dict) -> dict:
                 'Professional Experience',
                 'Education',
                 'Certifications',
-                'Interests',
-                'Additional Information',
             ],
             'project_priority': [
                 'Bunkerify',
@@ -1150,10 +1143,7 @@ def choose_resume_strategy(classification: dict) -> dict:
 
     return {
         'name': 'SOFTWARE_GENERAL',
-        'tagline': (
-            'Cybersecurity-Focused Software Engineer | Full-Stack Development | '
-            'Production Systems | ACSC Essential Eight'
-        ),
+        'tagline': None,
         'section_order': DEFAULT_SECTION_ORDER[:],
         'project_priority': [
             'Job Application Assistant',
@@ -1850,6 +1840,8 @@ def render_html(
     style_css,
     header_html=None,
     section_order=None,
+    grouped_skills=None,
+    skill_priority_groups=None,
 ):
     if not education:
         raise SystemExit('Resume rendering error: Education section is empty.')
@@ -1900,22 +1892,24 @@ def render_html(
         return '\n'.join(html)
 
     edu_html = render_entries(education, with_subtitle=True)
-    skills_html = ''.join([f'<span class="skill-tag">{s}</span>' for s in skills])
+    skills_grouped = grouped_skills or {}
+    skill_order = skill_priority_groups[:] if skill_priority_groups else list(skills_grouped.keys())
+    for group in skills_grouped.keys():
+        if group not in skill_order:
+            skill_order.append(group)
+    skill_lines = []
+    for group in skill_order:
+        values = [clean_skill_token(str(v)) for v in (skills_grouped.get(group, []) or []) if clean_skill_token(str(v))]
+        if not values:
+            continue
+        group_label = normalize_text(str(group)).strip().replace('_', ' ').title()
+        joined = ', '.join([html.escape(v) for v in values])
+        skill_lines.append(f'<p class="summary"><strong>{html.escape(group_label)}:</strong> {joined}</p>')
+    skills_html = ''.join(skill_lines)
     proj_html = render_entries(projects)
     combined_experience = (experience or []) + (volunteer or [])
-    professional_entries = []
-    additional_entries = []
-    for e in combined_experience:
-        title_l = normalize_text(e.get('title', '')).lower()
-        if _is_driving_role(e) or 'independent contractor' in title_l:
-            add_entry = dict(e)
-            add_entry['bullets'] = []
-            additional_entries.append(add_entry)
-        else:
-            professional_entries.append(e)
-    exp_html = render_entries(professional_entries)
+    exp_html = render_entries(combined_experience)
     cert_items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates]) if certificates else ''
-    interests_text = linkify_text(' - '.join(interests)) if interests else ''
 
     section_html_map = {
         'Professional Summary': (
@@ -1924,7 +1918,7 @@ def render_html(
         ),
         'Key Skills / Technical Skills': (
             '<div class="section"><div class="section-title">Key Skills</div>'
-            f'<div class="skills-grid">{skills_html}</div></div>'
+            f'{skills_html}</div>'
         ),
         'Professional Experience': (
             '<div class="section"><div class="section-title">Professional Experience</div>'
@@ -1942,14 +1936,6 @@ def render_html(
             '<div class="section"><div class="section-title">Certificates</div>'
             f'<ul>{cert_items}</ul></div>' if cert_items else ''
         ),
-        'Interests': (
-            f'<div class="section"><div class="section-title">Interests</div><p class="summary">{interests_text}</p></div>'
-            if interests_text else ''
-        ),
-        'Additional Information': (
-            '<div class="section"><div class="section-title">Additional Information</div>'
-            f'{render_entries(additional_entries)}</div>' if additional_entries else ''
-        ),
     }
     ordered_titles = section_order[:] if section_order else DEFAULT_SECTION_ORDER[:]
     body_sections = []
@@ -1966,7 +1952,7 @@ def render_html(
 </div>
 """
 
-    html = f"""<!DOCTYPE html>
+    html_doc = f"""<!DOCTYPE html>
 <html lang=\"en\">
 <head>
 <meta charset=\"UTF-8\">
@@ -1987,7 +1973,7 @@ def render_html(
 </body>
 </html>
 """
-    return html
+    return html_doc
 
 
 def render_header_html(name: str, headline: str, contact):
@@ -3765,8 +3751,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
 
     classification = classify_job(job_text or '')
     strategy = choose_resume_strategy(classification)
-    tagline = strategy.get('tagline') or parsed_resume.get('headline') or DEFAULT_TAILORED_TAGLINE
-    headline = tagline or parsed_resume.get('headline', '')
+    tagline = strategy.get('tagline') or resume_json.get('headline') or DEFAULT_TAILORED_TAGLINE
+    headline = tagline
 
     summary = parsed_resume.get('summary', '')
     if not summary:
@@ -3906,6 +3892,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         style_css=style_css,
         header_html=header_html,
         section_order=strategy.get('section_order', DEFAULT_SECTION_ORDER),
+        grouped_skills=ordered_grouped_skills,
+        skill_priority_groups=strategy.get('skill_priority_groups', []),
     )
 
     out_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / 'outputs')

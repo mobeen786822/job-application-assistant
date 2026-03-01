@@ -8,7 +8,7 @@
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
   "headline": "Software Engineer | Secure Full-Stack Applications & Production Systems",
-  "summary": "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), building secure full-stack web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. Designed and deployed production-style systems including an AI-assisted resume tailoring platform with strict content validation and an incident management console simulating real-world support workflows. Strong focus on system integrity, maintainability, and practical security principles aligned to the ACSC Essential Eight.",
+  "summary": "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), building secure full-stack web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. Designed and deployed production-style systems including an AI-assisted resume tailoring platform with strict content validation and an incident management console simulating real-world support workflows. Strong focus on system integrity, maintainability, and practical security principles.",
   "education": [
     {
       "degree": "Bachelor of Computer Science",
@@ -33,54 +33,25 @@
         "live": "",
         "website": ""
       },
-      "technologies": [
-        "OpenAI API",
-        "HTML",
-        "PDF",
-        "Tailscale",
-        "Cloud VM"
-      ],
+      "technologies": ["JavaScript", "OpenAI API", "Tailscale", "Cloud VM"],
       "bullets": [
         {
           "text": "Designed and developed a full-stack AI-assisted resume tailoring platform generating structured HTML and PDF outputs.",
           "core": false,
           "importance": 2,
-          "tags": [
-            "full-stack",
-            "ai",
-            "html",
-            "pdf"
-          ]
+          "tags": ["full-stack", "ai", "architecture"]
         },
         {
           "text": "Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency.",
           "core": true,
           "importance": 3,
-          "tags": [
-            "openai",
-            "validation",
-            "api"
-          ]
-        },
-        {
-          "text": "Deployed via VPN-only access (Tailscale) on a cloud VM to restrict public exposure.",
-          "core": false,
-          "importance": 1,
-          "tags": [
-            "deployment",
-            "tailscale",
-            "cloud"
-          ]
+          "tags": ["ai", "validation", "integrity", "api"]
         },
         {
           "text": "Built responsive UI with real-time preview and validation feedback mechanisms.",
           "core": false,
-          "importance": 2,
-          "tags": [
-            "ui",
-            "frontend",
-            "validation"
-          ]
+          "importance": 1,
+          "tags": ["ui", "frontend"]
         }
       ]
     },
@@ -91,50 +62,19 @@
         "live": "https://incident-console-ui.onrender.com/",
         "website": ""
       },
-      "technologies": [
-        "Web",
-        "SLA monitoring",
-        "Runbook documentation"
-      ],
+      "technologies": ["JavaScript", "React"],
       "bullets": [
         {
           "text": "Developed a web-based incident management console simulating production support workflows end-to-end.",
           "core": false,
           "importance": 2,
-          "tags": [
-            "incident",
-            "production",
-            "web"
-          ]
+          "tags": ["incident", "ops"]
         },
         {
           "text": "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, and event timelines.",
           "core": true,
           "importance": 3,
-          "tags": [
-            "incident",
-            "tracking",
-            "lifecycle"
-          ]
-        },
-        {
-          "text": "Added SLA-aware monitoring with breach indicators to support prioritisation and operational visibility.",
-          "core": false,
-          "importance": 2,
-          "tags": [
-            "sla",
-            "monitoring",
-            "operations"
-          ]
-        },
-        {
-          "text": "Integrated runbook documentation and root-cause analysis capture.",
-          "core": false,
-          "importance": 1,
-          "tags": [
-            "runbook",
-            "rca"
-          ]
+          "tags": ["lifecycle", "incident", "systems"]
         }
       ]
     },
@@ -145,51 +85,25 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": [
-        "ACSC Essential Eight",
-        "SendGrid",
-        "HTML",
-        "Cybersecurity"
-      ],
+      "technologies": ["JavaScript", "SendGrid"],
       "bullets": [
         {
           "text": "Built a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model.",
           "core": true,
           "importance": 3,
-          "tags": [
-            "cybersecurity",
-            "essential eight",
-            "assessment"
-          ]
+          "tags": ["security", "essential-eight"]
         },
         {
           "text": "Designed a 19-question structured assessment with automated scoring and category-level risk breakdowns.",
           "core": false,
           "importance": 2,
-          "tags": [
-            "risk",
-            "scoring",
-            "assessment"
-          ]
+          "tags": ["risk", "assessment"]
         },
         {
           "text": "Integrated SendGrid transactional email delivery for automated HTML report generation.",
           "core": false,
           "importance": 1,
-          "tags": [
-            "sendgrid",
-            "html",
-            "email"
-          ]
-        },
-        {
-          "text": "Implemented lead capture and calendar booking workflow.",
-          "core": false,
-          "importance": 1,
-          "tags": [
-            "workflow",
-            "booking"
-          ]
+          "tags": ["integration"]
         }
       ]
     },
@@ -200,43 +114,19 @@
         "live": "",
         "website": ""
       },
-      "technologies": [
-        "React Native",
-        "TypeScript",
-        "Firebase",
-        "Cloud Firestore",
-        "Geolocation"
-      ],
+      "technologies": ["React Native", "TypeScript", "Firebase"],
       "bullets": [
         {
           "text": "Built a cross-platform mobile application using React Native and TypeScript.",
           "core": false,
           "importance": 2,
-          "tags": [
-            "react native",
-            "typescript",
-            "mobile"
-          ]
+          "tags": ["mobile", "react-native"]
         },
         {
           "text": "Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.",
           "core": true,
           "importance": 3,
-          "tags": [
-            "firebase",
-            "authentication",
-            "cloud firestore"
-          ]
-        },
-        {
-          "text": "Added geolocation and media upload capabilities with structured navigation.",
-          "core": false,
-          "importance": 1,
-          "tags": [
-            "geolocation",
-            "media upload",
-            "navigation"
-          ]
+          "tags": ["firebase", "authentication", "backend"]
         }
       ]
     }
@@ -252,27 +142,19 @@
           "text": "Contributed to front-end and back-end development of the web platform.",
           "core": false,
           "importance": 1,
-          "tags": [
-            "frontend",
-            "backend"
-          ]
+          "tags": ["frontend", "backend"]
         },
         {
           "text": "Implemented responsive UI components and API-driven features.",
           "core": false,
-          "importance": 2,
-          "tags": [
-            "ui",
-            "api"
-          ]
+          "importance": 1,
+          "tags": ["ui", "api"]
         },
         {
           "text": "Translated stakeholder requirements into maintainable code.",
           "core": false,
           "importance": 1,
-          "tags": [
-            "stakeholders"
-          ]
+          "tags": ["collaboration"]
         }
       ]
     },
@@ -285,29 +167,20 @@
         {
           "text": "Implemented custom front-end features for an eCommerce website.",
           "core": false,
-          "importance": 2,
-          "tags": [
-            "frontend",
-            "ecommerce"
-          ]
+          "importance": 1,
+          "tags": ["frontend"]
         },
         {
           "text": "Supported server-side functionality for transactional workflows and content updates.",
           "core": false,
           "importance": 1,
-          "tags": [
-            "backend",
-            "workflows"
-          ]
+          "tags": ["backend"]
         },
         {
           "text": "Enhanced responsiveness and cross-device consistency.",
           "core": false,
           "importance": 1,
-          "tags": [
-            "responsive",
-            "ui"
-          ]
+          "tags": ["responsive"]
         }
       ]
     }
@@ -342,32 +215,16 @@
       "Database Management"
     ],
     "testing": [
-      "Jest",
-      "React Testing Library",
-      "ESLint",
-      "Git"
+      "React Testing Library"
     ],
     "security": [
-      "Cybersecurity",
-      "System Security",
-      "Cloud Security (Foundational)",
-      "Networking",
-      "Kali Linux",
-      "Nmap",
-      "Metasploit",
-      "Wireshark",
-      "Burp Suite",
-      "Penetration Testing",
-      "Vulnerability Assessment",
-      "Incident Response",
-      "Threat Intelligence",
-      "Network Segmentation",
-      "Log Analysis",
-      "Firewall Configuration"
+      "System Security"
     ],
-    "tools": []
+    "tools": [
+      "Git"
+    ]
   },
   "certifications": [
-    "AWS Academy Graduate - AWS Academy Cloud Foundations award"
+    "AWS Academy Graduate – AWS Academy Cloud Foundations award"
   ]
 }
