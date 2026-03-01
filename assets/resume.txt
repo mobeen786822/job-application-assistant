@@ -1,173 +1,99 @@
 Mobeen Khan
 
-
 mobeenk89@gmail.com
 https://www.mobeenkhan.com
 https://github.com/mobeen786822
 https://www.linkedin.com/in/mobeen-khan-6b3340197/
 
-
+------------------------
+HEADLINE
+Software Engineer | Secure Full-Stack Applications & Production Systems
 
 ------------------------
-Software Engineer
-
+PROFESSIONAL SUMMARY
+Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), building secure full-stack web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. Designed and deployed production-style systems including an AI-assisted resume tailoring platform with strict content validation and an incident management console simulating real-world support workflows. Strong focus on system integrity, maintainability, and practical security principles aligned to the ACSC Essential Eight.
 
 ------------------------
-Graduate Software Engineer with a Bachelor of Computer Science majoring in Software Engineering and Cybersecurity and hands-on experience building web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST API integrations. Delivered maintainable, user-focused products including an AI-assisted resume web app and an incident management console, with exposure to cloud deployment, authentication, and application testing (Jest/React Testing Library). Known for disciplined, self-driven delivery, clear communication, and strong collaboration across stakeholders.
+EDUCATION
 
-
-Education
-------------------------
 Bachelor of Computer Science
 University of Wollongong
 01/2021 - 05/2024
-Courses
-- Major in Software Engineering and Cybersecurity 
+Major in Software Engineering and Cybersecurity
 
-
-Masters of Computer Science (Cybersecurity
+Masters of Computer Science (Cybersecurity)
 University of Wollongong
 03/2025 - Present
-Courses
 
-
-
-
-
-Work experience/Projects
 ------------------------
-Job Application Assistant
-https://github.com/mobeen786822/job-application-assistant
-- Built a web app that tailors resumes from job descriptions and exports PDF/HTML.
-- Implemented OpenAI-powered content tailoring with strict no-fabrication rules.
-- Added private access via VPN-only deployment (Tailscale) on a cloud VM.
-- Added UI preview, download actions, and loading feedback.
+PROJECTS
 
-Production Support Incident Console
-https://github.com/mobeen786822/Production-Support-Incident-Console | https://incident-console-ui.onrender.com/
-- Built a web-based incident management console to simulate production support workflows end-to-end.
-- Implemented incident lifecycle tracking with severity, status transitions, ownership, and event timelines.
-- Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.
-- Implemented runbook and root-cause analysis capture to improve incident resolution consistency.
+PROJECT: Job Application Assistant
+LINK: https://github.com/mobeen786822/job-application-assistant
+- Designed and developed a full-stack AI-assisted resume tailoring platform generating structured HTML and PDF outputs.
+- Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency.
+- Deployed via VPN-only access (Tailscale) on a cloud VM to restrict public exposure.
+- Built responsive UI with real-time preview and validation feedback mechanisms.
 
-Cancer Awareness Mobile App
-- Built a cross-platform mobile app using React Native and TypeScript.
+PROJECT: Production Support Incident Console
+LINK: https://github.com/mobeen786822/Production-Support-Incident-Console
+LIVE: https://incident-console-ui.onrender.com/
+- Developed a web-based incident management console simulating production support workflows end-to-end.
+- Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, and event timelines.
+- Added SLA-aware monitoring with breach indicators to support prioritisation and operational visibility.
+- Integrated runbook documentation and root-cause analysis capture.
+
+PROJECT: Bunkerify
+LINK: https://www.bunkerify.com
+- Built a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model.
+- Designed a 19-question structured assessment with automated scoring and category-level risk breakdowns.
+- Integrated SendGrid transactional email delivery for automated HTML report generation.
+- Implemented lead capture and calendar booking workflow.
+
+PROJECT: Cancer Awareness Mobile App
+- Built a cross-platform mobile application using React Native and TypeScript.
 - Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.
-- Added geolocation and media upload capabilities with structured in-app navigation.
+- Added geolocation and media upload capabilities with structured navigation.
 
-Bunkerify (www.bunkerify.com)
-- Built Bunkerify, a free cyber health check platform based on the ACSC Essential Eight maturity model.
-- Designed and implemented a 19-question assessment with automated scoring and category-level risk breakdowns.
-- Delivered HTML email reports with clear CTAs, improving lead follow-up and conversion.
-- Integrated SendGrid transactional email delivery to send personalised HTML assessment reports to users automatically.
-- Integrated lead capture and booking workflow (Calendly) to turn assessments into consultations.
-- Deployed a live marketing funnel (landing page and LinkedIn launch assets) to drive inbound leads.
-
-
-Independent Contractor – Delivery Driver
-07/2025 - Present
-- Managed time-critical deliveries in high-pressure environments 
-- Demonstrated strong reliability, navigation, and customer service skills 
-- Maintained compliance with platform safety and operational standards 
-
-
-Independent Contractor – Rideshare Driver
-12/2025 - Present
-- Delivered consistent, professional customer experiences 
-- Managed scheduling, navigation, and safety across dynamic conditions 
-- Demonstrated accountability, risk awareness, and situational decision-making 
-
-
-
-
-
-Volunteer Experience
 ------------------------
-Web Developer (catchadrive.com)
-Catch a Drive
+PROFESSIONAL EXPERIENCE
+
+Web Developer (Volunteer)
+Catch A Drive
 11/2025 - 01/2026
-Tasks/Achievements
-- Contributed to both front-end and back-end development of the Catch A Drive web platform. 
-- Implemented responsive and user-centric UI components to enhance usability and visual appeal. 
-- Developed and integrated back-end features to support dynamic content, user interactions, and API workflows. 
--  Ensured cross-browser compatibility and performance optimisation across pages.     Collaborated with stakeholders to refine requirements and translate them into functional code.  
+- Contributed to front-end and back-end development of the web platform.
+- Implemented responsive UI components and API-driven features.
+- Translated stakeholder requirements into maintainable code.
 
-
-Web Developer (Hentley.co)
+Web Developer
 Hentley
 01/2018 - 03/2019
-Tasks/Achievements
-- Implemented custom front-end features for an eCommerce website, focusing on clean layout, responsiveness, and intuitive user flows. 
-- Supported server-side functionality to enable product displays, transactional workflows, and content updates. 
-- Enhanced site structure and styling to improve mobile usability and visual consistency across devices. 
-- Assisted with maintaining and extending existing code to support business requirements and scalability. 
+- Implemented custom front-end features for an eCommerce website.
+- Supported server-side functionality for transactional workflows and content updates.
+- Enhanced responsiveness and cross-device consistency.
 
-
-
-
-
-Skills
 ------------------------
--HTML
--CSS
--JavaScript
--TypeScript
--PHP
--Java
--C++
--Python
--SQL
--PL/SQL
--NoSQL
--Database Management
--Networking
--Cybersecurity
--Kali Linux
--Nmap
--Metasploit
--Wireshark
--Burp Suite
--Penetration Testing
--Vulnerability Assessment
--Incident Response
--Threat Intelligence
--Network Segmentation
--Log Analysis
--Firewall Configuration
--UI/UX Design
--AI
--React
--React Native
--Next.js
--Vite
--Tailwind CSS
--Framer Motion
--React Router
--Firebase
--Cloud Firestore
--REST API Integration
--Axios
--Jest
--React Testing Library
--ESLint
--Front-End
+SKILLS
 
+Languages:
+JavaScript, TypeScript, Python, Java, C++, SQL, PL/SQL
 
+Frontend:
+React, React Native, Next.js, Vite, Tailwind CSS, Framer Motion, React Router, HTML, CSS
 
-Certificates
+Backend & APIs:
+REST API Integration, Axios, Firebase, Cloud Firestore, NoSQL, Database Management
+
+Testing & Tooling:
+Jest, React Testing Library, ESLint, Git
+
+Security & Systems:
+Cybersecurity, System Security, Cloud Security (Foundational), Networking,
+Kali Linux, Nmap, Metasploit, Wireshark, Burp Suite,
+Penetration Testing, Vulnerability Assessment, Incident Response,
+Threat Intelligence, Network Segmentation, Log Analysis, Firewall Configuration
+
 ------------------------
-AWS Academy Graduate - AWS Academy Cloud Foundations award
+CERTIFICATES
 
-
-
-
-
-Interests
-------------------------
--Front-end Development and Web Technologies
--UX Design and Accessibility
--Responsive Web Design
--AI Machine Learning and Applications in UX
--Functional Programming in Web Development
--Modern JavaScript Frameworks
-
+AWS Academy Graduate – AWS Academy Cloud Foundations award
