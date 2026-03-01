@@ -78,9 +78,9 @@
   .two-col > div { flex: 1; }
 
   @media print {
-    .section-projects {
-      break-before: page;
-      page-break-before: always;
+    .section-projects .entry {
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
   }
 
