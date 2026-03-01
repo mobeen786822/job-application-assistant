@@ -11,6 +11,7 @@ from tools.resume_bot import (
     classify_job,
     generate_resume,
     generate_summary_with_guard,
+    parse_resume_sections,
 )
 
 RESUME_PATH = APP_ROOT / 'assets' / 'resume.txt'
@@ -89,10 +90,42 @@ def run_summary_guard_smoke(job_text: str) -> None:
     print(f'[SUMMARY] tech_used={summary_data.get("tech_used", [])}')
 
 
+def _extract_project_block(html_text: str, project_title: str) -> str:
+    idx = html_text.lower().find(project_title.lower())
+    if idx == -1:
+        return ''
+    next_idx = html_text.lower().find('<span class="entry-title">', idx + 1)
+    if next_idx == -1:
+        return html_text[idx:]
+    return html_text[idx:next_idx]
+
+
+def run_project_scope_validation_smoke() -> None:
+    resume_text = RESUME_PATH.read_text(encoding='utf-8', errors='replace')
+    parsed = parse_resume_sections(resume_text)
+    cancer = parsed.get('projects', {}).get('Cancer Awareness Mobile App', {})
+    original_block = ' '.join([cancer.get('title', ''), cancer.get('subtitle', ''), ' '.join(cancer.get('bullets', []))])
+    original_has_aws = bool(re.search(r'\baws\b', original_block, flags=re.IGNORECASE))
+
+    html_path, _, _ = generate_resume(
+        resume_path=RESUME_PATH,
+        template_path=TEMPLATE_PATH,
+        job_text=CYBER_JOB_TEXT,
+        out_dir=OUT_DIR,
+        label='smoke-project-scope',
+    )
+    html_text = Path(html_path).read_text(encoding='utf-8', errors='replace')
+    cancer_block = _extract_project_block(html_text, 'Cancer Awareness Mobile App')
+    if not original_has_aws:
+        assert 'aws' not in cancer_block.lower(), 'Cancer Awareness Mobile App incorrectly contains AWS'
+    print(f'[PROJECT_SCOPE] cancer_contains_aws={"aws" in cancer_block.lower()} original_has_aws={original_has_aws}')
+
+
 def main() -> None:
     run_case('SOFTWARE', SOFTWARE_JOB_TEXT)
     run_case('CYBER', CYBER_JOB_TEXT)
     run_summary_guard_smoke(CYBER_JOB_TEXT)
+    run_project_scope_validation_smoke()
 
 
 if __name__ == '__main__':

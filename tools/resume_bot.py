@@ -435,6 +435,33 @@ def parse_list(block_lines):
     return items
 
 
+def parse_resume_sections(resume_text: str) -> dict:
+    _, source_sections = split_sections(resume_text)
+    summary_lines = source_sections.get('Software Engineer', [])
+    summary = ' '.join([l for l in summary_lines if l.strip()])
+
+    work_entries = parse_experience(source_sections.get('Work experience/Projects', []))
+    work_entries = [e for e in work_entries if not _is_excluded_project_title(e.get('title', ''))]
+    volunteer_entries = parse_experience(source_sections.get('Volunteer Experience', []))
+
+    projects = {}
+    experience = []
+    for entry in work_entries:
+        title_l = normalize_text(entry.get('title', '')).lower()
+        if 'independent contractor' in title_l or 'web developer' in title_l or 'driver' in title_l:
+            experience.append(dict(entry))
+        else:
+            projects[entry.get('title', '')] = dict(entry)
+
+    return {
+        'summary': summary,
+        'projects': projects,
+        'skills': parse_skills(source_sections.get('Skills', [])),
+        'certificates': parse_list(source_sections.get('Certificates', [])),
+        'experience': experience + volunteer_entries,
+    }
+
+
 def extract_keywords(job_text, skills):
     if not job_text:
         return []
@@ -1979,6 +2006,100 @@ def _sanitize_skills_from_ai(
     )
 
 
+_TECH_PHRASE_HINTS = [
+    'javascript', 'typescript', 'react', 'react native', 'next.js', 'tailwind css',
+    'framer motion', 'react router', 'firebase', 'cloud firestore', 'rest api',
+    'api', 'sql', 'nosql', 'pl/sql', 'python', 'java', 'php', 'c++',
+    'kali linux', 'nmap', 'metasploit', 'wireshark', 'burp suite',
+    'incident response', 'threat intelligence', 'vulnerability assessment',
+    'penetration testing', 'network segmentation', 'firewall configuration',
+    'jest', 'react testing library', 'axios', 'vite', 'sendgrid', 'calendly',
+    'aws', 'amazon web services', 'azure', 'gcp', 'google cloud', 'asp.net', '.net', 'dotnet', 'c#',
+]
+
+_CLOUD_PROVIDER_VARIANTS = {
+    'aws': {'aws', 'amazon web services'},
+    'azure': {'azure', 'microsoft azure'},
+    'gcp': {'gcp', 'google cloud', 'google cloud platform'},
+    'firebase': {'firebase', 'cloud firestore'},
+}
+
+
+def _extract_tech_terms(text: str) -> set[str]:
+    norm = _normalize_term(text)
+    if not norm:
+        return set()
+    found = set()
+    for phrase in _TECH_PHRASE_HINTS:
+        p = _normalize_term(phrase)
+        if p and p in norm:
+            found.add(p)
+    for token in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\./-]{1,30}', norm):
+        token_n = _normalize_term(token)
+        if not token_n:
+            continue
+        techy = (
+            any(ch in token_n for ch in ('+', '#', '.', '/')) or
+            token_n in {'api', 'sql', 'nosql', 'firebase', 'react', 'typescript', 'javascript', 'aws', 'azure', 'gcp'}
+        )
+        if techy:
+            found.add(token_n)
+    return found
+
+
+def build_project_allowed_terms(projects_by_name: dict[str, dict]) -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for project_name, entry in (projects_by_name or {}).items():
+        key = _entry_match_key(project_name)
+        blob_parts = [entry.get('title', ''), entry.get('subtitle', ''), ' '.join(entry.get('bullets', []))]
+        terms = _extract_tech_terms(' '.join([str(p) for p in blob_parts if p]))
+        out[key] = terms
+    return out
+
+
+def _cloud_providers_in_terms(terms: set[str]) -> set[str]:
+    providers = set()
+    for provider, variants in _CLOUD_PROVIDER_VARIANTS.items():
+        if any(_normalize_term(v) in terms for v in variants):
+            providers.add(provider)
+    return providers
+
+
+def _validate_project_updates_section_scoped(
+    project_updates,
+    project_allowed_terms_by_title: dict[str, set[str]],
+    original_project_keys: set[str],
+) -> tuple[bool, list[dict], str]:
+    if not isinstance(project_updates, list):
+        return True, [], ''
+    cleaned_updates = []
+    for item in project_updates:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get('title', ''))
+        key = _entry_match_key(title)
+        bullets = item.get('bullets', [])
+        if key not in original_project_keys:
+            continue
+        if not isinstance(bullets, list):
+            return False, [], f'invalid bullets for project: {title}'
+        normalized_bullets = [normalize_text(str(b)).strip() for b in bullets if normalize_text(str(b)).strip()]
+        generated_terms = _extract_tech_terms(' '.join(normalized_bullets))
+        allowed_terms = project_allowed_terms_by_title.get(key, set())
+        disallowed = sorted(t for t in generated_terms if t not in allowed_terms)
+        if disallowed:
+            return False, [], f'project tech terms not in project allowlist for {title}: {", ".join(disallowed[:5])}'
+
+        original_providers = _cloud_providers_in_terms(allowed_terms)
+        generated_providers = _cloud_providers_in_terms(generated_terms)
+        substituted = sorted(p for p in generated_providers if p not in original_providers)
+        if substituted:
+            return False, [], f'cloud provider substitution in {title}: {", ".join(substituted)}'
+
+        cleaned_updates.append({'title': title, 'bullets': normalized_bullets[:6]})
+    return True, cleaned_updates, ''
+
+
 def _apply_bullet_updates(entries: list[dict], updates: list[dict]) -> None:
     if not entries or not updates:
         return
@@ -2018,6 +2139,7 @@ def tailor_resume_selective_with_ai(
     project_entries: list[dict],
     classification: dict,
     strategy: dict,
+    project_allowed_terms_by_title: dict[str, set[str]] | None = None,
 ) -> dict:
     if not _get_ai_provider():
         return {}
@@ -2034,47 +2156,77 @@ def tailor_resume_selective_with_ai(
             {'title': e.get('title', ''), 'subtitle': e.get('subtitle', ''), 'bullets': e.get('bullets', [])}
             for e in project_entries
         ],
+        'project_term_constraints': {
+            entry.get('title', ''): sorted(list(project_allowed_terms_by_title.get(_entry_match_key(entry.get('title', '')), set())))
+            for entry in project_entries
+        } if project_allowed_terms_by_title else {},
     }
-    instructions = (
-        "You are tailoring resume content for a specific job. Return STRICT JSON only.\n"
-        "Do not add or remove roles. Update ONLY:\n"
-        "1) professional summary text\n"
-        "2) skill tags\n"
-        "3) bullet points for provided project/work roles\n"
-        "Rules:\n"
-        "- No hallucinations; use only existing resume facts.\n"
-        "- Keep summary concise (45-65 words).\n"
-        "- Skills must come only from provided skill list.\n"
-        "- You may reorder bullet points to emphasize strategy priorities.\n"
-        "- You may NOT add new skills.\n"
-        "- You may NOT add new roles.\n"
-        "- Keep each role title unchanged.\n"
-        "- Keep 3-6 bullets per role when possible.\n"
-        "Output JSON shape:\n"
-        "{"
-        "\"summary\": string, "
-        "\"skills\": [string], "
-        "\"experience_updates\": [{\"title\": string, \"bullets\": [string]}], "
-        "\"project_updates\": [{\"title\": string, \"bullets\": [string]}]"
-        "}"
-    )
-    text = _call_ai_text(
-        prompt=(
-            f"Job description:\n{job_text}\n\n"
-            f"Current resume content JSON:\n{json.dumps(payload, ensure_ascii=False)}\n"
-        ),
-        instructions=instructions,
-        max_tokens=2200,
-    )
-    match = re.search(r'\{[\s\S]*\}', text or '')
-    raw = match.group(0) if match else (text or '{}')
-    try:
-        data = json.loads(raw)
-    except Exception:
+    original_project_keys = {_entry_match_key(e.get('title', '')) for e in project_entries}
+    last_data = {}
+
+    for attempt in range(2):
+        strict_warning = ''
+        if attempt == 1:
+            strict_warning = (
+                "CRITICAL: Previous output violated project-scoped validation. "
+                "For each project, do not use any technology term unless that exact project already contains it in the provided constraints.\n"
+            )
+        instructions = (
+            "You are tailoring resume content for a specific job. Return STRICT JSON only.\n"
+            "Do not add or remove roles. Update ONLY:\n"
+            "1) professional summary text\n"
+            "2) skill tags\n"
+            "3) bullet points for provided project/work roles\n"
+            "Rules:\n"
+            "- No hallucinations; use only existing resume facts.\n"
+            "- Keep summary concise (45-65 words).\n"
+            "- Skills must come only from provided skill list.\n"
+            "- You may reorder bullet points to emphasize strategy priorities.\n"
+            "- You may NOT add new skills.\n"
+            "- You may NOT add new roles.\n"
+            "- Keep each role title unchanged.\n"
+            "- Keep 3-6 bullets per role when possible.\n"
+            "- Project updates must obey project_term_constraints for that same project.\n"
+            "- Do not substitute cloud providers (example: Firebase cannot become AWS unless that project already used AWS).\n"
+            "Output JSON shape:\n"
+            "{"
+            "\"summary\": string, "
+            "\"skills\": [string], "
+            "\"experience_updates\": [{\"title\": string, \"bullets\": [string]}], "
+            "\"project_updates\": [{\"title\": string, \"bullets\": [string]}]"
+            "}\n"
+            f"{strict_warning}"
+        )
+        text = _call_ai_text(
+            prompt=(
+                f"Job description:\n{job_text}\n\n"
+                f"Current resume content JSON:\n{json.dumps(payload, ensure_ascii=False)}\n"
+            ),
+            instructions=instructions,
+            max_tokens=2200,
+        )
+        match = re.search(r'\{[\s\S]*\}', text or '')
+        raw = match.group(0) if match else (text or '{}')
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        last_data = data
+        ok, cleaned_project_updates, _reason = _validate_project_updates_section_scoped(
+            data.get('project_updates', []),
+            project_allowed_terms_by_title=project_allowed_terms_by_title or {},
+            original_project_keys=original_project_keys,
+        )
+        if ok:
+            data['project_updates'] = cleaned_project_updates
+            return data
+
+    if not isinstance(last_data, dict):
         return {}
-    if not isinstance(data, dict):
-        return {}
-    return data
+    last_data['project_updates'] = []
+    return last_data
 
 
 def render_sections_to_html(sections, allowed_sections):
@@ -2812,9 +2964,9 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
 
     template_skill_tags = extract_template_skill_tags(template_text)
 
+    parsed_resume = parse_resume_sections(resume_text)
     sections = source_sections
-    summary_lines = sections.get('Software Engineer', [])
-    summary = ' '.join([l for l in summary_lines if l.strip()])
+    summary = parsed_resume.get('summary', '')
     if not summary:
         summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
     summary_result = generate_summary_with_guard(
@@ -2845,6 +2997,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         else:
             projects.append(e)
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
+    project_allowed_terms_by_title = build_project_allowed_terms(parsed_resume.get('projects', {}))
 
     canonical_skills = template_skill_tags[:] if template_skill_tags else parse_skills(sections.get('Skills', []))
     skills = filter_skills_for_job(
@@ -2870,6 +3023,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
                 project_entries=projects,
                 classification=classification,
                 strategy=strategy,
+                project_allowed_terms_by_title=project_allowed_terms_by_title,
             )
         except Exception:
             selective = {}
