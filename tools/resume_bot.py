@@ -134,14 +134,25 @@ KEYWORD_TIER_WEIGHTS = {
     'export': 1,
 }
 SKILL_SYNONYM_MAP = {
-    'rest api': 'REST API Integration',
-    'react.js': 'React',
-    'react native': 'React Native',
-    'unit testing': 'Jest',
-    'testing library': 'React Testing Library',
-    'nosql': 'NoSQL',
-    'firestore': 'Cloud Firestore',
+    'REST API Integration': ['rest api', 'rest api integration', 'rest apis', 'api integration'],
+    'Jest': ['testing', 'unit testing'],
+    'React Testing Library': ['testing', 'react testing library', 'unit testing'],
+    'Git': ['version control', 'git'],
+    'CI/CD': ['github actions', 'pipeline', 'ci cd'],
+    'NoSQL': ['nosql'],
+    'Cloud Firestore': ['firestore'],
 }
+
+SOFTWARE_BASELINE_SKILLS = [
+    'JavaScript',
+    'TypeScript',
+    'React',
+    'Git',
+    'SQL',
+    'REST API Integration',
+    'Jest',
+    'React Testing Library',
+]
 
 
 def normalize_text(text: str) -> str:
@@ -1256,21 +1267,74 @@ def reorder_skill_groups(grouped_skills: dict, priority_groups: list[str]) -> tu
     return ordered_grouped, flattened
 
 
-def select_skills_deterministic(job_text: str, grouped_skills: dict, max_skills: int = 22) -> list[str]:
-    ordered_grouped, ordered_skills = reorder_skill_groups(grouped_skills=grouped_skills or {}, priority_groups=SKILL_GROUP_KEYS)
+def _normalize_skill_match_text(value: str) -> str:
+    text = normalize_text(value or '').lower()
+    text = re.sub(r'[^a-z0-9]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def _all_words_within_window(skill_norm: str, jd_tokens: list[str], window_size: int = 6) -> bool:
+    words = [w for w in skill_norm.split(' ') if w]
+    if not words or not jd_tokens:
+        return False
+    if len(words) == 1:
+        return words[0] in set(jd_tokens)
+
+    target = set(words)
+    span = max(window_size, len(words))
+    for start in range(len(jd_tokens)):
+        end = min(len(jd_tokens), start + span)
+        if target.issubset(set(jd_tokens[start:end])):
+            return True
+    return False
+
+
+def _is_software_role_category(role_category: str) -> bool:
+    cat = _normalize_term(role_category or '')
+    return cat in {'software_engineering', 'frontend', 'backend', 'devops', 'unknown'}
+
+
+def select_skills_deterministic(
+    job_text: str,
+    grouped_skills: dict,
+    max_skills: int = 18,
+    role_category: str = 'software_engineering',
+) -> list[str]:
+    _ordered_grouped, ordered_skills = reorder_skill_groups(grouped_skills=grouped_skills or {}, priority_groups=SKILL_GROUP_KEYS)
     if not ordered_skills:
+        print('[skills-selector] selected 0 skills: []')
         return []
 
-    job_norm = _normalize_term(job_text or '')
+    max_skills = max(1, int(max_skills or 18))
+    jd_norm = _normalize_skill_match_text(job_text or '')
+    jd_tokens = jd_norm.split(' ') if jd_norm else []
+    jd_token_set = set(jd_tokens)
+    mobile_terms = ('mobile', 'ios', 'android', 'react native')
 
     def score_skill(skill: str) -> int:
-        s_norm = _normalize_term(skill)
+        s_norm = _normalize_skill_match_text(skill)
         score = 0
-        if s_norm and s_norm in job_norm:
-            score += 3
-        for phrase, mapped_skill in SKILL_SYNONYM_MAP.items():
-            if _normalize_term(mapped_skill) == s_norm and _normalize_term(phrase) in job_norm:
-                score += 2
+        if s_norm and s_norm in jd_norm:
+            score += 6
+        if s_norm and _all_words_within_window(s_norm, jd_tokens):
+            score += 4
+        for canonical_skill, synonyms in SKILL_SYNONYM_MAP.items():
+            if _normalize_skill_match_text(canonical_skill) != s_norm:
+                continue
+            for synonym in synonyms:
+                synonym_norm = _normalize_skill_match_text(synonym)
+                if not synonym_norm:
+                    continue
+                synonym_words = [w for w in synonym_norm.split(' ') if w]
+                if (
+                    synonym_norm in jd_norm
+                    or _all_words_within_window(synonym_norm, jd_tokens)
+                    or (synonym_words and all(w in jd_token_set for w in synonym_words))
+                ):
+                    score += 3
+                    break
+            break
         return score
 
     scored = []
@@ -1280,50 +1344,48 @@ def select_skills_deterministic(job_text: str, grouped_skills: dict, max_skills:
 
     selected = []
     selected_keys = set()
-    for score, _, skill in scored:
-        if score <= 0:
-            continue
-        key = skill.lower()
-        if key in selected_keys:
-            continue
-        selected.append(skill)
-        selected_keys.add(key)
-        if len(selected) >= max_skills:
-            break
 
-    # Baseline core skills
-    for must_have in ('JavaScript', 'TypeScript', 'React'):
-        if len(selected) >= max_skills:
-            break
+    if _is_software_role_category(role_category):
+        for must_have in SOFTWARE_BASELINE_SKILLS:
+            for candidate in ordered_skills:
+                if _normalize_skill_match_text(candidate) == _normalize_skill_match_text(must_have):
+                    key = _normalize_skill_match_text(candidate)
+                    if key and key not in selected_keys and len(selected) < max_skills:
+                        selected.append(candidate)
+                        selected_keys.add(key)
+                    break
+
+    if any(t in jd_norm for t in mobile_terms):
         for candidate in ordered_skills:
-            if _normalize_term(candidate) == _normalize_term(must_have):
-                key = candidate.lower()
-                if key not in selected_keys:
-                    selected.append(candidate)
-                    selected_keys.add(key)
-                break
-    mobile_terms = ('mobile', 'ios', 'android', 'react native', 'flutter', 'xamarin')
-    if any(t in job_norm for t in mobile_terms):
-        for candidate in ordered_skills:
-            if _normalize_term(candidate) == 'react native':
-                key = candidate.lower()
+            if _normalize_skill_match_text(candidate) == 'react native':
+                key = _normalize_skill_match_text(candidate)
                 if key not in selected_keys and len(selected) < max_skills:
                     selected.append(candidate)
                     selected_keys.add(key)
                 break
 
-    # If too sparse, fill from stable order.
-    for skill in ordered_skills:
-        if len(selected) >= max_skills:
-            break
-        key = skill.lower()
+    for score, _, skill in scored:
+        if score <= 0:
+            continue
+        key = _normalize_skill_match_text(skill)
         if key in selected_keys:
             continue
         selected.append(skill)
         selected_keys.add(key)
-        if len(selected) >= 12 and any(s for s, _, _ in scored if s > 0):
+        if len(selected) >= max_skills:
             break
-    return selected[:max_skills]
+
+    for skill in ordered_skills:
+        if len(selected) >= max_skills:
+            break
+        key = _normalize_skill_match_text(skill)
+        if key in selected_keys:
+            continue
+        selected.append(skill)
+        selected_keys.add(key)
+    final_selected = selected[:max_skills]
+    print(f"[skills-selector] selected {len(final_selected)} skills: {final_selected}")
+    return final_selected
 
 
 def select_project_bullets_deterministic(
@@ -3875,7 +3937,8 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     name = parsed_resume.get('name', '')
     contact = [c for c in (parsed_resume.get('contact', []) or []) if c]
 
-    classification = classify_job(job_text or '')
+    raw_job_text = job_text or ''
+    classification = classify_job(raw_job_text)
     strategy = choose_resume_strategy(classification)
     tagline = strategy.get('tagline') or resume_json.get('headline') or DEFAULT_TAILORED_TAGLINE
     headline = tagline
@@ -3897,9 +3960,10 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         priority_groups=SKILL_GROUP_KEYS,
     )
     skills = select_skills_deterministic(
-        job_text=job_text or '',
+        job_text=raw_job_text,
         grouped_skills=ordered_grouped_skills,
-        max_skills=int(strategy.get('max_selected_skills', 22)),
+        max_skills=int(strategy.get('max_skills', 18)),
+        role_category=str(classification.get('primary_category', 'unknown')),
     )
 
     certificates = parsed_resume.get('certificates', [])
@@ -3909,9 +3973,9 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     deterministic_projects = [dict(p) for p in projects]
     deterministic_summary = summary
 
-    if _get_ai_provider() and (job_text or '').strip():
+    if _get_ai_provider() and raw_job_text.strip():
         payload = light_rephrase_selected_content_with_ai(
-            job_text=job_text,
+            job_text=raw_job_text,
             summary=summary,
             selected_projects=projects,
         )
@@ -3995,7 +4059,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     }
     validate_generated_resume(original_resume_json=resume_json, generated_resume_json=deterministic_generated_json)
 
-    keywords = extract_keywords(job_text or '', skills)
+    keywords = extract_keywords(raw_job_text, skills)
     html = render_html(
         name=name,
         headline=headline,
