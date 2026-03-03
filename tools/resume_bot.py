@@ -1185,23 +1185,14 @@ def classify_job(job_text: str) -> dict:
 
 
 def build_summary(classification: dict, resume_json: dict) -> str:
-    _ = resume_json  # Summary is deterministic and only uses facts already present in resume inventory.
-    category = _normalize_term(str((classification or {}).get('primary_category', 'unknown')))
-    s1 = "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity)."
-    s2 = (
-        "Build web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs; "
-        "write maintainable code with testing (Jest/React Testing Library)."
+    _ = classification
+    _ = resume_json
+    return (
+        "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), "
+        "building web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. "
+        "Write clean, maintainable code with testing (Jest/React Testing Library) and collaborate across product and "
+        "engineering teams to deliver production-ready systems."
     )
-    s3 = (
-        "Delivered production-style systems including an AI-assisted resume tailoring platform with strict validation "
-        "and an incident management console modelling real-world support workflows."
-    )
-    if category == 'cybersecurity':
-        s3 = (
-            "Delivered production-style systems including an AI-assisted resume tailoring platform with strict validation, "
-            "an incident management console modelling real-world support workflows, and security work aligned to the ACSC Essential Eight."
-        )
-    return f"{s1} {s2} {s3}"
 
 
 def choose_resume_strategy(classification: dict) -> dict:
@@ -1377,18 +1368,22 @@ def select_skills_deterministic(
     role_norm = _normalize_term(role_category or '')
     max_skills = max(1, int(max_skills or 18))
     if role_norm == 'software_engineering':
-        max_skills = min(max_skills, 20)
+        max_skills = min(max_skills, 18)
     jd_norm = _normalize_skill_match_text(job_text or '')
     jd_tokens = jd_norm.split(' ') if jd_norm else []
     jd_token_set = set(jd_tokens)
     mobile_terms = ('mobile', 'ios', 'android', 'react native')
-    quality_terms = ('clean code', 'code review', 'code reviews', 'quality', 'ticket', 'tickets', 'bug', 'bugs')
-    frontend_heavy_terms = (
-        'frontend', 'front end', 'ui', 'ux', 'css', 'design system', 'component library', 'figma',
+    quality_terms = (
+        'clean code', 'code review', 'code reviews', 'quality', 'ticket', 'tickets', 'bug', 'bugs',
+        'support', 'production support', 'incident support',
     )
-    is_frontend_heavy = role_norm == 'frontend' or sum(1 for t in frontend_heavy_terms if t in jd_norm) >= 2
+    styling_terms = (
+        'frontend styling', 'styling', 'design system', 'component styling', 'ui styling',
+        'css', 'tailwind', 'sass', 'responsive design',
+    )
+    mentions_frontend_styling = any(t in jd_norm for t in styling_terms)
     prefers_testing = any(t in jd_norm for t in quality_terms)
-    style_build_tools = {'tailwind css', 'vite', 'next js', 'nextjs'}
+    style_build_tools = {'tailwind css', 'vite', 'next js', 'nextjs', 'framer motion'}
 
     def score_skill(skill: str) -> int:
         s_norm = _normalize_skill_match_text(skill)
@@ -1415,7 +1410,7 @@ def select_skills_deterministic(
             break
         if prefers_testing and s_norm in {'jest', 'react testing library'}:
             score += 3
-        if not is_frontend_heavy and s_norm in style_build_tools:
+        if not mentions_frontend_styling and s_norm in style_build_tools:
             score -= 3
         return score
 
@@ -1423,6 +1418,7 @@ def select_skills_deterministic(
     for idx, skill in enumerate(ordered_skills):
         scored.append((score_skill(skill), idx, skill))
     scored.sort(key=lambda t: (-t[0], t[1]))
+    score_by_key = {_normalize_skill_match_text(skill): score for score, _, skill in scored}
 
     selected = []
     selected_keys = set()
@@ -1473,6 +1469,35 @@ def select_skills_deterministic(
             continue
         selected.append(skill)
         selected_keys.add(key)
+
+    if role_norm == 'software_engineering' and selected:
+        must_keys = {_normalize_skill_match_text(s) for s in SOFTWARE_BASELINE_SKILLS}
+        removable = []
+        for i, skill in enumerate(selected):
+            key = _normalize_skill_match_text(skill)
+            if key in must_keys:
+                continue
+            removable.append((score_by_key.get(key, 0), i, skill))
+        drop_count = int(len(selected) * 0.25)
+        if drop_count > 0 and removable:
+            removable.sort(key=lambda t: (t[0], -t[1]))
+            drop_set = {skill for _, _, skill in removable[:drop_count]}
+            selected = [s for s in selected if s not in drop_set]
+
+        # Re-assert must-include skills if present in inventory.
+        selected_keys = {_normalize_skill_match_text(s) for s in selected}
+        missing_baseline = []
+        for must_have in SOFTWARE_BASELINE_SKILLS:
+            for candidate in ordered_skills:
+                if _normalize_skill_match_text(candidate) == _normalize_skill_match_text(must_have):
+                    key = _normalize_skill_match_text(candidate)
+                    if key and key not in selected_keys:
+                        missing_baseline.append(candidate)
+                        selected_keys.add(key)
+                    break
+        if missing_baseline:
+            selected = missing_baseline + selected
+
     final_selected = selected[:max_skills]
     print(f"[skills-selector] selected {len(final_selected)} skills: {final_selected}")
     return final_selected
