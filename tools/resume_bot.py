@@ -148,10 +148,7 @@ SOFTWARE_BASELINE_SKILLS = [
     'TypeScript',
     'React',
     'Git',
-    'SQL',
     'REST API Integration',
-    'Jest',
-    'React Testing Library',
 ]
 
 
@@ -1089,7 +1086,11 @@ def classify_job_heuristic(job_text: str) -> dict:
     primary = 'unknown'
     if best_score > 0:
         primary = best_cat
-    if primary == 'software_engineering' and scores.get('cybersecurity', 0) >= best_score:
+    if (
+        primary == 'software_engineering'
+        and scores.get('cybersecurity', 0) >= best_score
+        and _security_analyst_dominance(job_text)
+    ):
         primary = 'cybersecurity'
 
     tone = 'unknown'
@@ -1118,6 +1119,52 @@ def classify_job_heuristic(job_text: str) -> dict:
     })
 
 
+def _security_analyst_dominance(job_text: str) -> bool:
+    norm = _normalize_term(job_text or '')
+    strong_markers = [
+        'security analyst',
+        'soc analyst',
+        'siem',
+        'threat hunting',
+        'incident response',
+        'vulnerability assessment',
+        'penetration testing',
+        'nmap',
+        'metasploit',
+        'wireshark',
+        'burp suite',
+    ]
+    hits = sum(1 for term in strong_markers if term in norm)
+    return hits >= 2
+
+
+def _apply_classification_guardrails(job_text: str, result: dict) -> dict:
+    safe = _sanitize_job_classification(result or {})
+    norm = _normalize_term(job_text or '')
+    software_signals = [
+        'software engineer',
+        'graduate software engineer',
+        'full stack',
+        'typescript',
+        'react',
+        'java',
+        'sql',
+    ]
+    has_software_signal = any(term in norm for term in software_signals)
+    has_explicit_swe_title = 'software engineer' in norm or 'graduate software engineer' in norm
+    if has_explicit_swe_title and safe.get('primary_category') in {'backend', 'frontend', 'devops', 'unknown'}:
+        safe['primary_category'] = 'software_engineering'
+        safe['confidence'] = max(60, int(safe.get('confidence', 60)))
+    if (
+        safe.get('primary_category') == 'cybersecurity'
+        and has_software_signal
+        and not _security_analyst_dominance(job_text)
+    ):
+        safe['primary_category'] = 'software_engineering'
+        safe['confidence'] = max(50, int(safe.get('confidence', 50)) - 10)
+    return safe
+
+
 def classify_job(job_text: str) -> dict:
     key = hashlib.sha256(normalize_text(job_text or '').encode('utf-8', errors='replace')).hexdigest()
     cached = _JOB_CLASSIFICATION_CACHE.get(key)
@@ -1132,8 +1179,29 @@ def classify_job(job_text: str) -> dict:
             result = None
     if result is None:
         result = classify_job_heuristic(job_text=job_text)
-    _JOB_CLASSIFICATION_CACHE[key] = dict(result)
-    return result
+    guarded = _apply_classification_guardrails(job_text=job_text, result=result)
+    _JOB_CLASSIFICATION_CACHE[key] = dict(guarded)
+    return guarded
+
+
+def build_summary(classification: dict, resume_json: dict) -> str:
+    _ = resume_json  # Summary is deterministic and only uses facts already present in resume inventory.
+    category = _normalize_term(str((classification or {}).get('primary_category', 'unknown')))
+    s1 = "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity)."
+    s2 = (
+        "Build web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs; "
+        "write maintainable code with testing (Jest/React Testing Library)."
+    )
+    s3 = (
+        "Delivered production-style systems including an AI-assisted resume tailoring platform with strict validation "
+        "and an incident management console modelling real-world support workflows."
+    )
+    if category == 'cybersecurity':
+        s3 = (
+            "Delivered production-style systems including an AI-assisted resume tailoring platform with strict validation, "
+            "an incident management console modelling real-world support workflows, and security work aligned to the ACSC Essential Eight."
+        )
+    return f"{s1} {s2} {s3}"
 
 
 def choose_resume_strategy(classification: dict) -> dict:
@@ -1170,15 +1238,15 @@ def choose_resume_strategy(classification: dict) -> dict:
         'tagline': None,
         'section_order': DEFAULT_SECTION_ORDER[:],
         'project_priority': [
-            'Bunkerify',
             'Job Application Assistant',
             'Production Support Incident Console',
             'Cancer Awareness Mobile App',
+            'Bunkerify',
         ],
         'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
         'min_bullets_per_project': 2,
         'max_bullets_per_project': 3,
-        'max_skills': 16,
+        'max_skills': 20,
         'min_skills': 10,
         'prefer_cyber_terms': False,
     }
@@ -1306,11 +1374,21 @@ def select_skills_deterministic(
         print('[skills-selector] selected 0 skills: []')
         return []
 
+    role_norm = _normalize_term(role_category or '')
     max_skills = max(1, int(max_skills or 18))
+    if role_norm == 'software_engineering':
+        max_skills = min(max_skills, 20)
     jd_norm = _normalize_skill_match_text(job_text or '')
     jd_tokens = jd_norm.split(' ') if jd_norm else []
     jd_token_set = set(jd_tokens)
     mobile_terms = ('mobile', 'ios', 'android', 'react native')
+    quality_terms = ('clean code', 'code review', 'code reviews', 'quality', 'ticket', 'tickets', 'bug', 'bugs')
+    frontend_heavy_terms = (
+        'frontend', 'front end', 'ui', 'ux', 'css', 'design system', 'component library', 'figma',
+    )
+    is_frontend_heavy = role_norm == 'frontend' or sum(1 for t in frontend_heavy_terms if t in jd_norm) >= 2
+    prefers_testing = any(t in jd_norm for t in quality_terms)
+    style_build_tools = {'tailwind css', 'vite', 'next js', 'nextjs'}
 
     def score_skill(skill: str) -> int:
         s_norm = _normalize_skill_match_text(skill)
@@ -1335,6 +1413,10 @@ def select_skills_deterministic(
                     score += 3
                     break
             break
+        if prefers_testing and s_norm in {'jest', 'react testing library'}:
+            score += 3
+        if not is_frontend_heavy and s_norm in style_build_tools:
+            score -= 3
         return score
 
     scored = []
@@ -1345,7 +1427,7 @@ def select_skills_deterministic(
     selected = []
     selected_keys = set()
 
-    if _is_software_role_category(role_category):
+    if role_norm == 'software_engineering':
         for must_have in SOFTWARE_BASELINE_SKILLS:
             for candidate in ordered_skills:
                 if _normalize_skill_match_text(candidate) == _normalize_skill_match_text(must_have):
@@ -1375,6 +1457,14 @@ def select_skills_deterministic(
         if len(selected) >= max_skills:
             break
 
+    for score, _, skill in scored:
+        if len(selected) >= max_skills:
+            break
+        key = _normalize_skill_match_text(skill)
+        if key in selected_keys:
+            continue
+        selected.append(skill)
+        selected_keys.add(key)
     for skill in ordered_skills:
         if len(selected) >= max_skills:
             break
@@ -3943,9 +4033,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     tagline = strategy.get('tagline') or resume_json.get('headline') or DEFAULT_TAILORED_TAGLINE
     headline = tagline
 
-    summary = parsed_resume.get('summary', '')
-    if not summary:
-        summary = 'Software engineer with a strong foundation in web technologies, networking, and object-oriented programming.'
+    summary = build_summary(classification=classification, resume_json=resume_json)
 
     education = parsed_resume.get('education', [])
     experience = [dict(e) for e in (parsed_resume.get('experience', []) or [])]
@@ -3980,13 +4068,6 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             selected_projects=projects,
         )
         if payload:
-            candidate_summary = _sanitize_summary_text(
-                str(payload.get('summary', '')),
-                fallback=summary,
-                max_words=65,
-            )
-            if 'bunkerify' in _normalize_term(deterministic_summary) and 'bunkerify' not in _normalize_term(candidate_summary):
-                candidate_summary = deterministic_summary
             by_name = {_entry_match_key(p.get('title', '')): dict(p) for p in projects}
             for row in payload.get('projects', []):
                 key = _entry_match_key(row.get('name', ''))
@@ -4004,7 +4085,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             candidate_generated_json = {
                 'basics': resume_json.get('basics', {}),
                 'headline': headline,
-                'summary': candidate_summary,
+                'summary': deterministic_summary,
                 'education': resume_json.get('education', []),
                 'projects': [
                     {
@@ -4027,7 +4108,7 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
             }
             try:
                 validate_generated_resume(original_resume_json=resume_json, generated_resume_json=candidate_generated_json)
-                summary = candidate_summary
+                summary = deterministic_summary
                 projects = ai_projects
             except (Exception, SystemExit):
                 summary = deterministic_summary
