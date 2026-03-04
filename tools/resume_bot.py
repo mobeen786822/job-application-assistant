@@ -3171,6 +3171,12 @@ def _project_tech_allowlist_from_resume_json(project: dict) -> set[str]:
                 allowed.add(_normalize_term(token))
             for inferred in _extract_tech_terms(t):
                 allowed.add(_normalize_term(inferred))
+    bullet_rows = normalize_bullet_list(project.get('bullets', []) or [])
+    bullet_text_blob = ' '.join([b.get('text', '') for b in bullet_rows if b.get('text', '')])
+    for inferred in _extract_tech_terms(bullet_text_blob):
+        t = _normalize_term(inferred)
+        if t:
+            allowed.add(t)
     for generic in GENERIC_BULLET_TERMS:
         allowed.add(_normalize_term(generic))
     return allowed
