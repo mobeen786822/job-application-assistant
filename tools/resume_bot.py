@@ -173,12 +173,10 @@ SOFTWARE_FULLSTACK_ROLE_TERMS = [
     'api',
 ]
 JUNIOR_GRADUATE_ROLE_TERMS = [
-    'junior',
     'graduate',
-    'entry level',
-    'entry-level',
     'new grad',
-    'intern',
+    'graduate developer',
+    'graduate software engineer',
 ]
 APPSEC_PRIORITY_TAGS = {'security', 'ci cd', 'ci-cd', 'devsecops', 'remediation'}
 APPSEC_DEPRIORITY_TAGS = {'ui', 'ux', 'marketing', 'mobile'}
@@ -1459,25 +1457,53 @@ def filter_projects_for_role(projects: list[dict], role_profile: str) -> list[di
     include_cancer = role_profile in {'graduate', 'mobile'}
     for project in projects or []:
         title = _normalize_term(project.get('title', ''))
+        if role_profile == 'pentest' and 'job application assistant' in title:
+            continue
         if 'cancer awareness mobile app' in title and not include_cancer:
             continue
         out.append(project)
     return out
 
 
-def cap_hentley_experience_bullets(entries: list[dict], max_bullets: int = 2) -> list[dict]:
-    capped = []
+def select_experience_bullets_for_render(
+    entries: list[dict],
+    min_bullets: int = 2,
+    max_bullets: int = 2,
+) -> list[dict]:
+    min_keep = max(1, int(min_bullets or 2))
+    max_keep = max(min_keep, int(max_bullets or 2))
+    selected = []
     for entry in entries or []:
         updated = dict(entry)
-        title_norm = _normalize_term(updated.get('title', ''))
-        subtitle_norm = _normalize_term(updated.get('subtitle', ''))
-        if 'hentley' in title_norm or 'hentley' in subtitle_norm:
-            bullets = updated.get('bullets', []) or []
-            bullet_objects = normalize_bullet_list(updated.get('bullet_objects', bullets))
-            updated['bullet_objects'] = bullet_objects[:max_bullets]
-            updated['bullets'] = [b.get('text', '') for b in updated['bullet_objects'] if b.get('text', '')]
-        capped.append(updated)
-    return capped
+        bullet_objects = normalize_bullet_list(updated.get('bullet_objects', updated.get('bullets', [])))
+        ranked = []
+        for idx, bullet_obj in enumerate(bullet_objects):
+            try:
+                importance = int(bullet_obj.get('importance', 0))
+            except Exception:
+                importance = 0
+            importance = max(0, min(3, importance))
+            ranked.append((importance, idx, bullet_obj))
+
+        ranked.sort(key=lambda t: (-t[0], t[1]))
+        chosen = []
+        for _, _, bullet_obj in ranked:
+            if len(chosen) >= max_keep:
+                break
+            chosen.append(bullet_obj)
+
+        if len(chosen) < min_keep:
+            for bullet_obj in bullet_objects:
+                if bullet_obj in chosen:
+                    continue
+                chosen.append(bullet_obj)
+                if len(chosen) >= min_keep or len(chosen) >= max_keep:
+                    break
+
+        updated['bullet_objects'] = chosen
+        updated['bullets'] = [b.get('text', '') for b in chosen if b.get('text', '')]
+        selected.append(updated)
+    return selected
 
 
 def apply_ai_project_selection_and_order(
@@ -4394,14 +4420,11 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         role_category=str(classification.get('primary_category', 'unknown')),
     )
     projects = [p for p in projects if p.get('bullets')]
-    experience = select_project_bullets_deterministic(
-        projects=experience,
-        job_text=raw_job_text,
-        max_bullets_per_project=int(strategy.get('max_bullets_per_experience', 3)),
-        min_bullets_per_project=1,
-        role_category=str(classification.get('primary_category', 'unknown')),
+    experience = select_experience_bullets_for_render(
+        entries=experience,
+        min_bullets=2,
+        max_bullets=2,
     )
-    experience = cap_hentley_experience_bullets(experience, max_bullets=2)
 
     grouped_skills = parsed_resume.get('skills_grouped', {})
     ordered_grouped_skills, _ordered_skills = reorder_skill_groups(
