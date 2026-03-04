@@ -184,6 +184,22 @@ APPSEC_PRIORITY_TAGS = {'security', 'ci cd', 'ci-cd', 'devsecops', 'remediation'
 APPSEC_DEPRIORITY_TAGS = {'ui', 'ux', 'marketing', 'mobile'}
 SWE_PRIORITY_TAGS = {'full stack', 'full-stack', 'architecture', 'ai', 'deployment'}
 SWE_SECURITY_SUPPORT_TAGS = {'security', 'ci cd', 'ci-cd', 'devsecops', 'sast', 'dast', 'pipeline'}
+PENTEST_ROLE_TERMS = [
+    'penetration testing',
+    'penetration tester',
+    'pentest',
+    'red team',
+    'ethical hacker',
+    'offensive security',
+    'vulnerability assessment',
+]
+MOBILE_ROLE_TERMS = [
+    'mobile developer',
+    'mobile engineer',
+    'react native',
+    'ios',
+    'android',
+]
 
 
 def normalize_text(text: str) -> str:
@@ -1229,22 +1245,110 @@ def classify_job(job_text: str) -> dict:
     return guarded
 
 
-def build_summary(classification: dict, resume_json: dict) -> str:
-    _ = classification
-    _ = resume_json
-    return (
-        "Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), "
-        "building web and mobile applications using JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. "
-        "Write clean, maintainable code with testing (Jest/React Testing Library) and collaborate across product and "
-        "engineering teams to deliver production-ready systems."
-    )
+def _detect_role_profile(job_text: str, classification: dict | None = None) -> str:
+    norm = _normalize_term(job_text or '')
+    category = _normalize_term(str((classification or {}).get('primary_category', 'unknown')))
 
-
-def choose_resume_strategy(classification: dict) -> dict:
-    category = str((classification or {}).get('primary_category', 'unknown')).lower()
+    if any(_normalize_term(term) in norm for term in PENTEST_ROLE_TERMS):
+        return 'pentest'
+    if any(_normalize_term(term) in norm for term in APPSEC_DEVSECOPS_ROLE_TERMS):
+        return 'appsec_devsecops'
+    if any(_normalize_term(term) in norm for term in MOBILE_ROLE_TERMS):
+        return 'mobile'
+    if any(_normalize_term(term) in norm for term in JUNIOR_GRADUATE_ROLE_TERMS):
+        return 'graduate'
     if category == 'cybersecurity':
+        return 'appsec_devsecops'
+    if category in {'software_engineering', 'frontend', 'backend', 'devops'}:
+        return 'software_engineering'
+    return 'general'
+
+
+def _extract_primary_degree(resume_json: dict) -> str:
+    for edu in resume_json.get('education', []) or []:
+        degree = normalize_text(str(edu.get('degree', ''))).strip()
+        if degree:
+            return degree
+    return 'Computer Science degree'
+
+
+def build_summary(classification: dict, resume_json: dict, job_text: str = '') -> str:
+    profile = _detect_role_profile(job_text=job_text, classification=classification)
+    degree = _extract_primary_degree(resume_json)
+
+    who_i_am = 'Software Engineer'
+    if profile == 'appsec_devsecops':
+        who_i_am = 'Application Security-focused Software Engineer'
+    elif profile == 'pentest':
+        who_i_am = 'Offensive Security-focused Software Engineer'
+    elif profile == 'mobile':
+        who_i_am = 'Mobile-focused Software Engineer'
+    elif profile == 'graduate':
+        who_i_am = 'Graduate Software Engineer'
+
+    article = 'an' if who_i_am[:1].lower() in {'a', 'e', 'i', 'o', 'u'} else 'a'
+    sentence_one = f"I am {article} {who_i_am} with a {degree}."
+    if profile == 'appsec_devsecops':
+        sentence_two = (
+            "I focus on security tooling across CI/CD, including SAST/DAST workflows, "
+            "vulnerability remediation, and production hardening."
+        )
+    elif profile == 'pentest':
+        sentence_two = (
+            "I focus on offensive security workflows, vulnerability assessment, "
+            "penetration testing, and practical remediation outcomes."
+        )
+    elif profile in {'software_engineering', 'graduate'}:
+        sentence_two = (
+            "I build full-stack systems with AI-assisted features across React frontends, "
+            "Python/API backends, and reliable deployment pipelines."
+        )
+    elif profile == 'mobile':
+        sentence_two = (
+            "I build mobile-first product features with React Native while integrating secure APIs "
+            "and production deployment workflows."
+        )
+    else:
+        sentence_two = (
+            "I build production-ready software with strong full-stack fundamentals, "
+            "secure engineering practices, and measurable delivery outcomes."
+        )
+    return f"{sentence_one} {sentence_two}"
+
+
+def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
+    profile = _detect_role_profile(job_text=job_text, classification=classification)
+    if profile == 'appsec_devsecops':
         return {
-            'name': 'CYBERSECURITY',
+            'name': 'APPSEC_DEVSECOPS',
+            'tagline': None,
+            'section_order': [
+                'Professional Summary',
+                'Key Skills / Technical Skills',
+                'Projects',
+                'Professional Experience',
+                'Education',
+                'Certifications',
+            ],
+            'project_priority': [
+                'Production Support Incident Console',
+                'Job Application Assistant',
+                'Bunkerify',
+            ],
+            'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 4,
+            'max_bullets_per_experience': 3,
+            'max_skills': 14,
+            'min_skills': 10,
+            'prefer_cyber_terms': True,
+            'target_max_pages': 1.5,
+            'role_profile': profile,
+        }
+
+    if profile == 'pentest':
+        return {
+            'name': 'PENTEST',
             'tagline': None,
             'section_order': [
                 'Professional Summary',
@@ -1258,33 +1362,80 @@ def choose_resume_strategy(classification: dict) -> dict:
                 'Bunkerify',
                 'Production Support Incident Console',
                 'Job Application Assistant',
-                'Cancer Awareness Mobile App',
             ],
             'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
             'min_bullets_per_project': 2,
-            'max_bullets_per_project': 3,
-            'max_skills': 16,
+            'max_bullets_per_project': 4,
+            'max_bullets_per_experience': 3,
+            'max_skills': 14,
             'min_skills': 10,
             'prefer_cyber_terms': True,
+            'target_max_pages': 1.5,
+            'role_profile': profile,
         }
 
-    # Default to software/general ordering for software_engineering, frontend, backend, devops, and unknown.
+    if profile in {'software_engineering', 'graduate'}:
+        return {
+            'name': 'SOFTWARE_GENERAL' if profile == 'software_engineering' else 'GRADUATE',
+            'tagline': None,
+            'section_order': DEFAULT_SECTION_ORDER[:],
+            'project_priority': [
+                'Job Application Assistant',
+                'Production Support Incident Console',
+                'Bunkerify',
+            ],
+            'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 4,
+            'max_bullets_per_experience': 3,
+            'max_skills': 10,
+            'min_skills': 8,
+            'prefer_cyber_terms': False,
+            'target_max_pages': 1.0,
+            'role_profile': profile,
+        }
+
+    if profile == 'mobile':
+        return {
+            'name': 'MOBILE',
+            'tagline': None,
+            'section_order': DEFAULT_SECTION_ORDER[:],
+            'project_priority': [
+                'Cancer Awareness Mobile App',
+                'Job Application Assistant',
+                'Production Support Incident Console',
+                'Bunkerify',
+            ],
+            'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 4,
+            'max_bullets_per_experience': 3,
+            'max_skills': 10,
+            'min_skills': 8,
+            'prefer_cyber_terms': False,
+            'target_max_pages': 1.0,
+            'role_profile': profile,
+        }
+
+    # Default to general ordering for unknown roles.
     return {
-        'name': 'SOFTWARE_GENERAL',
+        'name': 'GENERAL',
         'tagline': None,
         'section_order': DEFAULT_SECTION_ORDER[:],
         'project_priority': [
             'Job Application Assistant',
             'Production Support Incident Console',
-            'Cancer Awareness Mobile App',
             'Bunkerify',
         ],
         'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
         'min_bullets_per_project': 2,
-        'max_bullets_per_project': 3,
-        'max_skills': 20,
-        'min_skills': 10,
+        'max_bullets_per_project': 4,
+        'max_bullets_per_experience': 3,
+        'max_skills': 10,
+        'min_skills': 8,
         'prefer_cyber_terms': False,
+        'target_max_pages': 1.0,
+        'role_profile': profile,
     }
 
 
@@ -1301,6 +1452,32 @@ def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> l
         return (1, 99, title)
 
     return sorted(projects, key=project_key)
+
+
+def filter_projects_for_role(projects: list[dict], role_profile: str) -> list[dict]:
+    out = []
+    include_cancer = role_profile in {'graduate', 'mobile'}
+    for project in projects or []:
+        title = _normalize_term(project.get('title', ''))
+        if 'cancer awareness mobile app' in title and not include_cancer:
+            continue
+        out.append(project)
+    return out
+
+
+def cap_hentley_experience_bullets(entries: list[dict], max_bullets: int = 2) -> list[dict]:
+    capped = []
+    for entry in entries or []:
+        updated = dict(entry)
+        title_norm = _normalize_term(updated.get('title', ''))
+        subtitle_norm = _normalize_term(updated.get('subtitle', ''))
+        if 'hentley' in title_norm or 'hentley' in subtitle_norm:
+            bullets = updated.get('bullets', []) or []
+            bullet_objects = normalize_bullet_list(updated.get('bullet_objects', bullets))
+            updated['bullet_objects'] = bullet_objects[:max_bullets]
+            updated['bullets'] = [b.get('text', '') for b in updated['bullet_objects'] if b.get('text', '')]
+        capped.append(updated)
+    return capped
 
 
 def apply_ai_project_selection_and_order(
@@ -1609,13 +1786,12 @@ def select_project_bullets_deterministic(
     role_category: str = 'unknown',
 ) -> list[dict]:
     max_bullets = max(1, int(max_bullets_per_project or 3))
-    min_bullets = max(2, int(min_bullets_per_project or 2))
+    min_bullets = max(1, int(min_bullets_per_project or 1))
     jd_norm = _normalize_term(job_text or '')
     jd_words = set(re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', jd_norm))
     jd_tech_terms = _extract_tech_terms(jd_norm)
     profile = _infer_bullet_selection_profile(job_text=job_text, role_category=role_category)
     profile_focus = profile.get('focus', 'general')
-    junior_or_graduate = bool(profile.get('junior_or_graduate'))
 
     if profile_focus == 'appsec_devsecops':
         priority_tags = APPSEC_PRIORITY_TAGS
@@ -1665,7 +1841,6 @@ def select_project_bullets_deterministic(
         return tiered_keyword_score + tag_score + importance_score + priority_score + core_score
 
     selected = []
-    chosen_security_support = False
 
     for project in projects or []:
         bullet_objects = normalize_bullet_list(project.get('bullet_objects', project.get('bullets', [])))
@@ -1676,132 +1851,56 @@ def select_project_bullets_deterministic(
             selected.append(updated)
             continue
 
-        indexed = list(enumerate(bullet_objects))
-        always_pairs = []
-        candidate_pairs = []
-        all_rows = []
-
-        for idx, bullet_obj in indexed:
+        eligible_rows = []
+        for idx, bullet_obj in enumerate(bullet_objects):
             try:
-                raw_importance = int(bullet_obj.get('importance', 0))
+                importance = int(bullet_obj.get('importance', 0))
             except Exception:
-                raw_importance = 0
-            raw_importance = max(0, min(3, raw_importance))
-            importance = max(1, raw_importance)
-            is_core = bool(bullet_obj.get('core'))
-            tags = {_normalize_term(tag) for tag in (bullet_obj.get('tags', []) or []) if _normalize_term(tag)}
-            relevant, explicit = _bullet_relevance_signals(
+                importance = 0
+            importance = max(0, min(3, importance))
+
+            if importance == 1:
+                continue
+            _relevant, explicit = _bullet_relevance_signals(
                 bullet_obj=bullet_obj,
                 jd_norm=jd_norm,
                 jd_words=jd_words,
                 jd_tech_terms=jd_tech_terms,
             )
+            if not (importance == 3 or (importance == 2 and explicit)):
+                continue
 
-            include_by_importance = False
-            if importance >= 3:
-                include_by_importance = True
-            elif importance == 2 and relevant:
-                include_by_importance = True
-            elif importance == 1 and explicit:
-                include_by_importance = True
-
-            if junior_or_graduate and is_core:
-                include_by_importance = True
-
-            security_support_candidate = bool(tags & SWE_SECURITY_SUPPORT_TAGS) or any(
-                marker in _normalize_term(bullet_obj.get('text', ''))
-                for marker in ('security pipeline', 'ci/cd', 'ci cd', 'sast', 'dast')
-            )
-
-            row = {
+            eligible_rows.append({
                 'idx': idx,
                 'bullet': bullet_obj,
                 'score': score_bullet(bullet_obj),
                 'importance': importance,
-                'core': is_core,
-                'security_support_candidate': security_support_candidate,
-            }
-            all_rows.append(row)
+            })
 
-            if include_by_importance:
-                always_pairs.append(row)
-            elif importance >= 3:
-                candidate_pairs.append(row)
-            elif importance == 2 and relevant:
-                candidate_pairs.append(row)
-            elif importance == 1 and explicit:
-                candidate_pairs.append(row)
-            elif profile_focus == 'software_fullstack' and security_support_candidate and importance >= 2:
-                candidate_pairs.append(row)
+        imp3_rows = [r for r in eligible_rows if int(r.get('importance', 0)) == 3]
+        imp2_rows = [r for r in eligible_rows if int(r.get('importance', 0)) == 2]
+        imp3_rows.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
+        imp2_rows.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
 
-        # For software/full-stack roles, include only one security-pipeline support bullet
-        # unless multiple are mandatory by the global importance/core rules.
-        if profile_focus == 'software_fullstack' and not chosen_security_support:
-            support_candidates = [r for r in candidate_pairs if r.get('security_support_candidate')]
-            if support_candidates:
-                support_candidates.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
-                promoted = support_candidates[0]
-                candidate_pairs = [r for r in candidate_pairs if r.get('idx') != promoted.get('idx')]
-                always_pairs.append(promoted)
-                chosen_security_support = True
-        elif profile_focus == 'software_fullstack' and chosen_security_support:
-            candidate_pairs = [r for r in candidate_pairs if not r.get('security_support_candidate')]
-
-        # Dedupe mandatory rows by source index.
-        dedup_always = {}
-        for row in always_pairs:
-            dedup_always[int(row.get('idx', 0))] = row
-        always_pairs = list(dedup_always.values())
-        if profile_focus == 'software_fullstack' and any(r.get('security_support_candidate') for r in always_pairs):
-            chosen_security_support = True
-
-        chosen_rows = sorted(always_pairs, key=lambda r: int(r.get('idx', 0)))
-        chosen_idx = {int(r.get('idx', 0)) for r in chosen_rows}
-
-        # Keep all mandatory bullets; if they exceed max, do not drop them.
-        target_count = max(len(chosen_rows), max_bullets)
-        candidate_pairs.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
-        for row in candidate_pairs:
-            if len(chosen_rows) >= target_count:
+        chosen_rows = []
+        for row in imp3_rows:
+            if len(chosen_rows) >= max_bullets:
                 break
-            idx = int(row.get('idx', 0))
-            if idx in chosen_idx:
-                continue
             chosen_rows.append(row)
-            chosen_idx.add(idx)
+        for row in imp2_rows:
+            if len(chosen_rows) >= max_bullets:
+                break
+            chosen_rows.append(row)
 
-        # Respect minimum bullet count without violating inclusion rules.
         if len(chosen_rows) < min_bullets:
-            for row in candidate_pairs:
-                idx = int(row.get('idx', 0))
-                if idx in chosen_idx:
+            for row in imp2_rows:
+                if row in chosen_rows:
                     continue
                 chosen_rows.append(row)
-                chosen_idx.add(idx)
-                if len(chosen_rows) >= min_bullets:
+                if len(chosen_rows) >= min_bullets or len(chosen_rows) >= max_bullets:
                     break
-        if len(chosen_rows) < min_bullets:
-            fallback_rows = [r for r in all_rows if int(r.get('idx', 0)) not in chosen_idx]
-            fallback_rows.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
-            if profile_focus == 'software_fullstack' and chosen_security_support:
-                for row in fallback_rows:
-                    if row.get('security_support_candidate'):
-                        continue
-                    chosen_rows.append(row)
-                    chosen_idx.add(int(row.get('idx', 0)))
-                    if len(chosen_rows) >= min_bullets:
-                        break
-            if len(chosen_rows) < min_bullets:
-                for row in fallback_rows:
-                    idx = int(row.get('idx', 0))
-                    if idx in chosen_idx:
-                        continue
-                    chosen_rows.append(row)
-                    chosen_idx.add(idx)
-                    if len(chosen_rows) >= min_bullets:
-                        break
 
-        chosen_rows.sort(key=lambda r: int(r.get('idx', 0)))
+        chosen_rows.sort(key=lambda r: (-int(r.get('importance', 0)), int(r.get('idx', 0))))
         chosen_objects = [r.get('bullet', {}) for r in chosen_rows]
         chosen_bullets = [b.get('text', '') for b in chosen_objects if b.get('text', '')]
 
@@ -3383,10 +3482,6 @@ def validate_generated_resume(original_resume_json: dict, generated_resume_json:
         allowed_terms = _project_tech_allowlist_from_resume_json(orig_project) | skills_allowlist
         orig_bullets = bullet_texts(orig_project.get('bullets', []) or [])
         gen_bullets = [normalize_text(str(b)).strip() for b in (project.get('bullets', []) or []) if normalize_text(str(b)).strip()]
-        if len(gen_bullets) == 1:
-            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has only 1 bullet.')
-        if len(gen_bullets) < 2 and len(orig_bullets) >= 2:
-            raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has fewer than 2 bullets.')
         if len(gen_bullets) > len(orig_bullets):
             raise SystemExit(f'Generated resume invalid: project "{project.get("name", "")}" has new bullets.')
         tech_terms = _extract_tech_terms(' '.join(gen_bullets))
@@ -4279,24 +4374,34 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
 
     raw_job_text = job_text or ''
     classification = classify_job(raw_job_text)
-    strategy = choose_resume_strategy(classification)
+    strategy = choose_resume_strategy(classification=classification, job_text=raw_job_text)
     tagline = strategy.get('tagline') or resume_json.get('headline') or DEFAULT_TAILORED_TAGLINE
     headline = tagline
 
-    summary = build_summary(classification=classification, resume_json=resume_json)
+    summary = build_summary(classification=classification, resume_json=resume_json, job_text=raw_job_text)
 
     education = parsed_resume.get('education', [])
     experience = [dict(e) for e in (parsed_resume.get('experience', []) or [])]
     volunteer_entries = []
     projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
+    projects = filter_projects_for_role(projects, role_profile=str(strategy.get('role_profile', 'general')))
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
     projects = select_project_bullets_deterministic(
         projects=projects,
         job_text=raw_job_text,
         max_bullets_per_project=int(strategy.get('max_bullets_per_project', 3)),
-        min_bullets_per_project=int(strategy.get('min_bullets_per_project', 2)),
+        min_bullets_per_project=1,
         role_category=str(classification.get('primary_category', 'unknown')),
     )
+    projects = [p for p in projects if p.get('bullets')]
+    experience = select_project_bullets_deterministic(
+        projects=experience,
+        job_text=raw_job_text,
+        max_bullets_per_project=int(strategy.get('max_bullets_per_experience', 3)),
+        min_bullets_per_project=1,
+        role_category=str(classification.get('primary_category', 'unknown')),
+    )
+    experience = cap_hentley_experience_bullets(experience, max_bullets=2)
 
     grouped_skills = parsed_resume.get('skills_grouped', {})
     ordered_grouped_skills, _ordered_skills = reorder_skill_groups(
