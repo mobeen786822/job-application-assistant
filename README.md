@@ -138,3 +138,20 @@ Verify workflow success:
 
 - GitHub `Actions` -> `Deploy to Lightsail VM` -> latest run is green
 - Open app and confirm `Build: <commit>` matches the latest pushed commit
+
+## Security
+
+This repo includes `.github/workflows/security.yml`, a CI security pipeline that runs on every push and pull request to `main` (also configured for `master`).
+
+Pipeline coverage:
+
+- `Bandit`: Python SAST for insecure coding patterns in source code.
+- `Semgrep`: broader static analysis for Python issues, secrets exposure patterns, and OWASP-style risks.
+- `Gitleaks`: git-history and code scanning for leaked credentials/secrets.
+- `pip-audit`: dependency vulnerability scanning against known advisories from `requirements.txt`.
+
+Enforcement behavior:
+
+- Reports are uploaded as workflow artifacts and summarized in the GitHub Actions run summary.
+- A policy job runs after scanning and fails the workflow when `Bandit` reports any `HIGH` severity findings.
+- The policy job also fails when vulnerable dependencies are detected by `pip-audit`, blocking merge until remediated.

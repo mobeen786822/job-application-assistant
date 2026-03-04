@@ -1,0 +1,171 @@
+name: Security Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history needed for Gitleaks
+
+      # 1. BANDIT (Python SAST)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit
+        run: |
+          bandit -r . \
+            --exclude ./.venv,./tests \
+            --severity-level medium \
+            --confidence-level medium \
+            -f json \
+            -o bandit-report.json || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+      # 2. SEMGREP (Broader SAST)
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/secrets
+            p/owasp-top-ten
+
+      # 3. GITLEAKS (Secrets Detection)
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4. PIP-AUDIT (Dependency Scanning)
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          if [ -f requirements.txt ]; then
+            pip-audit \
+              --requirement requirements.txt \
+              --format json \
+              --output pip-audit-report.json || true
+          else
+            echo '{"dependencies":[]}' > pip-audit-report.json
+            echo "requirements.txt not found; skipped pip-audit scan."
+          fi
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+      # 5. SUMMARY
+      - name: Print Bandit summary
+        if: always()
+        run: |
+          echo "## Bandit Results" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+          import json
+          with open('bandit-report.json') as f:
+            data = json.load(f)
+          results = data.get('results', [])
+          if not results:
+            print('No issues found.')
+          else:
+            for r in results:
+              print(f\"[{r['issue_severity']}] {r['issue_text']} - {r['filename']}:{r['line_number']}\")
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Print pip-audit summary
+        if: always()
+        run: |
+          echo "## pip-audit Results" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+          import json
+          with open('pip-audit-report.json') as f:
+            data = json.load(f)
+          vulns = [d for d in data.get('dependencies', []) if d.get('vulns')]
+          if not vulns:
+            print('No vulnerable dependencies found.')
+          else:
+            for dep in vulns:
+              for v in dep['vulns']:
+                desc = v.get('description') or ''
+                print(f\"{dep['name']}=={dep['version']} - {v['id']}: {desc[:100]}\")
+          " >> $GITHUB_STEP_SUMMARY
+
+  # FAIL ON HIGH SEVERITY
+  enforce-policy:
+    name: Enforce Security Policy
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: always()
+
+    steps:
+      - name: Download Bandit report
+        uses: actions/download-artifact@v4
+        with:
+          name: bandit-report
+
+      - name: Fail on HIGH severity Bandit findings
+        run: |
+          python3 -c "
+          import json, sys
+          with open('bandit-report.json') as f:
+            data = json.load(f)
+          high = [r for r in data.get('results', []) if r['issue_severity'] == 'HIGH']
+          if high:
+            print(f'{len(high)} HIGH severity issue(s) found. Fix before merging.')
+            for r in high:
+              print(f'  - {r[\"issue_text\"]} ({r[\"filename\"]}:{r[\"line_number\"]})')
+            sys.exit(1)
+          else:
+            print('No HIGH severity issues found.')
+          "
+
+      - name: Download pip-audit report
+        uses: actions/download-artifact@v4
+        with:
+          name: pip-audit-report
+
+      - name: Fail on vulnerable dependencies
+        run: |
+          python3 -c "
+          import json, sys
+          with open('pip-audit-report.json') as f:
+            data = json.load(f)
+          vulnerable = [
+            (d['name'], v['id'])
+            for d in data.get('dependencies', [])
+            for v in d.get('vulns', [])
+          ]
+          if vulnerable:
+            print(f'{len(vulnerable)} vulnerable dependenc(ies) found.')
+            for name, vid in vulnerable:
+              print(f'  - {name}: {vid}')
+            sys.exit(1)
+          else:
+            print('No vulnerable dependencies found.')
+          "
