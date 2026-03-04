@@ -7,8 +7,8 @@
     "github": "https://github.com/mobeen786822",
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
-  "headline": "Software Engineer | Secure Full-Stack Applications & Production Systems",
-  "summary": "Built and launched Bunkerify, a cybersecurity assessment platform aligned to the ACSC Essential Eight, then extended that product focus into secure full-stack web and mobile engineering. Graduate Software Engineer with a Bachelor of Computer Science (Software Engineering and Cybersecurity), building applications with JavaScript/TypeScript, React/React Native, SQL/NoSQL, and REST APIs. Delivered production-style systems including an AI-assisted resume tailoring platform and an incident management console, with strong focus on system integrity and maintainability.",
+  "headline": "Graduate Software Engineer | Application Security & Secure Full-Stack Development",
+  "summary": "Built and launched Bunkerify, a cybersecurity assessment platform aligned to the ACSC Essential Eight, then extended that product focus into secure full-stack web and mobile engineering. Graduate Software Engineer with a Master of Computer Science (Cybersecurity) and a Bachelor of Computer Science (Software Engineering and Cybersecurity), building applications with JavaScript/TypeScript, React, Python, and REST APIs. Delivered production-style systems including an AI-assisted resume tailoring platform and a full-stack incident management console, with a strong focus on system integrity, secure CI/CD pipelines, and dependency hygiene.",
   "education": [
     {
       "degree": "Bachelor of Computer Science",
@@ -33,25 +33,31 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["JavaScript", "OpenAI API", "Tailscale", "Cloud VM", "HTML", "PDF"],
+      "technologies": ["Python", "Flask", "Anthropic Claude API", "OpenAI API", "HTML", "PDF", "GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "Tailscale"],
       "bullets": [
         {
-          "text": "Designed and developed a full-stack AI-assisted resume tailoring platform that generates structured HTML and PDF outputs from job descriptions.",
-          "core": false,
-          "importance": 2,
+          "text": "Designed and developed a full-stack AI-assisted resume tailoring platform that generates structured HTML and PDF outputs from job descriptions using Anthropic Claude and OpenAI APIs with dual-provider fallback logic.",
+          "core": true,
+          "importance": 3,
           "tags": ["full-stack", "ai", "architecture"]
         },
         {
-          "text": "Implemented OpenAI API integration with strict no-fabrication validation logic to enforce factual consistency and prevent unsupported claims.",
+          "text": "Implemented strict no-fabrication validation logic and a structured JSON resume format with weighted bullet points and importance scores to enforce factual consistency across generated outputs.",
           "core": true,
           "importance": 3,
           "tags": ["ai", "validation", "integrity", "api"]
         },
         {
-          "text": "Built a responsive UI with real-time preview, export actions, and validation feedback to improve usability and output reliability.",
+          "text": "Built a GitHub Actions CI/CD security pipeline with Bandit, Semgrep, Gitleaks, and pip-audit — scanning for vulnerabilities, secrets, and CVEs on every push to main.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "ci-cd", "devsecops"]
+        },
+        {
+          "text": "Identified and resolved a medium severity Bandit finding (B104 interface binding vulnerability) surfaced by the pipeline, documenting the fix in the project README.",
           "core": false,
           "importance": 2,
-          "tags": ["ui", "frontend", "workflow"]
+          "tags": ["security", "remediation"]
         },
         {
           "text": "Deployed the application with VPN-only access (Tailscale) on a cloud VM to restrict public exposure and protect user data.",
@@ -68,31 +74,37 @@
         "live": "https://incident-console-ui.onrender.com/",
         "website": ""
       },
-      "technologies": ["JavaScript", "React"],
+      "technologies": ["React", "TypeScript", "Vite", "FastAPI", "Python", "SQLAlchemy", "JWT", "Docker", "Nginx", "GitHub Actions", "Bandit", "Gitleaks", "pip-audit"],
       "bullets": [
         {
-          "text": "Developed a web-based incident management console simulating production support workflows end-to-end.",
-          "core": false,
-          "importance": 2,
-          "tags": ["incident", "ops"]
+          "text": "Developed a full-stack incident management console with a React/TypeScript frontend and FastAPI/Python backend, containerised with Docker and deployed via Render.",
+          "core": true,
+          "importance": 3,
+          "tags": ["full-stack", "incident", "ops"]
         },
         {
-          "text": "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, and event timelines.",
+          "text": "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, SLA breach indicators, and root-cause analysis capture.",
           "core": true,
           "importance": 3,
           "tags": ["lifecycle", "incident", "systems"]
         },
         {
-          "text": "Added SLA-aware monitoring with breach indicators to support prioritisation and response quality.",
-          "core": false,
-          "importance": 2,
-          "tags": ["sla", "monitoring", "ops"]
+          "text": "Built a full-stack GitHub Actions security pipeline covering Python (Bandit, pip-audit) and JavaScript (npm audit, Gitleaks) with a consolidated fail-gate enforcing zero HIGH findings before merge.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "ci-cd", "devsecops"]
         },
         {
-          "text": "Included runbook and root-cause analysis capture to improve incident resolution consistency and documentation quality.",
+          "text": "Discovered 8 CVEs in backend Python dependencies via pip-audit; replaced python-jose (no upstream fix path) with PyJWT and migrated the JWT authentication implementation to eliminate the vulnerability chain.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "remediation", "dependencies"]
+        },
+        {
+          "text": "Resolved a high severity frontend vulnerability identified by npm audit by upgrading the Vite toolchain to v7 and associated plugin dependencies.",
           "core": false,
           "importance": 2,
-          "tags": ["runbook", "rca", "documentation"]
+          "tags": ["security", "remediation", "frontend"]
         }
       ]
     },
@@ -103,31 +115,31 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": ["JavaScript", "SendGrid", "ACSC Essential Eight"],
+      "technologies": ["JavaScript", "Next.js", "Supabase", "SendGrid", "ACSC Essential Eight"],
       "bullets": [
         {
-          "text": "Built a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model.",
+          "text": "Built and launched a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model, deployed on Vercel with Supabase for data persistence.",
           "core": true,
           "importance": 3,
-          "tags": ["security", "essential-eight"]
+          "tags": ["security", "essential-eight", "saas"]
         },
         {
-          "text": "Designed a 19-question structured assessment with automated scoring and category-level risk breakdowns.",
+          "text": "Designed a 19-question structured assessment with automated scoring, category-level risk breakdowns, and CTI-backed findings.",
           "core": false,
           "importance": 2,
           "tags": ["risk", "assessment"]
         },
         {
-          "text": "Automated HTML report delivery using SendGrid transactional email for consistent user feedback and follow-up.",
+          "text": "Automated HTML report delivery using SendGrid transactional email and integrated Calendly booking to convert assessments into consultations.",
           "core": false,
           "importance": 2,
-          "tags": ["integration", "email"]
+          "tags": ["integration", "email", "workflow"]
         },
         {
-          "text": "Integrated lead capture and booking workflow (Calendly) to convert assessments into consultations.",
+          "text": "Deployed a live marketing funnel with a landing page and LinkedIn launch assets to drive inbound leads.",
           "core": false,
           "importance": 1,
-          "tags": ["workflow"]
+          "tags": ["marketing", "launch"]
         }
       ]
     },
@@ -141,10 +153,10 @@
       "technologies": ["React Native", "TypeScript", "Firebase"],
       "bullets": [
         {
-          "text": "Built a cross-platform mobile application using React Native and TypeScript.",
+          "text": "Built a cross-platform mobile application using React Native and TypeScript with a focus on privacy-conscious data handling for sensitive health-related user interactions.",
           "core": false,
           "importance": 2,
-          "tags": ["mobile", "react-native"]
+          "tags": ["mobile", "react-native", "privacy"]
         },
         {
           "text": "Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.",
@@ -218,10 +230,11 @@
   "skills": {
     "languages": ["JavaScript", "TypeScript", "Python", "Java", "C++", "SQL", "PL/SQL"],
     "frontend": ["React", "React Native", "Next.js", "Vite", "Tailwind CSS", "Framer Motion", "React Router", "HTML", "CSS"],
-    "backend": ["REST API Integration", "Axios", "Firebase", "Cloud Firestore", "NoSQL", "Database Management"],
-    "testing": ["Jest", "React Testing Library", "ESLint"],
+    "backend": ["FastAPI", "Flask", "REST API Integration", "SQLAlchemy", "Axios", "Firebase", "Cloud Firestore", "NoSQL", "Docker", "Nginx"],
+    "testing": ["Jest", "Vitest", "React Testing Library", "ESLint"],
     "security": ["Cybersecurity", "System Security", "Cloud Security (Foundational)", "Networking", "Kali Linux", "Nmap", "Metasploit", "Wireshark", "Burp Suite", "Penetration Testing", "Vulnerability Assessment", "Incident Response", "Threat Intelligence", "Network Segmentation", "Log Analysis", "Firewall Configuration"],
-    "tools": ["Git"]
+    "devsecops": ["GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "npm audit", "SAST", "Dependency Scanning", "Secrets Detection", "CI/CD Security"],
+    "tools": ["Git", "Docker", "Tailscale"]
   },
   "certifications": ["AWS Academy Graduate – AWS Academy Cloud Foundations award"]
 }

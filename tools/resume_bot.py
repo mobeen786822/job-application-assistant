@@ -151,6 +151,40 @@ SOFTWARE_BASELINE_SKILLS = [
     'REST API Integration',
 ]
 
+APPSEC_DEVSECOPS_ROLE_TERMS = [
+    'appsec',
+    'application security',
+    'security engineer',
+    'devsecops',
+    'penetration testing',
+    'vulnerability',
+    'sast',
+    'dast',
+]
+SOFTWARE_FULLSTACK_ROLE_TERMS = [
+    'software engineer',
+    'full-stack',
+    'full stack',
+    'frontend',
+    'backend',
+    'developer',
+    'react',
+    'python',
+    'api',
+]
+JUNIOR_GRADUATE_ROLE_TERMS = [
+    'junior',
+    'graduate',
+    'entry level',
+    'entry-level',
+    'new grad',
+    'intern',
+]
+APPSEC_PRIORITY_TAGS = {'security', 'ci cd', 'ci-cd', 'devsecops', 'remediation'}
+APPSEC_DEPRIORITY_TAGS = {'ui', 'ux', 'marketing', 'mobile'}
+SWE_PRIORITY_TAGS = {'full stack', 'full-stack', 'architecture', 'ai', 'deployment'}
+SWE_SECURITY_SUPPORT_TAGS = {'security', 'ci cd', 'ci-cd', 'devsecops', 'sast', 'dast', 'pipeline'}
+
 
 def normalize_text(text: str) -> str:
     # Fix common mojibake and replace non-ASCII punctuation with ASCII.
@@ -1045,6 +1079,8 @@ def classify_job_heuristic(job_text: str) -> dict:
     multi_terms = {
         'cybersecurity': CYBER_JOB_TERMS + [
             'incident response', 'threat hunting', 'security operations', 'essential eight',
+            'appsec', 'application security', 'security engineer', 'devsecops', 'sast', 'dast',
+            'penetration testing', 'vulnerability management',
         ],
         'frontend': [
             'frontend', 'front-end', 'react', 'typescript', 'javascript', 'html', 'css',
@@ -1060,7 +1096,7 @@ def classify_job_heuristic(job_text: str) -> dict:
         ],
         'software_engineering': [
             'software engineer', 'software engineering', 'full stack', 'full-stack',
-            'application development', 'agile',
+            'application development', 'agile', 'developer', 'api',
         ],
     }
     token_terms = {
@@ -1141,6 +1177,8 @@ def _security_analyst_dominance(job_text: str) -> bool:
 def _apply_classification_guardrails(job_text: str, result: dict) -> dict:
     safe = _sanitize_job_classification(result or {})
     norm = _normalize_term(job_text or '')
+    has_appsec_signal = any(term in norm for term in APPSEC_DEVSECOPS_ROLE_TERMS)
+    has_swe_signal = any(term in norm for term in SOFTWARE_FULLSTACK_ROLE_TERMS)
     software_signals = [
         'software engineer',
         'graduate software engineer',
@@ -1152,12 +1190,19 @@ def _apply_classification_guardrails(job_text: str, result: dict) -> dict:
     ]
     has_software_signal = any(term in norm for term in software_signals)
     has_explicit_swe_title = 'software engineer' in norm or 'graduate software engineer' in norm
+    if has_appsec_signal:
+        safe['primary_category'] = 'cybersecurity'
+        safe['confidence'] = max(70, int(safe.get('confidence', 70)))
     if has_explicit_swe_title and safe.get('primary_category') in {'backend', 'frontend', 'devops', 'unknown'}:
+        safe['primary_category'] = 'software_engineering'
+        safe['confidence'] = max(60, int(safe.get('confidence', 60)))
+    if has_swe_signal and safe.get('primary_category') in {'frontend', 'backend', 'devops', 'unknown'}:
         safe['primary_category'] = 'software_engineering'
         safe['confidence'] = max(60, int(safe.get('confidence', 60)))
     if (
         safe.get('primary_category') == 'cybersecurity'
         and has_software_signal
+        and not has_appsec_signal
         and not _security_analyst_dominance(job_text)
     ):
         safe['primary_category'] = 'software_engineering'
@@ -1354,6 +1399,59 @@ def _is_software_role_category(role_category: str) -> bool:
     return cat in {'software_engineering', 'frontend', 'backend', 'devops', 'unknown'}
 
 
+def _infer_bullet_selection_profile(job_text: str, role_category: str) -> dict:
+    jd_norm = _normalize_term(job_text or '')
+    has_appsec_signal = any(_normalize_term(term) in jd_norm for term in APPSEC_DEVSECOPS_ROLE_TERMS)
+    has_swe_signal = any(_normalize_term(term) in jd_norm for term in SOFTWARE_FULLSTACK_ROLE_TERMS)
+    has_junior_signal = any(_normalize_term(term) in jd_norm for term in JUNIOR_GRADUATE_ROLE_TERMS)
+
+    role_norm = _normalize_term(role_category or '')
+    if has_appsec_signal:
+        focus = 'appsec_devsecops'
+    elif has_swe_signal or role_norm in {'software_engineering', 'frontend', 'backend', 'devops'}:
+        focus = 'software_fullstack'
+    else:
+        focus = 'general'
+
+    return {
+        'focus': focus,
+        'junior_or_graduate': has_junior_signal,
+    }
+
+
+def _bullet_relevance_signals(bullet_obj: dict, jd_norm: str, jd_words: set[str], jd_tech_terms: set[str]) -> tuple[bool, bool]:
+    text_norm = _normalize_term(bullet_obj.get('text', ''))
+    tags = {_normalize_term(tag) for tag in (bullet_obj.get('tags', []) or []) if _normalize_term(tag)}
+
+    relevant = False
+    explicit = False
+
+    for tag in tags:
+        if not tag:
+            continue
+        tag_tokens = [t for t in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', tag) if t]
+        if tag in jd_norm or any(tok in jd_words for tok in tag_tokens):
+            relevant = True
+            explicit = True
+
+    text_tokens = [
+        tok for tok in re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', text_norm)
+        if len(tok) >= 3 and tok not in STOPWORDS
+    ]
+    token_hits = sum(1 for tok in text_tokens if tok in jd_words)
+    if token_hits >= 1:
+        relevant = True
+    if token_hits >= 2:
+        explicit = True
+
+    bullet_tech_terms = _extract_tech_terms(text_norm)
+    if bullet_tech_terms & jd_tech_terms:
+        relevant = True
+        explicit = True
+
+    return relevant, explicit
+
+
 def select_skills_deterministic(
     job_text: str,
     grouped_skills: dict,
@@ -1508,15 +1606,31 @@ def select_project_bullets_deterministic(
     job_text: str,
     max_bullets_per_project: int,
     min_bullets_per_project: int = 2,
+    role_category: str = 'unknown',
 ) -> list[dict]:
     max_bullets = max(1, int(max_bullets_per_project or 3))
     min_bullets = max(2, int(min_bullets_per_project or 2))
     jd_norm = _normalize_term(job_text or '')
     jd_words = set(re.findall(r'[a-zA-Z][a-zA-Z0-9\+\#\-]+', jd_norm))
+    jd_tech_terms = _extract_tech_terms(jd_norm)
+    profile = _infer_bullet_selection_profile(job_text=job_text, role_category=role_category)
+    profile_focus = profile.get('focus', 'general')
+    junior_or_graduate = bool(profile.get('junior_or_graduate'))
+
+    if profile_focus == 'appsec_devsecops':
+        priority_tags = APPSEC_PRIORITY_TAGS
+        depriority_tags = APPSEC_DEPRIORITY_TAGS
+    elif profile_focus == 'software_fullstack':
+        priority_tags = SWE_PRIORITY_TAGS
+        depriority_tags = set()
+    else:
+        priority_tags = set()
+        depriority_tags = set()
 
     def score_bullet(bullet_obj: dict) -> int:
         text = bullet_obj.get('text', '')
         text_norm = _normalize_term(text)
+        tags = {_normalize_term(tag) for tag in (bullet_obj.get('tags', []) or []) if _normalize_term(tag)}
 
         tiered_keyword_score = 0
         for term, weight in KEYWORD_TIER_WEIGHTS.items():
@@ -1526,16 +1640,33 @@ def select_project_bullets_deterministic(
                 tiered_keyword_score += int(weight)
 
         tag_matches = 0
-        for tag in bullet_obj.get('tags', []) or []:
-            t = _normalize_term(tag)
-            if t and t in jd_norm:
+        for t in tags:
+            if t and (t in jd_norm or t in jd_words):
                 tag_matches += 1
         tag_score = min(6, tag_matches * 2)
 
-        importance_score = max(0, min(3, int(bullet_obj.get('importance', 0)))) * 2
-        return tiered_keyword_score + tag_score + importance_score
+        relevance, _explicit = _bullet_relevance_signals(
+            bullet_obj=bullet_obj,
+            jd_norm=jd_norm,
+            jd_words=jd_words,
+            jd_tech_terms=jd_tech_terms,
+        )
+
+        priority_score = 0
+        if tags & priority_tags:
+            priority_score += 6
+        if tags & depriority_tags:
+            priority_score -= 6
+        if relevance:
+            priority_score += 2
+
+        importance_score = max(0, min(3, int(bullet_obj.get('importance', 0)))) * 3
+        core_score = 2 if bullet_obj.get('core') else 0
+        return tiered_keyword_score + tag_score + importance_score + priority_score + core_score
 
     selected = []
+    chosen_security_support = False
+
     for project in projects or []:
         bullet_objects = normalize_bullet_list(project.get('bullet_objects', project.get('bullets', [])))
         if not bullet_objects:
@@ -1545,46 +1676,133 @@ def select_project_bullets_deterministic(
             selected.append(updated)
             continue
 
-        core_items = [(idx, b) for idx, b in enumerate(bullet_objects) if b.get('core')]
-        non_core_items = [(idx, b) for idx, b in enumerate(bullet_objects) if not b.get('core')]
+        indexed = list(enumerate(bullet_objects))
+        always_pairs = []
+        candidate_pairs = []
+        all_rows = []
 
-        chosen_pairs = []
-        for idx, bullet_obj in core_items:
-            chosen_pairs.append((idx, bullet_obj))
+        for idx, bullet_obj in indexed:
+            try:
+                raw_importance = int(bullet_obj.get('importance', 0))
+            except Exception:
+                raw_importance = 0
+            raw_importance = max(0, min(3, raw_importance))
+            importance = max(1, raw_importance)
+            is_core = bool(bullet_obj.get('core'))
+            tags = {_normalize_term(tag) for tag in (bullet_obj.get('tags', []) or []) if _normalize_term(tag)}
+            relevant, explicit = _bullet_relevance_signals(
+                bullet_obj=bullet_obj,
+                jd_norm=jd_norm,
+                jd_words=jd_words,
+                jd_tech_terms=jd_tech_terms,
+            )
 
-        scored_non_core = []
-        for idx, bullet_obj in non_core_items:
-            scored_non_core.append((score_bullet(bullet_obj), idx, bullet_obj))
-        scored_non_core.sort(key=lambda t: (-t[0], t[1]))
+            include_by_importance = False
+            if importance >= 3:
+                include_by_importance = True
+            elif importance == 2 and relevant:
+                include_by_importance = True
+            elif importance == 1 and explicit:
+                include_by_importance = True
 
-        # Never drop core bullets. If cores exceed max, keep all core.
-        if len(chosen_pairs) < max_bullets:
-            remaining = max_bullets - len(chosen_pairs)
-            for _, idx, bullet_obj in scored_non_core[:remaining]:
-                chosen_pairs.append((idx, bullet_obj))
+            if junior_or_graduate and is_core:
+                include_by_importance = True
 
-        # Never output only 1 bullet for a selected project.
-        if len(chosen_pairs) < min_bullets:
-            already = {i for i, _ in chosen_pairs}
-            for _, idx, bullet_obj in scored_non_core:
-                if idx in already:
+            security_support_candidate = bool(tags & SWE_SECURITY_SUPPORT_TAGS) or any(
+                marker in _normalize_term(bullet_obj.get('text', ''))
+                for marker in ('security pipeline', 'ci/cd', 'ci cd', 'sast', 'dast')
+            )
+
+            row = {
+                'idx': idx,
+                'bullet': bullet_obj,
+                'score': score_bullet(bullet_obj),
+                'importance': importance,
+                'core': is_core,
+                'security_support_candidate': security_support_candidate,
+            }
+            all_rows.append(row)
+
+            if include_by_importance:
+                always_pairs.append(row)
+            elif importance >= 3:
+                candidate_pairs.append(row)
+            elif importance == 2 and relevant:
+                candidate_pairs.append(row)
+            elif importance == 1 and explicit:
+                candidate_pairs.append(row)
+            elif profile_focus == 'software_fullstack' and security_support_candidate and importance >= 2:
+                candidate_pairs.append(row)
+
+        # For software/full-stack roles, include only one security-pipeline support bullet
+        # unless multiple are mandatory by the global importance/core rules.
+        if profile_focus == 'software_fullstack' and not chosen_security_support:
+            support_candidates = [r for r in candidate_pairs if r.get('security_support_candidate')]
+            if support_candidates:
+                support_candidates.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
+                promoted = support_candidates[0]
+                candidate_pairs = [r for r in candidate_pairs if r.get('idx') != promoted.get('idx')]
+                always_pairs.append(promoted)
+                chosen_security_support = True
+        elif profile_focus == 'software_fullstack' and chosen_security_support:
+            candidate_pairs = [r for r in candidate_pairs if not r.get('security_support_candidate')]
+
+        # Dedupe mandatory rows by source index.
+        dedup_always = {}
+        for row in always_pairs:
+            dedup_always[int(row.get('idx', 0))] = row
+        always_pairs = list(dedup_always.values())
+        if profile_focus == 'software_fullstack' and any(r.get('security_support_candidate') for r in always_pairs):
+            chosen_security_support = True
+
+        chosen_rows = sorted(always_pairs, key=lambda r: int(r.get('idx', 0)))
+        chosen_idx = {int(r.get('idx', 0)) for r in chosen_rows}
+
+        # Keep all mandatory bullets; if they exceed max, do not drop them.
+        target_count = max(len(chosen_rows), max_bullets)
+        candidate_pairs.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
+        for row in candidate_pairs:
+            if len(chosen_rows) >= target_count:
+                break
+            idx = int(row.get('idx', 0))
+            if idx in chosen_idx:
+                continue
+            chosen_rows.append(row)
+            chosen_idx.add(idx)
+
+        # Respect minimum bullet count without violating inclusion rules.
+        if len(chosen_rows) < min_bullets:
+            for row in candidate_pairs:
+                idx = int(row.get('idx', 0))
+                if idx in chosen_idx:
                     continue
-                chosen_pairs.append((idx, bullet_obj))
-                already.add(idx)
-                if len(chosen_pairs) >= min_bullets:
+                chosen_rows.append(row)
+                chosen_idx.add(idx)
+                if len(chosen_rows) >= min_bullets:
                     break
-            if len(chosen_pairs) < min_bullets:
-                for idx, bullet_obj in enumerate(bullet_objects):
-                    if idx in already:
+        if len(chosen_rows) < min_bullets:
+            fallback_rows = [r for r in all_rows if int(r.get('idx', 0)) not in chosen_idx]
+            fallback_rows.sort(key=lambda r: (-int(r.get('score', 0)), int(r.get('idx', 0))))
+            if profile_focus == 'software_fullstack' and chosen_security_support:
+                for row in fallback_rows:
+                    if row.get('security_support_candidate'):
                         continue
-                    chosen_pairs.append((idx, bullet_obj))
-                    already.add(idx)
-                    if len(chosen_pairs) >= min_bullets:
+                    chosen_rows.append(row)
+                    chosen_idx.add(int(row.get('idx', 0)))
+                    if len(chosen_rows) >= min_bullets:
+                        break
+            if len(chosen_rows) < min_bullets:
+                for row in fallback_rows:
+                    idx = int(row.get('idx', 0))
+                    if idx in chosen_idx:
+                        continue
+                    chosen_rows.append(row)
+                    chosen_idx.add(idx)
+                    if len(chosen_rows) >= min_bullets:
                         break
 
-        # Keep output in original resume order while preserving core-inclusion rule.
-        chosen_pairs.sort(key=lambda t: t[0])
-        chosen_objects = [b for _, b in chosen_pairs]
+        chosen_rows.sort(key=lambda r: int(r.get('idx', 0)))
+        chosen_objects = [r.get('bullet', {}) for r in chosen_rows]
         chosen_bullets = [b.get('text', '') for b in chosen_objects if b.get('text', '')]
 
         updated = dict(project)
@@ -3670,6 +3888,7 @@ def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) ->
         "DO NOT invent or exaggerate experience, achievements, or skills.\n\n"
         "DO NOT add fake metrics, fake projects, or fake responsibilities.\n\n"
         "Only use information that already exists in my resume.\n\n"
+        "Never add technologies, tools, or outcomes that are not already present in my resume.\n\n"
         "If something is not in my resume, do not mention it.\n\n"
         "You may reword and present my experience in a stronger way, but the meaning must stay truthful.\n\n"
         "Use keywords and language from the job description where relevant, but only when it matches my actual experience.\n\n"
@@ -4065,7 +4284,13 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     volunteer_entries = []
     projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
-    # Keep all source bullets; no project bullet pruning.
+    projects = select_project_bullets_deterministic(
+        projects=projects,
+        job_text=raw_job_text,
+        max_bullets_per_project=int(strategy.get('max_bullets_per_project', 3)),
+        min_bullets_per_project=int(strategy.get('min_bullets_per_project', 2)),
+        role_category=str(classification.get('primary_category', 'unknown')),
+    )
 
     grouped_skills = parsed_resume.get('skills_grouped', {})
     ordered_grouped_skills, _ordered_skills = reorder_skill_groups(
