@@ -198,6 +198,18 @@ MOBILE_ROLE_TERMS = [
     'ios',
     'android',
 ]
+EXPLICIT_MOBILE_REQUIREMENT_TERMS = [
+    'react native',
+    'mobile development',
+    'mobile developer',
+    'mobile engineer',
+    'cross-platform apps',
+    'cross platform apps',
+    'cross-platform',
+    'cross platform',
+    'ios',
+    'android',
+]
 
 
 def normalize_text(text: str) -> str:
@@ -1243,15 +1255,21 @@ def classify_job(job_text: str) -> dict:
     return guarded
 
 
+def _has_explicit_mobile_requirement(job_text: str) -> bool:
+    norm = _normalize_term(job_text or '')
+    return any(_normalize_term(term) in norm for term in EXPLICIT_MOBILE_REQUIREMENT_TERMS)
+
+
 def _detect_role_profile(job_text: str, classification: dict | None = None) -> str:
     norm = _normalize_term(job_text or '')
     category = _normalize_term(str((classification or {}).get('primary_category', 'unknown')))
+    has_explicit_mobile = _has_explicit_mobile_requirement(job_text)
 
     if any(_normalize_term(term) in norm for term in PENTEST_ROLE_TERMS):
         return 'pentest'
     if any(_normalize_term(term) in norm for term in APPSEC_DEVSECOPS_ROLE_TERMS):
         return 'appsec_devsecops'
-    if any(_normalize_term(term) in norm for term in MOBILE_ROLE_TERMS):
+    if has_explicit_mobile and any(_normalize_term(term) in norm for term in MOBILE_ROLE_TERMS):
         return 'mobile'
     if any(_normalize_term(term) in norm for term in JUNIOR_GRADUATE_ROLE_TERMS):
         return 'graduate'
@@ -1452,9 +1470,11 @@ def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> l
     return sorted(projects, key=project_key)
 
 
-def filter_projects_for_role(projects: list[dict], role_profile: str) -> list[dict]:
+def filter_projects_for_role(projects: list[dict], role_profile: str, job_text: str = '') -> list[dict]:
     out = []
-    include_cancer = role_profile in {'graduate', 'mobile'}
+    include_cancer = role_profile == 'mobile' or (
+        role_profile == 'graduate' and _has_explicit_mobile_requirement(job_text)
+    )
     for project in projects or []:
         title = _normalize_term(project.get('title', ''))
         if role_profile == 'pentest' and 'job application assistant' in title:
@@ -4410,7 +4430,11 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     experience = [dict(e) for e in (parsed_resume.get('experience', []) or [])]
     volunteer_entries = []
     projects = [dict(p) for p in (parsed_resume.get('projects', {}) or {}).values()]
-    projects = filter_projects_for_role(projects, role_profile=str(strategy.get('role_profile', 'general')))
+    projects = filter_projects_for_role(
+        projects,
+        role_profile=str(strategy.get('role_profile', 'general')),
+        job_text=raw_job_text,
+    )
     projects = reorder_projects_by_priority(projects, strategy.get('project_priority', []))
     projects = select_project_bullets_deterministic(
         projects=projects,
