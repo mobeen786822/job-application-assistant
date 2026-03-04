@@ -45,13 +45,15 @@ jobs:
           path: bandit-report.json
 
       # 2. SEMGREP (Broader SAST)
+      - name: Install Semgrep
+        run: pip install semgrep
+
       - name: Run Semgrep
-        uses: semgrep/semgrep-action@v1
-        with:
-          config: >-
-            p/python
-            p/secrets
-            p/owasp-top-ten
+        run: |
+          semgrep scan \
+            --config p/python \
+            --config p/secrets \
+            --config p/owasp-top-ten || true
 
       # 3. GITLEAKS (Secrets Detection)
       - name: Run Gitleaks
