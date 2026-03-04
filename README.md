@@ -146,7 +146,6 @@ This repo includes `.github/workflows/security.yml`, a CI security pipeline that
 Pipeline coverage:
 
 - `Bandit`: Python SAST for insecure coding patterns in source code.
-- `Semgrep`: broader static analysis for Python issues, secrets exposure patterns, and OWASP-style risks.
 - `Gitleaks`: git-history and code scanning for leaked credentials/secrets.
 - `pip-audit`: dependency vulnerability scanning against known advisories from `requirements.txt`.
 
