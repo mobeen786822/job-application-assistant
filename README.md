@@ -154,3 +154,8 @@ Enforcement behavior:
 - Reports are uploaded as workflow artifacts and summarized in the GitHub Actions run summary.
 - A policy job runs after scanning and fails the workflow when `Bandit` reports any `HIGH` severity findings.
 - The policy job also fails when vulnerable dependencies are detected by `pip-audit`, blocking merge until remediated.
+
+Bandit finding note:
+
+- A `Bandit` `B104` (possible bind to all interfaces) finding was identified at `web_app.py` line 586.
+- This binding to `0.0.0.0` is intentional for deployment, and the line is explicitly documented with `# nosec B104` to suppress the false-positive warning.
