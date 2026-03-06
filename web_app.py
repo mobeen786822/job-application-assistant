@@ -3,8 +3,14 @@ import os
 import subprocess
 import tempfile
 import time
+import sys
+import importlib.machinery
+import importlib.util
+from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
-from flask import Flask, request, render_template_string, send_from_directory, url_for, Response
+from flask import Flask, request, render_template_string, send_from_directory, url_for, Response, redirect, session
+from flask_session import Session
 from tools.resume_bot import (
     assess_job_fit,
     choose_resume_strategy,
@@ -16,11 +22,235 @@ from tools.resume_bot import (
 )
 
 APP_ROOT = Path(__file__).resolve().parent
+
+
+def load_supabase_create_client():
+    search_paths = []
+    for raw_path in sys.path:
+        candidate = Path(raw_path or '.').resolve()
+        if candidate == APP_ROOT:
+            continue
+        search_paths.append(raw_path)
+    spec = importlib.machinery.PathFinder.find_spec('supabase', search_paths)
+    if not spec or not spec.loader:
+        raise ImportError('supabase package is not installed.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, 'create_client')
+
+
+def load_env_file(path: Path) -> None:
+    if not path.exists() or not path.is_file():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip().lstrip('\ufeff')
+        value = value.strip()
+        if not key:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+load_env_file(APP_ROOT / '.env')
+
 DEFAULT_RESUME = os.environ.get('RESUME_JSON', str(APP_ROOT / 'assets' / 'resume.json'))
 DEFAULT_TEMPLATE = os.environ.get('RESUME_TEMPLATE', str(APP_ROOT / 'assets' / 'template.html'))
 OUTPUT_DIR = os.environ.get('RESUME_OUTPUT_DIR', str(Path(tempfile.gettempdir()) / 'job-application-assistant'))
+MAX_MONTHLY_GENERATIONS = 10
+SUPABASE_URL = (os.environ.get('SUPABASE_URL') or '').strip()
+SUPABASE_ANON_KEY = (os.environ.get('SUPABASE_ANON_KEY') or '').strip()
+SUPABASE_SERVICE_KEY = (os.environ.get('SUPABASE_SERVICE_KEY') or '').strip()
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'change-me-in-production')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = str(APP_ROOT / '.flask_session')
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_USE_SIGNER'] = True
+Session(app)
+
+try:
+    create_client = load_supabase_create_client()
+except Exception:
+    create_client = None
+
+SUPABASE_AUTH_CLIENT = None
+SUPABASE_SERVICE_CLIENT = None
+if create_client and SUPABASE_URL and SUPABASE_ANON_KEY:
+    SUPABASE_AUTH_CLIENT = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+if create_client and SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    SUPABASE_SERVICE_CLIENT = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+
+def supabase_is_configured() -> bool:
+    return bool(SUPABASE_AUTH_CLIENT and SUPABASE_SERVICE_CLIENT)
+
+
+def current_user() -> dict | None:
+    user_id = session.get('user_id')
+    email = session.get('user_email')
+    access_token = session.get('sb_access_token')
+    refresh_token = session.get('sb_refresh_token')
+    if not (user_id and email and access_token and refresh_token):
+        return None
+    return {
+        'id': user_id,
+        'email': email,
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+    }
+
+
+def login_required(handler):
+    @wraps(handler)
+    def wrapped(*args, **kwargs):
+        if not current_user():
+            return redirect(url_for('login', next=request.path))
+        return handler(*args, **kwargs)
+    return wrapped
+
+
+def _safe_next_path(next_value: str | None) -> str:
+    if next_value and next_value.startswith('/') and not next_value.startswith('//'):
+        return next_value
+    return url_for('index')
+
+
+def _extract_job_title(job_text: str) -> str:
+    for line in job_text.splitlines():
+        candidate = line.strip()
+        if candidate:
+            return candidate[:120]
+    return 'Unknown role'
+
+
+def _get_local_generations() -> list[dict]:
+    return list(session.get('local_generations') or [])
+
+
+def _append_local_generation(job_title: str, detected_role_type: str, status: str) -> None:
+    rows = _get_local_generations()
+    rows.append(
+        {
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'job_title': job_title,
+            'detected_role_type': detected_role_type,
+            'status': status,
+        }
+    )
+    session['local_generations'] = rows[-200:]
+
+
+def _month_window_utc(now_utc: datetime | None = None) -> tuple[str, str]:
+    now_utc = now_utc or datetime.now(timezone.utc)
+    start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+    return start.isoformat(), end.isoformat()
+
+
+def _get_user_data_client():
+    user = current_user()
+    if not user or not SUPABASE_AUTH_CLIENT:
+        return None
+    client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    client.auth.set_session(user['access_token'], user['refresh_token'])
+    return client
+
+
+def get_current_month_generation_count() -> int:
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    if not client or not user:
+        return 0
+    try:
+        month_start, month_end = _month_window_utc()
+        resp = (
+            client.table('generations')
+            .select('id', count='exact')
+            .eq('user_id', user['id'])
+            .gte('created_at', month_start)
+            .lt('created_at', month_end)
+            .execute()
+        )
+        return int(resp.count or 0)
+    except Exception:
+        logging.exception('Failed to query monthly generation count')
+        month_start, month_end = _month_window_utc()
+        count = 0
+        for row in _get_local_generations():
+            created = str(row.get('created_at') or '')
+            if month_start <= created < month_end:
+                count += 1
+        return count
+
+
+def get_generation_history(limit: int = 50) -> list[dict]:
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    if not client or not user:
+        return []
+    try:
+        resp = (
+            client.table('generations')
+            .select('created_at,job_title,detected_role_type,status')
+            .eq('user_id', user['id'])
+            .order('created_at', desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return resp.data or []
+    except Exception:
+        logging.exception('Failed to query generation history')
+        rows = _get_local_generations()
+        rows.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
+        return rows[:limit]
+
+
+def record_generation(job_title: str, detected_role_type: str, status: str) -> None:
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    if not user or not client:
+        return
+    try:
+        (
+            client.table('generations')
+            .insert(
+                {
+                    'user_id': user['id'],
+                    'job_title': job_title,
+                    'detected_role_type': detected_role_type,
+                    'status': status,
+                }
+            )
+            .execute()
+        )
+    except Exception:
+        logging.exception('Failed to insert generation record')
+        _append_local_generation(
+            job_title=job_title,
+            detected_role_type=detected_role_type,
+            status=status,
+        )
+
+
+def format_created_at(value: str | None) -> str:
+    raw = (value or '').strip()
+    if not raw:
+        return '-'
+    try:
+        dt = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        hour_12 = dt.hour % 12 or 12
+        return f"{dt.day:02d} {dt.strftime('%b %Y')}, {hour_12}:{dt.minute:02d} {'AM' if dt.hour < 12 else 'PM'}"
+    except Exception:
+        return raw
 
 
 def get_app_version() -> str:
@@ -65,42 +295,30 @@ PAGE = """
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Resume Tailor</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root {
-      --ink: #0f172a;
-      --muted: #5b6475;
-      --accent: #0ea5e9;
-      --accent-2: #22c55e;
-      --panel: #ffffff;
-      --panel-2: #f8fafc;
-      --stroke: #e2e8f0;
-      --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
-      --bg-base: #f1f5f9;
-      --bg-radial-1: #dbeafe;
-      --bg-radial-2: #ecfccb;
-    }
-
-    body[data-theme="dark"] {
       --ink: #e2e8f0;
       --muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-2: #34d399;
+      --accent: #67e8f9;
+      --accent-2: #22c55e;
       --panel: #0f172a;
-      --panel-2: #111827;
-      --stroke: #1f2937;
-      --shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
-      --bg-base: #0b1220;
-      --bg-radial-1: #0c2740;
-      --bg-radial-2: #1f2a1b;
+      --panel-2: #020617;
+      --stroke: #334155;
+      --shadow: 0 18px 60px -24px rgba(6, 182, 212, 0.45);
+      --bg-base: #030712;
+      --bg-radial-1: rgba(34, 197, 94, 0.16);
+      --bg-radial-2: rgba(6, 182, 212, 0.2);
     }
 
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Space Grotesk", "Sora", "Manrope", system-ui, sans-serif;
+      font-family: "DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(1200px 600px at 10% -10%, var(--bg-radial-1) 0%, rgba(219,234,254,0) 60%),
-        radial-gradient(1000px 600px at 100% 0%, var(--bg-radial-2) 0%, rgba(236,252,203,0) 55%),
+        radial-gradient(1200px 600px at 15% 10%, var(--bg-radial-1) 0%, rgba(34,197,94,0) 38%),
+        radial-gradient(1000px 600px at 80% 12%, var(--bg-radial-2) 0%, rgba(6,182,212,0) 36%),
+        radial-gradient(900px 500px at 50% 85%, rgba(14,116,144,0.2) 0%, rgba(14,116,144,0) 42%),
         var(--bg-base);
       background-repeat: no-repeat;
       background-attachment: fixed;
@@ -121,7 +339,7 @@ PAGE = """
       margin-bottom: 18px;
     }
 
-    h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.5px; }
+    h1 { font-family: "Space Grotesk", sans-serif; font-size: 26px; margin: 0 0 6px; letter-spacing: -0.5px; }
     .hint { color: var(--muted); font-size: 13.5px; }
 
     .card {
@@ -151,32 +369,39 @@ PAGE = """
       font-size: 14px;
       border-radius: 10px;
       border: 1px solid transparent;
-      background: linear-gradient(135deg, var(--accent), #38bdf8);
+      background: linear-gradient(135deg, #0e7490, #06b6d4);
       color: #fff;
       cursor: pointer;
     }
     button[disabled] { opacity: 0.6; cursor: not-allowed; }
     .secondary-btn { background: var(--panel-2); color: var(--ink); border: 1px solid var(--stroke); }
-    .theme-btn {
-      background: var(--panel);
-      color: var(--ink);
-      border: 1px solid var(--stroke);
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .nav-link {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
       padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: var(--panel-2);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
     }
-    .theme-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    .nav-link:hover {
+      border-color: #0e7490;
     }
 
     .loading { display: none; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
     .spinner {
-      width: 16px; height: 16px; border: 2px solid #c7d6e2; border-top-color: var(--accent);
+      width: 16px; height: 16px; border: 2px solid #334155; border-top-color: var(--accent);
       border-radius: 50%; animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -186,12 +411,12 @@ PAGE = """
     .actions a {
       display: inline-block;
       padding: 8px 12px;
-      background: linear-gradient(135deg, var(--accent-2), #86efac);
-      color: #052e16;
+      background: linear-gradient(135deg, #0e7490, #06b6d4);
+      color: #ecfeff;
       text-decoration: none;
       border-radius: 10px;
       font-size: 13px;
-      border: 1px solid #bbf7d0;
+      border: 1px solid #0e7490;
     }
     .preview { width: 100%; height: 780px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel); }
     .cover-box {
@@ -221,12 +446,6 @@ PAGE = """
       padding: 10px 12px;
       border-radius: 10px;
       font-size: 13px;
-      border: 1px solid #fecaca;
-      background: #fef2f2;
-      color: #991b1b;
-    }
-
-    body[data-theme="dark"] .alert {
       border: 1px solid #7f1d1d;
       background: #1f0a0a;
       color: #fecaca;
@@ -252,9 +471,9 @@ PAGE = """
       font-weight: 600;
       border: 1px solid transparent;
     }
-    .fit-apply { background: #dcfce7; color: #14532d; border-color: #bbf7d0; }
-    .fit-maybe { background: #fef9c3; color: #854d0e; border-color: #fde68a; }
-    .fit-no { background: #fee2e2; color: #7f1d1d; border-color: #fecaca; }
+    .fit-apply { background: #052e16; color: #86efac; border-color: #166534; }
+    .fit-maybe { background: #422006; color: #fde68a; border-color: #854d0e; }
+    .fit-no { background: #450a0a; color: #fecaca; border-color: #991b1b; }
     .fit-meta { font-size: 12px; color: var(--muted); }
     .fit-rationale { font-size: 13px; margin: 6px 0; }
     .fit-gaps { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
@@ -280,11 +499,12 @@ PAGE = """
       <div>
         <h1>Resume Tailor</h1>
         <div class="hint">Paste a job description and generate a tailored HTML + PDF. Build: <code>{{ app_version }}</code></div>
+        <div class="hint">Signed in as {{ user_email }}. This month: {{ monthly_used }}/{{ monthly_limit }} generations.</div>
       </div>
-      <button type="button" id="theme-toggle" class="theme-btn" aria-pressed="false">
-        <span class="theme-dot"></span>
-        <span id="theme-label">Dark mode</span>
-      </button>
+      <div class="header-right">
+        <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+      </div>
     </div>
 
     <div class="grid">
@@ -389,8 +609,6 @@ PAGE = """
   const clearBtn = document.getElementById('clear-btn');
   const loading = document.getElementById('loading');
   const loadingText = document.getElementById('loading-text');
-  const themeToggle = document.getElementById('theme-toggle');
-  const themeLabel = document.getElementById('theme-label');
   const steps = [
     'Parsing job description...',
     'Assessing fit...',
@@ -439,35 +657,395 @@ PAGE = """
       result.remove();
     }
   });
-
-  const applyTheme = (mode) => {
-    document.body.setAttribute('data-theme', mode);
-    const isDark = mode === 'dark';
-    themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-    themeLabel.textContent = isDark ? 'Light mode' : 'Dark mode';
-  };
-
-  const storedTheme = localStorage.getItem('theme');
-  if (storedTheme) {
-    applyTheme(storedTheme);
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    applyTheme('dark');
-  } else {
-    applyTheme('light');
-  }
-
-  themeToggle.addEventListener('click', () => {
-    const current = document.body.getAttribute('data-theme') || 'light';
-    const next = current === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-    localStorage.setItem('theme', next);
-  });
 </script>
 </html>
 """
 
 
+AUTH_PAGE = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+    :root {
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #67e8f9;
+      --panel: #0f172a;
+      --panel-2: #020617;
+      --stroke: #334155;
+      --shadow: 0 18px 60px -24px rgba(6, 182, 212, 0.45);
+      --bg-base: #030712;
+      --bg-radial-1: rgba(34, 197, 94, 0.16);
+      --bg-radial-2: rgba(6, 182, 212, 0.2);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 15% 10%, var(--bg-radial-1) 0%, rgba(34,197,94,0) 38%),
+        radial-gradient(1000px 600px at 80% 12%, var(--bg-radial-2) 0%, rgba(6,182,212,0) 36%),
+        radial-gradient(900px 500px at 50% 85%, rgba(14,116,144,0.2) 0%, rgba(14,116,144,0) 42%),
+        var(--bg-base);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 460px;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    h1 { margin: 0 0 6px; letter-spacing: -0.5px; font-family: "Space Grotesk", sans-serif; }
+    .hint { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 6px; }
+    input {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 14px;
+    }
+    button {
+      margin-top: 14px;
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0e7490, #06b6d4);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .sub {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .sub a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .alert {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+    .ok {
+      border-color: #166534;
+      background: #052e16;
+      color: #86efac;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>{{ title }}</h1>
+    <div class="hint">Resume Tailor account access via Supabase auth.</div>
+    {% if error_msg %}
+    <div class="alert">{{ error_msg }}</div>
+    {% endif %}
+    {% if success_msg %}
+    <div class="alert ok">{{ success_msg }}</div>
+    {% endif %}
+    <form method="post">
+      <input type="hidden" name="next" value="{{ next_path }}" />
+      <label>Email</label>
+      <input type="email" name="email" required autocomplete="email" />
+      <label>Password</label>
+      <input type="password" name="password" required autocomplete="current-password" />
+      <button type="submit">{{ submit_label }}</button>
+    </form>
+    <div class="sub">
+      {{ alt_text }} <a href="{{ alt_href }}">{{ alt_link }}</a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+DASHBOARD_PAGE = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+    :root {
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #67e8f9;
+      --panel: #0f172a;
+      --panel-2: #020617;
+      --stroke: #334155;
+      --shadow: 0 18px 60px -24px rgba(6, 182, 212, 0.45);
+      --bg-base: #030712;
+      --bg-radial-1: rgba(34, 197, 94, 0.16);
+      --bg-radial-2: rgba(6, 182, 212, 0.2);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 15% 10%, var(--bg-radial-1) 0%, rgba(34,197,94,0) 38%),
+        radial-gradient(1000px 600px at 80% 12%, var(--bg-radial-2) 0%, rgba(6,182,212,0) 36%),
+        radial-gradient(900px 500px at 50% 85%, rgba(14,116,144,0.2) 0%, rgba(14,116,144,0) 42%),
+        var(--bg-base);
+      min-height: 100vh;
+    }
+    .shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-family: "Space Grotesk", sans-serif; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: var(--panel-2);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .nav-link:hover {
+      border-color: #0e7490;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--stroke);
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="hint">{{ user_email }}</div>
+        <div class="hint">Build: <code>{{ app_version }}</code></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
+        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </div>
+    <div class="card">
+      <strong>Generations this month:</strong> {{ monthly_used }}/{{ monthly_limit }}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Past Generations</h3>
+      {% if generations %}
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Job title</th>
+            <th>Detected role type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in generations %}
+          <tr>
+            <td>{{ item.created_at }}</td>
+            <td>{{ item.job_title or '-' }}</td>
+            <td>{{ item.detected_role_type or '-' }}</td>
+            <td>{{ item.status or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="hint">No generations yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if not supabase_is_configured():
+        return Response('Supabase is not configured. Check .env keys.', status=500)
+    if current_user():
+        return redirect(url_for('index'))
+
+    error_msg = None
+    success_msg = None
+    next_path = _safe_next_path(request.args.get('next') or request.form.get('next'))
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip()
+        password = request.form.get('password') or ''
+        if not email or not password:
+            error_msg = 'Email and password are required.'
+        else:
+            try:
+                auth_resp = SUPABASE_AUTH_CLIENT.auth.sign_in_with_password(
+                    {'email': email, 'password': password}
+                )
+                user = auth_resp.user
+                user_session = auth_resp.session
+                if not user or not user_session:
+                    raise ValueError('Invalid login response from Supabase.')
+                session.clear()
+                session['user_id'] = str(user.id)
+                session['user_email'] = str(user.email or email)
+                session['sb_access_token'] = user_session.access_token
+                session['sb_refresh_token'] = user_session.refresh_token
+                return redirect(next_path)
+            except Exception:
+                logging.exception('Login failed')
+                error_msg = 'Login failed. Check your email/password and try again.'
+    return render_template_string(
+        AUTH_PAGE,
+        title='Login',
+        submit_label='Sign In',
+        alt_text='Need an account?',
+        alt_link='Create one',
+        alt_href=url_for('signup'),
+        error_msg=error_msg,
+        success_msg=success_msg,
+        next_path=next_path,
+    )
+
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if not supabase_is_configured():
+        return Response('Supabase is not configured. Check .env keys.', status=500)
+    if current_user():
+        return redirect(url_for('index'))
+
+    error_msg = None
+    success_msg = None
+    next_path = _safe_next_path(request.args.get('next') or request.form.get('next'))
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip()
+        password = request.form.get('password') or ''
+        if not email or not password:
+            error_msg = 'Email and password are required.'
+        else:
+            try:
+                signup_resp = SUPABASE_AUTH_CLIENT.auth.sign_up(
+                    {'email': email, 'password': password}
+                )
+                if signup_resp.session and signup_resp.user:
+                    session.clear()
+                    session['user_id'] = str(signup_resp.user.id)
+                    session['user_email'] = str(signup_resp.user.email or email)
+                    session['sb_access_token'] = signup_resp.session.access_token
+                    session['sb_refresh_token'] = signup_resp.session.refresh_token
+                    return redirect(next_path)
+                success_msg = 'Signup succeeded. Confirm your email if required, then log in.'
+            except Exception:
+                logging.exception('Signup failed')
+                error_msg = 'Signup failed. Try a stronger password or a different email.'
+    return render_template_string(
+        AUTH_PAGE,
+        title='Sign Up',
+        submit_label='Create Account',
+        alt_text='Already have an account?',
+        alt_link='Log in',
+        alt_href=url_for('login'),
+        error_msg=error_msg,
+        success_msg=success_msg,
+        next_path=next_path,
+    )
+
+
+@app.route('/logout')
+def logout():
+    user = current_user()
+    if user and SUPABASE_AUTH_CLIENT:
+        try:
+            client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+            client.auth.set_session(user['access_token'], user['refresh_token'])
+            client.auth.sign_out()
+        except Exception:
+            logging.exception('Supabase sign_out failed')
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    monthly_used = get_current_month_generation_count()
+    generations = get_generation_history(limit=100)
+    for item in generations:
+        item['created_at'] = format_created_at(item.get('created_at'))
+    return render_template_string(
+        DASHBOARD_PAGE,
+        user_email=(current_user() or {}).get('email', ''),
+        monthly_used=monthly_used,
+        monthly_limit=MAX_MONTHLY_GENERATIONS,
+        generations=generations,
+        app_version=get_app_version(),
+    )
+
+
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
     html_path = None
     pdf_path = None
@@ -483,13 +1061,21 @@ def index():
     strategy_name = None
     job_text_value = ''
     error_msg = None
+    user = current_user()
+    monthly_used = get_current_month_generation_count()
     if request.method == 'POST':
         try:
             cleanup_old_output_files()
             job_text = request.form.get('job_text', '').strip()
             job_text_value = job_text
+            monthly_used = get_current_month_generation_count()
+            if monthly_used >= MAX_MONTHLY_GENERATIONS:
+                raise ValueError(
+                    f'You have reached your monthly generation limit ({MAX_MONTHLY_GENERATIONS}).'
+                )
             label = 'Tailored'
             job_label = None
+            role_type = 'unknown'
             if job_text:
                 resume_text = resume_json_to_text(load_resume_json(DEFAULT_RESUME))
                 fit = assess_job_fit(job_text=job_text, resume_text=resume_text)
@@ -497,6 +1083,7 @@ def index():
                 strategy = choose_resume_strategy(classification)
                 detected_focus = classification
                 strategy_name = strategy.get('name')
+                role_type = (classification or {}).get('primary_category') or 'unknown'
             else:
                 raise ValueError('Please paste a job description first.')
 
@@ -531,9 +1118,18 @@ def index():
             except (Exception, SystemExit):
                 logging.exception("Cover letter generation skipped")
                 cover_text = "Cover letter unavailable. Resume generation completed."
-        except (Exception, SystemExit):
+            record_generation(
+                job_title=_extract_job_title(job_text),
+                detected_role_type=role_type,
+                status='success',
+            )
+            monthly_used += 1
+        except (Exception, SystemExit) as exc:
             logging.exception("Resume generation failed")
-            error_msg = "Something went wrong. Please try again or check your job description."
+            if isinstance(exc, ValueError):
+                error_msg = str(exc)
+            else:
+                error_msg = "Something went wrong. Please try again or check your job description."
 
     return render_template_string(
         PAGE,
@@ -552,15 +1148,20 @@ def index():
         job_text_value=job_text_value,
         error_msg=error_msg,
         app_version=get_app_version(),
+        user_email=(user or {}).get('email', ''),
+        monthly_used=monthly_used,
+        monthly_limit=MAX_MONTHLY_GENERATIONS,
     )
 
 
 @app.route('/outputs/<path:filename>')
+@login_required
 def download_output(filename: str):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=False)
 
 
 @app.route('/preview/<path:filename>')
+@login_required
 def preview_output(filename: str):
     path = Path(OUTPUT_DIR) / filename
     if not path.exists():

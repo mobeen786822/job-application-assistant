@@ -1,8 +1,11 @@
 __pycache__/
 *.py[cod]
 outputs/
+.env
+.env.*
 .claude/worktrees/
 tmp_job.txt
 .claude/settings.local.json
 .venv/
 .venv-1/
+.flask_session/
