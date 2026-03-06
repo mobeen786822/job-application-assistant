@@ -16,6 +16,27 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
   - no cloud-provider substitution (for example `Firebase -> AWS`)
 - Optional AI "light rephrase" layer with hard validation and deterministic fallback
 
+## SaaS Extension
+
+The platform has been extended into a multi-user SaaS with:
+
+- **Supabase Auth** — email/password login with server-side Flask session management
+- **Generation dashboard** — per-user history showing date, job title, detected role type, and status
+- **Monthly usage limits** — enforced server-side at 10 generations/month per user, blocking AI API calls when limit is reached
+- **Row Level Security** — Supabase RLS policies ensure users can only access their own generation history
+
+### Database Schema
+```sql
+CREATE TABLE generations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users,
+  created_at timestamptz DEFAULT now(),
+  job_title text,
+  detected_role_type text,
+  status text
+);
+```
+
 ## Project Structure
 
 - `web_app.py` - Flask web app (default port `5055`)
@@ -33,8 +54,9 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 Install dependencies:
 
 ```powershell
-python -m pip install flask openai anthropic playwright
+python -m pip install flask openai anthropic playwright supabase flask-session python-dotenv
 python -m playwright install chromium
+
 ```
 
 ## Run the Web App
