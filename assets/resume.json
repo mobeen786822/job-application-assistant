@@ -191,6 +191,41 @@
       ]
     },
     {
+      "name": "LLM Security Tester",
+      "links": {
+        "github": "https://github.com/mobeen786822/llm-security-tester",
+        "live": "",
+        "website": ""
+      },
+      "technologies": ["Python", "Flask", "React", "Vite", "Tailwind CSS", "Ollama", "Anthropic API"],
+      "bullets": [
+        {
+          "text": "Built a full-stack security testing tool that probes LLMs for prompt injection, jailbreaking, system prompt extraction, data exfiltration, and role confusion attacks across 15 test cases.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "ai", "appsec"]
+        },
+        {
+          "text": "Compared Llama 3.2 (local via Ollama) against Claude Haiku — Llama achieved 15/15 resistant while Haiku returned 3 FAIL and 5 PARTIAL, with HIGH severity prompt injection failures.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "ai", "findings"]
+        },
+        {
+          "text": "Built a React/Tailwind dashboard with per-category breakdowns, severity badges, expandable prompt/response rows, and JSON report export.",
+          "core": false,
+          "importance": 2,
+          "tags": ["react", "frontend", "dashboard"]
+        },
+        {
+          "text": "Designed an extensible JSON attack library so new test cases and categories can be added without modifying backend or frontend code.",
+          "core": false,
+          "importance": 2,
+          "tags": ["architecture", "extensibility"]
+        }
+      ]
+    },
+    {
       "name": "Cancer Awareness Mobile App",
       "links": {
         "github": "",
