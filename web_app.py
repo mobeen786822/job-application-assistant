@@ -65,6 +65,11 @@ MAX_MONTHLY_GENERATIONS = 10
 SUPABASE_URL = (os.environ.get('SUPABASE_URL') or '').strip()
 SUPABASE_ANON_KEY = (os.environ.get('SUPABASE_ANON_KEY') or '').strip()
 SUPABASE_SERVICE_KEY = (os.environ.get('SUPABASE_SERVICE_KEY') or '').strip()
+UNLIMITED_USAGE_EMAILS = {
+    x.strip().lower()
+    for x in (os.environ.get('UNLIMITED_USAGE_EMAILS') or '').split(',')
+    if x.strip()
+}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'change-me-in-production')
@@ -104,6 +109,12 @@ def current_user() -> dict | None:
         'access_token': access_token,
         'refresh_token': refresh_token,
     }
+
+
+def has_unlimited_usage(user: dict | None) -> bool:
+    if not user:
+        return False
+    return (user.get('email') or '').strip().lower() in UNLIMITED_USAGE_EMAILS
 
 
 def login_required(handler):
@@ -1030,15 +1041,17 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    user = current_user()
+    unlimited = has_unlimited_usage(user)
     monthly_used = get_current_month_generation_count()
     generations = get_generation_history(limit=100)
     for item in generations:
         item['created_at'] = format_created_at(item.get('created_at'))
     return render_template_string(
         DASHBOARD_PAGE,
-        user_email=(current_user() or {}).get('email', ''),
+        user_email=(user or {}).get('email', ''),
         monthly_used=monthly_used,
-        monthly_limit=MAX_MONTHLY_GENERATIONS,
+        monthly_limit='Unlimited' if unlimited else MAX_MONTHLY_GENERATIONS,
         generations=generations,
         app_version=get_app_version(),
     )
@@ -1062,14 +1075,16 @@ def index():
     job_text_value = ''
     error_msg = None
     user = current_user()
+    unlimited = has_unlimited_usage(user)
     monthly_used = get_current_month_generation_count()
+    monthly_limit_display = 'Unlimited' if unlimited else MAX_MONTHLY_GENERATIONS
     if request.method == 'POST':
         try:
             cleanup_old_output_files()
             job_text = request.form.get('job_text', '').strip()
             job_text_value = job_text
             monthly_used = get_current_month_generation_count()
-            if monthly_used >= MAX_MONTHLY_GENERATIONS:
+            if not unlimited and monthly_used >= MAX_MONTHLY_GENERATIONS:
                 raise ValueError(
                     f'You have reached your monthly generation limit ({MAX_MONTHLY_GENERATIONS}).'
                 )
@@ -1150,7 +1165,7 @@ def index():
         app_version=get_app_version(),
         user_email=(user or {}).get('email', ''),
         monthly_used=monthly_used,
-        monthly_limit=MAX_MONTHLY_GENERATIONS,
+        monthly_limit=monthly_limit_display,
     )
 
 
