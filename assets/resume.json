@@ -33,7 +33,7 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["Python", "Flask", "Anthropic Claude API", "OpenAI API", "HTML", "PDF", "GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "Tailscale"],
+      "technologies": ["Python", "Flask", "Anthropic Claude API", "OpenAI API", "Supabase", "Flask-Session", "GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "Tailscale"],
       "bullets": [
         {
           "text": "Designed and developed a full-stack AI-assisted resume tailoring platform that generates structured HTML and PDF outputs from job descriptions using Anthropic Claude and OpenAI APIs with dual-provider fallback logic.",
@@ -46,6 +46,18 @@
           "core": true,
           "importance": 3,
           "tags": ["ai", "validation", "integrity", "api"]
+        },
+        {
+          "text": "Extended the platform into a multi-user SaaS with Supabase Auth, server-side Flask sessions, and a per-user generation dashboard tracking usage history.",
+          "core": true,
+          "importance": 3,
+          "tags": ["saas", "auth", "supabase"]
+        },
+        {
+          "text": "Implemented monthly usage limits enforced server-side — blocking generation requests at 10/month per user without hitting the AI API, with usage tracked in Supabase with RLS-enforced data isolation.",
+          "core": true,
+          "importance": 3,
+          "tags": ["saas", "rate-limiting", "security"]
         },
         {
           "text": "Built a GitHub Actions CI/CD security pipeline with Bandit, Semgrep, Gitleaks, and pip-audit — scanning for vulnerabilities, secrets, and CVEs on every push to main.",
@@ -115,7 +127,7 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": ["JavaScript", "Next.js", "Supabase", "SendGrid", "ACSC Essential Eight"],
+      "technologies": ["JavaScript", "Next.js", "Supabase", "Vercel", "SendGrid", "Tailwind CSS", "ACSC Essential Eight"],
       "bullets": [
         {
           "text": "Built and launched a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model, deployed on Vercel with Supabase for data persistence.",
@@ -140,6 +152,41 @@
           "core": false,
           "importance": 1,
           "tags": ["marketing", "launch"]
+        }
+      ]
+    },
+    {
+      "name": "Local LLM Benchmark — Ollama",
+      "links": {
+        "github": "https://github.com/mobeen786822/local-llm-benchmark",
+        "live": "",
+        "website": ""
+      },
+      "technologies": ["Python", "Ollama", "Llama 3.2", "Phi-3 Mini", "Gemma 2", "Ubuntu", "VirtualBox"],
+      "bullets": [
+        {
+          "text": "Benchmarked three small language models (Llama 3.2, Phi-3 Mini, Gemma 2) running entirely offline via Ollama on a CPU-only Ubuntu VM, with no GPU or cloud API dependency.",
+          "core": true,
+          "importance": 3,
+          "tags": ["ai", "local-ai", "benchmarking"]
+        },
+        {
+          "text": "Designed a Python benchmarking script evaluating all 3 models across 4 task types (summarisation, JSON extraction, code generation, and multi-step reasoning) — 12 data points total.",
+          "core": true,
+          "importance": 3,
+          "tags": ["python", "benchmarking", "ai"]
+        },
+        {
+          "text": "Identified task-specific failure modes including two 120s timeouts that would not surface in quality-only evaluations, informing model selection recommendations by task type.",
+          "core": true,
+          "importance": 3,
+          "tags": ["ai", "reliability", "findings"]
+        },
+        {
+          "text": "Documented speed vs quality tradeoffs: Gemma 2 fastest at 4.8 tok/s, Llama 3.2 most reliable (4/4 tasks), Phi-3 Mini best code quality but unreliable on structured output.",
+          "core": false,
+          "importance": 2,
+          "tags": ["ai", "benchmarking", "findings"]
         }
       ]
     },
@@ -234,7 +281,7 @@
     "testing": ["Jest", "Vitest", "React Testing Library", "ESLint"],
     "security": ["Cybersecurity", "System Security", "Cloud Security (Foundational)", "Networking", "Kali Linux", "Nmap", "Metasploit", "Wireshark", "Burp Suite", "Penetration Testing", "Vulnerability Assessment", "Incident Response", "Threat Intelligence", "Network Segmentation", "Log Analysis", "Firewall Configuration"],
     "devsecops": ["GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "npm audit", "SAST", "Dependency Scanning", "Secrets Detection", "CI/CD Security"],
-    "tools": ["Git", "Docker", "Tailscale"]
+    "tools": ["Git", "Docker", "Tailscale", "Ollama"]
   },
   "certifications": ["AWS Academy Graduate – AWS Academy Cloud Foundations award"]
 }
