@@ -47,6 +47,11 @@ jobs:
             git fetch origin
             git checkout main
             git reset --hard origin/main
+            if [ -x ".venv/bin/pip" ]; then
+              .venv/bin/pip install -r requirements.txt
+            else
+              python3 -m pip install -r requirements.txt
+            fi
             sudo systemctl restart resume-tailor
             sudo systemctl is-active resume-tailor
             git rev-parse --short HEAD
