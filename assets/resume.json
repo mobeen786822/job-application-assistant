@@ -225,6 +225,42 @@
         }
       ]
     },
+
+    {
+      "name": "Web Vulnerability Scanner",
+      "links": {
+        "github": "https://github.com/mobeen786822/web-vulnerability-scanner",
+        "live": "",
+        "website": ""
+      },
+      "technologies": ["Python", "Flask", "React", "Vite", "Tailwind CSS", "Bandit", "pip-audit", "GitHub Actions"],
+      "bullets": [
+        {
+          "text": "Built a full-stack web vulnerability scanner with 6 scanner modules covering security headers, SSL/TLS, sensitive path exposure, cookie flags, open redirects, and information disclosure.",
+          "core": true,
+          "importance": 3,
+          "tags": ["security", "appsec", "full-stack"]
+        },
+        {
+          "text": "Implemented concurrent URL scanning via ThreadPoolExecutor — each URL scanned in parallel with a shared requests.Session for efficiency, supporting single and batch scan modes.",
+          "core": true,
+          "importance": 3,
+          "tags": ["python", "concurrency", "architecture"]
+        },
+        {
+          "text": "Built a React/Tailwind dashboard with severity-coded findings (CRITICAL/HIGH/MEDIUM/LOW/INFO), collapsible per-URL sections, and client-side JSON report export.",
+          "core": false,
+          "importance": 2,
+          "tags": ["react", "frontend", "dashboard"]
+        },
+        {
+          "text": "Added a GitHub Actions CI/CD security pipeline with Bandit SAST, Gitleaks secrets detection, and pip-audit dependency scanning with fail-gate on HIGH findings.",
+          "core": false,
+          "importance": 2,
+          "tags": ["security", "ci-cd", "devsecops"]
+        }
+      ]
+    },
     {
       "name": "Cancer Awareness Mobile App",
       "links": {
