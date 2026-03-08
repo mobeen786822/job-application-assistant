@@ -230,7 +230,7 @@
       "name": "Web Vulnerability Scanner",
       "links": {
         "github": "https://github.com/mobeen786822/web-vulnerability-scanner",
-        "live": "",
+        "live": "https://web-vulnerability-scanner-lqy5.onrender.com/",
         "website": ""
       },
       "technologies": ["Python", "Flask", "React", "Vite", "Tailwind CSS", "Bandit", "pip-audit", "GitHub Actions"],
