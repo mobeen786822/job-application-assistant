@@ -377,7 +377,7 @@
   "skills": {
     "languages": ["JavaScript", "TypeScript", "Python", "Java", "C++", "SQL", "PL/SQL"],
     "frontend": ["React", "React Native", "Next.js", "Vite", "Tailwind CSS", "Framer Motion", "React Router", "HTML", "CSS"],
-    "backend": ["FastAPI", "Flask", "REST API Integration", "SQLAlchemy", "Axios", "Firebase", "Cloud Firestore", "NoSQL", "Docker", "Nginx"],
+    "backend": ["FastAPI", "Flask", "REST API Integration", "SQLAlchemy", "Axios", "Supabase", "Firebase", "Cloud Firestore", "NoSQL", "Docker", "Nginx"],
     "testing": ["Jest", "Vitest", "React Testing Library", "ESLint"],
     "security": ["Cybersecurity", "System Security", "Cloud Security (Foundational)", "Networking", "Kali Linux", "Nmap", "Metasploit", "Wireshark", "Burp Suite", "Penetration Testing", "Vulnerability Assessment", "Incident Response", "Threat Intelligence", "Network Segmentation", "Log Analysis", "Firewall Configuration"],
     "devsecops": ["GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "npm audit", "SAST", "Dependency Scanning", "Secrets Detection", "CI/CD Security"],
