@@ -262,6 +262,35 @@
       ]
     },
     {
+      "name": "Cyber Content Bot",
+      "links": {
+        "github": "https://github.com/mobeen786822/cyber-content-bot",
+        "live": "https://cyber-content-bot-ui.onrender.com",
+        "website": ""
+      },
+      "technologies": ["Python", "Flask", "React", "TypeScript", "Vite", "Tailwind CSS", "Anthropic Claude API", "GitHub Actions"],
+      "bullets": [
+        {
+          "text": "Built an automated cybersecurity content pipeline that aggregates HIGH/CRITICAL CVEs from NVD, actively exploited vulnerabilities from CISA KEV, and AI security research from arXiv — then uses Claude Haiku to draft LinkedIn posts for review.",
+          "core": true,
+          "importance": 3,
+          "tags": ["ai", "automation", "security"]
+        },
+        {
+          "text": "Implemented tone control (professional/conversational/technical) and a React/TypeScript dashboard for draft review and one-click clipboard copy — deployed live on Render.",
+          "core": true,
+          "importance": 3,
+          "tags": ["python", "react", "automation"]
+        },
+        {
+          "text": "Resolved 6 CVEs in dependencies (Flask, Flask-CORS, Requests) and a HIGH severity Bandit B201 finding (hardcoded Flask debug mode) surfaced by the CI/CD security pipeline.",
+          "core": false,
+          "importance": 2,
+          "tags": ["security", "remediation", "devsecops"]
+        }
+      ]
+    },
+    {
       "name": "Cancer Awareness Mobile App",
       "links": {
         "github": "",
