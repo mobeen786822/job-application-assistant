@@ -127,7 +127,7 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": ["JavaScript", "Next.js", "Supabase", "Vercel", "SendGrid", "Tailwind CSS", "ACSC Essential Eight"],
+      "technologies": ["JavaScript", "Next.js", "Supabase", "Vercel", "SendGrid", "Tailwind CSS", "ACSC Essential Eight", "Web Vulnerability Scanner"],
       "bullets": [
         {
           "text": "Built and launched a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model, deployed on Vercel with Supabase for data persistence.",
