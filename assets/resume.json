@@ -152,6 +152,18 @@
           "core": false,
           "importance": 1,
           "tags": ["marketing", "launch"]
+        },
+        {
+          "text": "Integrated a live web vulnerability scanner into the results page — triggered after the Essential Eight assessment, with findings stored in Supabase and included in the HTML email report.",
+          "core": true,
+          "importance": 3,
+          "tags": ["integration", "security", "full-stack"]
+        },
+        {
+          "text": "Implemented an email gate for new users prior to scanning, with direct scan access for returning authenticated users.",
+          "core": false,
+          "importance": 2,
+          "tags": ["saas", "auth", "conversion"]
         }
       ]
     },
