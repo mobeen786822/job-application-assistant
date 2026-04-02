@@ -1148,8 +1148,8 @@ CLAUDE_MODEL_FAST=claude-haiku-4-5-20251001
 
 # Multi-user SaaS setup (optional; omit for single-user)
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_ANON_KEY=your-supabase-anon-key-here
+SUPABASE_SERVICE_KEY=your-supabase-service-key-here
 
 # Flask security
 FLASK_SECRET_KEY=your-random-secret-key-here
