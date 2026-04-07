@@ -1312,28 +1312,38 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
     degree = _extract_primary_degree(resume_json)
 
     who_i_am = 'Software Engineer'
-    if profile == 'appsec_devsecops':
+    if profile == 'appsec':
         who_i_am = 'Application Security-focused Software Engineer'
+    elif profile == 'devsecops':
+        who_i_am = 'DevSecOps-focused Software Engineer'
     elif profile == 'pentest':
         who_i_am = 'Offensive Security-focused Software Engineer'
     elif profile == 'mobile':
         who_i_am = 'Mobile-focused Software Engineer'
-    elif profile == 'graduate':
-        who_i_am = 'Graduate Software Engineer'
+    elif profile in {'graduate', 'graduate_developer', 'junior_swe', 'software_engineering'}:
+        who_i_am = 'Software Engineer'
 
     article = 'an' if who_i_am[:1].lower() in {'a', 'e', 'i', 'o', 'u'} else 'a'
     sentence_one = f"I am {article} {who_i_am} with a {degree}."
-    if profile == 'appsec_devsecops':
+    if profile == 'appsec':
         sentence_two = (
-            "I focus on security tooling across CI/CD, including SAST/DAST workflows, "
-            "vulnerability remediation, and production hardening."
+            "I focus on vulnerability remediation, secure SDLC practices, and production-hardening security workflows."
+        )
+    elif profile == 'devsecops':
+        sentence_two = (
+            "I focus on CI/CD security pipelines, automated scanning, and secure delivery automation."
         )
     elif profile == 'pentest':
         sentence_two = (
             "I focus on offensive security workflows, vulnerability assessment, "
             "penetration testing, and practical remediation outcomes."
         )
-    elif profile in {'software_engineering', 'graduate'}:
+    elif profile == 'ai_ml':
+        sentence_two = (
+            "I focus on machine learning systems, LLM evaluation, "
+            "and reliable model deployment workflows."
+        )
+    elif profile in {'software_engineering', 'graduate', 'graduate_developer', 'junior_swe'}:
         sentence_two = (
             "I build full-stack systems with AI-assisted features across React frontends, "
             "Python/API backends, and reliable deployment pipelines."
@@ -1640,18 +1650,25 @@ def _project_priority_by_role(role_profile: str) -> list[str]:
 def filter_projects_for_role(projects: list[dict], role_profile: str, job_text: str = '') -> list[dict]:
     priority_titles = _project_priority_by_role(role_profile)
     selected = []
-    allowed_keys = { _normalize_term(title) for title in priority_titles }
+    normalized_priority = [ _normalize_term(title) for title in priority_titles ]
+    allowed_keys = set(normalized_priority)
     for title in priority_titles:
+        target = _normalize_term(title)
         for project in projects or []:
-            if _normalize_term(project.get('title', '')) == _normalize_term(title):
+            proj_key = _normalize_term(project.get('title', ''))
+            if not proj_key:
+                continue
+            if proj_key == target or target in proj_key or proj_key in target:
                 selected.append(project)
                 break
-    # If fewer than 4 matched, preserve only any remaining allowed projects in original order.
+    # If fewer than 4 matched, preserve any remaining allowed projects in original order.
     for project in projects or []:
         if len(selected) >= 4:
             break
         proj_key = _normalize_term(project.get('title', ''))
-        if proj_key in allowed_keys and project not in selected:
+        if not proj_key:
+            continue
+        if any(marker in proj_key for marker in allowed_keys) and project not in selected:
             selected.append(project)
     return selected[:4]
 
