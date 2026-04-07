@@ -191,6 +191,16 @@ PENTEST_ROLE_TERMS = [
     'offensive security',
     'vulnerability assessment',
 ]
+AI_ML_ROLE_TERMS = [
+    'machine learning',
+    'ml engineer',
+    'ai engineer',
+    'artificial intelligence',
+    'data scientist',
+    'deep learning',
+    'computer vision',
+    'natural language processing',
+]
 MOBILE_ROLE_TERMS = [
     'mobile developer',
     'mobile engineer',
@@ -1264,20 +1274,29 @@ def _detect_role_profile(job_text: str, classification: dict | None = None) -> s
     norm = _normalize_term(job_text or '')
     category = _normalize_term(str((classification or {}).get('primary_category', 'unknown')))
     has_explicit_mobile = _has_explicit_mobile_requirement(job_text)
+    is_junior = any(_normalize_term(term) in norm for term in ('junior', 'entry level', 'entry-level', 'entrylevel', 'associate'))
+    has_graduate = any(_normalize_term(term) in norm for term in JUNIOR_GRADUATE_ROLE_TERMS)
+    has_ai_ml = any(_normalize_term(term) in norm for term in AI_ML_ROLE_TERMS)
 
     if any(_normalize_term(term) in norm for term in PENTEST_ROLE_TERMS):
-        return 'pentest'
+        return 'pentester'
     if any(_normalize_term(term) in norm for term in APPSEC_DEVSECOPS_ROLE_TERMS):
-        return 'appsec_devsecops'
+        return 'appsec'
+    if has_ai_ml:
+        return 'ai_ml'
     if has_explicit_mobile and any(_normalize_term(term) in norm for term in MOBILE_ROLE_TERMS):
         return 'mobile'
-    if any(_normalize_term(term) in norm for term in JUNIOR_GRADUATE_ROLE_TERMS):
-        return 'graduate'
+    if has_graduate:
+        return 'graduate_developer'
+    if is_junior and category in {'software_engineering', 'frontend', 'backend', 'devops', 'unknown'}:
+        return 'junior_swe'
     if category == 'cybersecurity':
-        return 'appsec_devsecops'
-    if category in {'software_engineering', 'frontend', 'backend', 'devops'}:
-        return 'software_engineering'
-    return 'general'
+        return 'appsec'
+    if category == 'devops':
+        return 'devsecops'
+    if category in {'software_engineering', 'frontend', 'backend'}:
+        return 'graduate_developer'
+    return 'graduate_developer'
 
 
 def _extract_primary_degree(resume_json: dict) -> str:
@@ -1332,40 +1351,33 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
     return f"{sentence_one} {sentence_two}"
 
 
+def build_dynamic_headline(profile: str) -> str:
+    profile = _normalize_term(profile or '')
+    if profile == 'appsec':
+        return 'Application Security Engineer | Secure Full-Stack Development | DevSecOps'
+    if profile == 'devsecops':
+        return 'DevSecOps Engineer | Secure CI/CD | Production Systems'
+    if profile == 'pentester':
+        return 'Penetration Testing Engineer | Offensive Security | Vulnerability Assessment'
+    if profile == 'mobile':
+        return 'Mobile Software Engineer | React Native | Secure API Integrations'
+    if profile == 'graduate_developer':
+        return 'Graduate Software Engineer | Full-Stack Development | Secure Coding'
+    if profile == 'junior_swe':
+        return 'Junior Software Engineer | Full-Stack Development | Secure Delivery'
+    if profile == 'ai_ml':
+        return 'AI/ML Engineer | Machine Learning Systems | Secure Data Pipelines'
+    if profile == 'software_engineering':
+        return 'Software Engineer | Full-Stack Development | Secure Systems'
+    return 'Software Engineer | Full-Stack Systems | Secure Engineering'
+
+
 def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
     profile = _detect_role_profile(job_text=job_text, classification=classification)
-    if profile == 'appsec_devsecops':
+    if profile == 'appsec':
         return {
-            'name': 'APPSEC_DEVSECOPS',
-            'tagline': None,
-            'section_order': [
-                'Professional Summary',
-                'Key Skills / Technical Skills',
-                'Projects',
-                'Professional Experience',
-                'Education',
-                'Certifications',
-            ],
-            'project_priority': [
-                'Production Support Incident Console',
-                'Job Application Assistant',
-                'Bunkerify',
-            ],
-            'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
-            'min_bullets_per_project': 2,
-            'max_bullets_per_project': 4,
-            'max_bullets_per_experience': 3,
-            'max_skills': 14,
-            'min_skills': 10,
-            'prefer_cyber_terms': True,
-            'target_max_pages': 1.5,
-            'role_profile': profile,
-        }
-
-    if profile == 'pentest':
-        return {
-            'name': 'PENTEST',
-            'tagline': None,
+            'name': 'APPSEC',
+            'tagline': build_dynamic_headline(profile),
             'section_order': [
                 'Professional Summary',
                 'Key Skills / Technical Skills',
@@ -1377,12 +1389,13 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             'project_priority': [
                 'Bunkerify',
                 'Production Support Incident Console',
-                'Job Application Assistant',
+                'LLM Security Tester',
+                'Cyber Content Bot',
             ],
             'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
             'min_bullets_per_project': 2,
-            'max_bullets_per_project': 4,
-            'max_bullets_per_experience': 3,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
             'max_skills': 14,
             'min_skills': 10,
             'prefer_cyber_terms': True,
@@ -1390,20 +1403,124 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             'role_profile': profile,
         }
 
-    if profile in {'software_engineering', 'graduate'}:
+    if profile == 'devsecops':
         return {
-            'name': 'SOFTWARE_GENERAL' if profile == 'software_engineering' else 'GRADUATE',
-            'tagline': None,
+            'name': 'DEVSECOPS',
+            'tagline': build_dynamic_headline(profile),
+            'section_order': [
+                'Professional Summary',
+                'Key Skills / Technical Skills',
+                'Projects',
+                'Professional Experience',
+                'Education',
+                'Certifications',
+            ],
+            'project_priority': [
+                'Production Support Incident Console',
+                'Bunkerify',
+                'Cyber Content Bot',
+                'Web Vulnerability Scanner',
+            ],
+            'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
+            'max_skills': 14,
+            'min_skills': 10,
+            'prefer_cyber_terms': True,
+            'target_max_pages': 1.5,
+            'role_profile': profile,
+        }
+
+    if profile == 'pentester':
+        return {
+            'name': 'PENTESTER',
+            'tagline': build_dynamic_headline(profile),
+            'section_order': [
+                'Professional Summary',
+                'Key Skills / Technical Skills',
+                'Projects',
+                'Professional Experience',
+                'Education',
+                'Certifications',
+            ],
+            'project_priority': [
+                'Bunkerify',
+                'LLM Security Tester',
+                'Web Vulnerability Scanner',
+                'Production Support Incident Console',
+            ],
+            'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
+            'max_skills': 14,
+            'min_skills': 10,
+            'prefer_cyber_terms': True,
+            'target_max_pages': 1.5,
+            'role_profile': profile,
+        }
+
+    if profile in {'software_engineering', 'graduate_developer'}:
+        normalized = 'graduate_developer' if profile != 'software_engineering' else profile
+        return {
+            'name': 'GRADUATE' if normalized == 'graduate_developer' else 'SOFTWARE_GENERAL',
+            'tagline': build_dynamic_headline(normalized),
             'section_order': DEFAULT_SECTION_ORDER[:],
             'project_priority': [
                 'Job Application Assistant',
                 'Production Support Incident Console',
                 'Bunkerify',
+                'Cyber Content Bot',
             ],
             'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
             'min_bullets_per_project': 2,
-            'max_bullets_per_project': 4,
-            'max_bullets_per_experience': 3,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
+            'max_skills': 10,
+            'min_skills': 8,
+            'prefer_cyber_terms': False,
+            'target_max_pages': 1.0,
+            'role_profile': normalized,
+        }
+
+    if profile == 'junior_swe':
+        return {
+            'name': 'JUNIOR_SWE',
+            'tagline': build_dynamic_headline(profile),
+            'section_order': DEFAULT_SECTION_ORDER[:],
+            'project_priority': [
+                'Job Application Assistant',
+                'Production Support Incident Console',
+                'Bunkerify',
+                'Cyber Content Bot',
+            ],
+            'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
+            'max_skills': 10,
+            'min_skills': 8,
+            'prefer_cyber_terms': False,
+            'target_max_pages': 1.0,
+            'role_profile': profile,
+        }
+
+    if profile == 'ai_ml':
+        return {
+            'name': 'AI_ML',
+            'tagline': build_dynamic_headline(profile),
+            'section_order': DEFAULT_SECTION_ORDER[:],
+            'project_priority': [
+                'Job Application Assistant',
+                'LLM Security Tester',
+                'Local LLM Benchmark',
+                'Cyber Content Bot',
+            ],
+            'skill_priority_groups': ['backend', 'languages', 'testing', 'security', 'frontend', 'tools'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
             'max_skills': 10,
             'min_skills': 8,
             'prefer_cyber_terms': False,
@@ -1414,7 +1531,7 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
     if profile == 'mobile':
         return {
             'name': 'MOBILE',
-            'tagline': None,
+            'tagline': build_dynamic_headline(profile),
             'section_order': DEFAULT_SECTION_ORDER[:],
             'project_priority': [
                 'Cancer Awareness Mobile App',
@@ -1424,8 +1541,8 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             ],
             'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
             'min_bullets_per_project': 2,
-            'max_bullets_per_project': 4,
-            'max_bullets_per_experience': 3,
+            'max_bullets_per_project': 3,
+            'max_bullets_per_experience': 2,
             'max_skills': 10,
             'min_skills': 8,
             'prefer_cyber_terms': False,
@@ -1433,25 +1550,26 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             'role_profile': profile,
         }
 
-    # Default to general ordering for unknown roles.
+    # Default to graduate developer project list for unknown roles.
     return {
         'name': 'GENERAL',
-        'tagline': None,
+        'tagline': build_dynamic_headline('graduate_developer'),
         'section_order': DEFAULT_SECTION_ORDER[:],
         'project_priority': [
             'Job Application Assistant',
             'Production Support Incident Console',
             'Bunkerify',
+            'Cyber Content Bot',
         ],
         'skill_priority_groups': ['frontend', 'backend', 'languages', 'testing', 'security', 'tools'],
         'min_bullets_per_project': 2,
-        'max_bullets_per_project': 4,
-        'max_bullets_per_experience': 3,
+        'max_bullets_per_project': 3,
+        'max_bullets_per_experience': 2,
         'max_skills': 10,
         'min_skills': 8,
         'prefer_cyber_terms': False,
         'target_max_pages': 1.0,
-        'role_profile': profile,
+        'role_profile': 'graduate_developer',
     }
 
 
@@ -1470,19 +1588,72 @@ def reorder_projects_by_priority(projects: list[dict], priority: list[str]) -> l
     return sorted(projects, key=project_key)
 
 
+def _project_priority_by_role(role_profile: str) -> list[str]:
+    profile = _normalize_term(role_profile or '')
+    mapping = {
+        'appsec': [
+            'bunkerify',
+            'production support incident console',
+            'llm security tester',
+            'cyber content bot',
+        ],
+        'devsecops': [
+            'production support incident console',
+            'bunkerify',
+            'cyber content bot',
+            'web vulnerability scanner',
+        ],
+        'graduate_developer': [
+            'job application assistant',
+            'production support incident console',
+            'bunkerify',
+            'cyber content bot',
+        ],
+        'junior_swe': [
+            'job application assistant',
+            'production support incident console',
+            'bunkerify',
+            'cyber content bot',
+        ],
+        'software_engineering': [
+            'job application assistant',
+            'production support incident console',
+            'bunkerify',
+            'cyber content bot',
+        ],
+        'ai_ml': [
+            'job application assistant',
+            'llm security tester',
+            'local llm benchmark',
+            'cyber content bot',
+        ],
+        'pentester': [
+            'bunkerify',
+            'llm security tester',
+            'web vulnerability scanner',
+            'production support incident console',
+        ],
+    }
+    return mapping.get(profile, mapping['graduate_developer'])
+
+
 def filter_projects_for_role(projects: list[dict], role_profile: str, job_text: str = '') -> list[dict]:
-    out = []
-    include_cancer = role_profile == 'mobile' or (
-        role_profile == 'graduate' and _has_explicit_mobile_requirement(job_text)
-    )
+    priority_titles = _project_priority_by_role(role_profile)
+    selected = []
+    allowed_keys = { _normalize_term(title) for title in priority_titles }
+    for title in priority_titles:
+        for project in projects or []:
+            if _normalize_term(project.get('title', '')) == _normalize_term(title):
+                selected.append(project)
+                break
+    # If fewer than 4 matched, preserve only any remaining allowed projects in original order.
     for project in projects or []:
-        title = _normalize_term(project.get('title', ''))
-        if role_profile == 'pentest' and 'job application assistant' in title:
-            continue
-        if 'cancer awareness mobile app' in title and not include_cancer:
-            continue
-        out.append(project)
-    return out
+        if len(selected) >= 4:
+            break
+        proj_key = _normalize_term(project.get('title', ''))
+        if proj_key in allowed_keys and project not in selected:
+            selected.append(project)
+    return selected[:4]
 
 
 def select_experience_bullets_for_render(
