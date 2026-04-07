@@ -1316,7 +1316,7 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
         who_i_am = 'Application Security-focused Software Engineer'
     elif profile == 'devsecops':
         who_i_am = 'DevSecOps-focused Software Engineer'
-    elif profile == 'pentest':
+    elif profile == 'pentester':
         who_i_am = 'Offensive Security-focused Software Engineer'
     elif profile == 'mobile':
         who_i_am = 'Mobile-focused Software Engineer'
@@ -1333,7 +1333,7 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
         sentence_two = (
             "I focus on CI/CD security pipelines, automated scanning, and secure delivery automation."
         )
-    elif profile == 'pentest':
+    elif profile == 'pentester':
         sentence_two = (
             "I focus on offensive security workflows, vulnerability assessment, "
             "penetration testing, and practical remediation outcomes."
