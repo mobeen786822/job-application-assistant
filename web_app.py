@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import subprocess
@@ -145,6 +146,20 @@ def _get_local_generations() -> list[dict]:
     return list(session.get('local_generations') or [])
 
 
+def _get_local_job_leads() -> list[dict]:
+    return list(session.get('local_job_leads') or [])
+
+
+def _job_lead_hash(job: dict) -> str:
+    seed = '|'.join([
+        str(job.get('url') or '').strip().lower(),
+        str(job.get('title') or '').strip().lower(),
+        str(job.get('company') or '').strip().lower(),
+        str(job.get('description') or '').strip().lower(),
+    ])
+    return hashlib.sha256(seed.encode('utf-8', errors='replace')).hexdigest()
+
+
 def _append_local_generation(job_title: str, detected_role_type: str, status: str) -> None:
     rows = _get_local_generations()
     rows.append(
@@ -251,6 +266,77 @@ def record_generation(job_title: str, detected_role_type: str, status: str) -> N
             detected_role_type=detected_role_type,
             status=status,
         )
+
+
+def save_job_leads(ranked_jobs: list[dict]) -> int:
+    user = current_user()
+    if not ranked_jobs:
+        return 0
+    rows = []
+    for job in ranked_jobs:
+        rows.append({
+            'user_id': (user or {}).get('id'),
+            'job_hash': _job_lead_hash(job),
+            'title': job.get('title') or 'Untitled role',
+            'company': job.get('company') or '',
+            'location': job.get('location') or '',
+            'url': job.get('url') or '',
+            'platform': job.get('platform') or 'Unknown',
+            'description': job.get('description') or '',
+            'score': int(job.get('score') or 0),
+            'recommendation': job.get('recommendation') or 'REVIEW',
+            'detected_role_type': job.get('detected_role_type') or 'unknown',
+            'matched_terms': job.get('matched_terms') or [],
+            'missing_terms': job.get('missing_terms') or [],
+            'positive_signals': job.get('positive_signals') or [],
+            'risk_signals': job.get('risk_signals') or [],
+            'status': 'shortlisted',
+        })
+
+    client = SUPABASE_SERVICE_CLIENT
+    if user and client:
+        try:
+            (
+                client.table('job_leads')
+                .upsert(rows, on_conflict='user_id,job_hash')
+                .execute()
+            )
+            return len(rows)
+        except Exception:
+            logging.exception('Failed to upsert job leads; falling back to session storage')
+
+    existing = {row.get('job_hash'): row for row in _get_local_job_leads()}
+    now = datetime.now(timezone.utc).isoformat()
+    for row in rows:
+        row['user_id'] = row.get('user_id') or 'local'
+        row.setdefault('created_at', now)
+        row['updated_at'] = now
+        existing[row['job_hash']] = row
+    local_rows = sorted(existing.values(), key=lambda x: int(x.get('score') or 0), reverse=True)
+    session['local_job_leads'] = local_rows[:200]
+    return len(rows)
+
+
+def get_job_leads(limit: int = 100) -> list[dict]:
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    if user and client:
+        try:
+            resp = (
+                client.table('job_leads')
+                .select('created_at,updated_at,title,company,location,url,platform,score,recommendation,detected_role_type,status,matched_terms,risk_signals')
+                .eq('user_id', user['id'])
+                .order('score', desc=True)
+                .order('created_at', desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return resp.data or []
+        except Exception:
+            logging.exception('Failed to query job leads; falling back to session storage')
+    rows = _get_local_job_leads()
+    rows.sort(key=lambda x: (int(x.get('score') or 0), str(x.get('created_at') or '')), reverse=True)
+    return rows[:limit]
 
 
 def format_created_at(value: str | None) -> str:
@@ -1011,7 +1097,7 @@ JOBS_PAGE = """
       <div>
         <h1>Job Shortlist</h1>
         <div class="hint">Paste job postings from LinkedIn, SEEK, Indeed, or anywhere else. Separate postings with <code>---</code> or <code>===</code>.</div>
-        <div class="hint">This is approval-first: rank jobs and generate docs before any external application step.</div>
+        <div class="hint">This is approval-first: rank jobs, save a shortlist, and generate docs before any external application step.</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
@@ -1030,9 +1116,47 @@ JOBS_PAGE = """
       </form>
     </div>
 
+    {% if save_notice %}
+    <div class="card">
+      <strong>{{ save_notice }}</strong>
+      <div class="hint">Saved jobs are listed below and will remain available after refresh.</div>
+    </div>
+    {% endif %}
+
+    {% if saved_leads %}
+    <div class="card">
+      <h2 style="margin-top:0">Saved shortlist</h2>
+      {% for job in saved_leads %}
+      <div class="job-card">
+        <div>
+          <div class="score">{{ job.score }}</div>
+          <div class="meta">match score</div>
+        </div>
+        <div>
+          <div>
+            <span class="pill {% if job.recommendation == 'APPLY' %}apply{% elif job.recommendation == 'SKIP' %}skip{% else %}review{% endif %}">{{ job.recommendation }}</span>
+            <span class="pill">{{ job.status|title }}</span>
+            <span class="pill">{{ job.platform }}</span>
+          </div>
+          <h3 style="margin:8px 0 4px">{{ job.title }}</h3>
+          <div class="meta">
+            {% if job.company %}{{ job.company }}{% endif %}{% if job.company and job.location %} · {% endif %}{% if job.location %}{{ job.location }}{% endif %}
+            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" style="color:var(--accent)">job link</a>{% endif %}
+          </div>
+          {% if job.matched_terms %}
+          <div class="terms">
+            {% for term in job.matched_terms[:8] %}<span class="term">{{ term }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% if ranked_jobs %}
     <div class="card">
-      <h2 style="margin-top:0">Ranked jobs</h2>
+      <h2 style="margin-top:0">Latest ranked jobs</h2>
       {% for job in ranked_jobs %}
       <div class="job-card">
         <div>
@@ -1195,6 +1319,7 @@ def logout():
 def jobs():
     job_posts_value = ''
     ranked_jobs = []
+    save_notice = ''
     if request.method == 'POST':
         job_posts_value = request.form.get('job_posts', '').strip()
         if job_posts_value:
@@ -1202,10 +1327,18 @@ def jobs():
                 raw_text=job_posts_value,
                 resume_dict=load_resume_json(DEFAULT_RESUME),
             )
+            saved_count = save_job_leads(ranked_jobs)
+            save_notice = f'Saved {saved_count} ranked job lead(s) to your shortlist.'
+    saved_leads = get_job_leads(limit=50)
+    for item in saved_leads:
+        item['created_at'] = format_created_at(item.get('created_at'))
+        item['updated_at'] = format_created_at(item.get('updated_at'))
     return render_template_string(
         JOBS_PAGE,
         job_posts_value=job_posts_value,
         ranked_jobs=ranked_jobs,
+        saved_leads=saved_leads,
+        save_notice=save_notice,
         app_version=get_app_version(),
     )
 

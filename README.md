@@ -5,7 +5,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 ## Features
 
 - Web UI (`Flask`) for pasting a job description and generating tailored documents
-- Job shortlist workflow for ranking pasted LinkedIn/SEEK/Indeed postings before generating application packs
+- Job shortlist workflow for ranking and saving pasted LinkedIn/SEEK/Indeed postings before generating application packs
 - Job-fit assessment with recommendation (`APPLY`, `MAYBE`, `NO`) and gap breakdown
 - Resume generation from `assets/resume.json` + `assets/template.html`
 - Cover letter generation with HTML preview (or text fallback)
@@ -36,13 +36,35 @@ CREATE TABLE generations (
   detected_role_type text,
   status text
 );
+
+CREATE TABLE job_leads (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users,
+  job_hash text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  title text NOT NULL,
+  company text,
+  location text,
+  url text,
+  platform text,
+  description text NOT NULL,
+  score integer DEFAULT 0,
+  recommendation text DEFAULT 'REVIEW',
+  detected_role_type text,
+  matched_terms jsonb DEFAULT '[]'::jsonb,
+  missing_terms jsonb DEFAULT '[]'::jsonb,
+  positive_signals jsonb DEFAULT '[]'::jsonb,
+  risk_signals jsonb DEFAULT '[]'::jsonb,
+  status text DEFAULT 'shortlisted'
+);
 ```
 
 ## Project Structure
 
 - `web_app.py` - Flask web app (default port `5055`)
 - `tools/resume_bot.py` - classification, strategy selection, deterministic ranking, validation, rendering
-- `tools/job_discovery.py` - safe pasted-job ingestion, parsing, and shortlist ranking helpers
+- `tools/job_discovery.py` - safe pasted-job ingestion, parsing, shortlist ranking, and saved lead helpers
 - `assets/resume.json` - canonical resume data source
 - `assets/template.html` - base visual template/style
 - `outputs/` - generated files (created automatically)
