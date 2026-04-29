@@ -311,6 +311,7 @@ def save_job_leads(ranked_jobs: list[dict]) -> int:
         row['user_id'] = row.get('user_id') or 'local'
         row.setdefault('created_at', now)
         row['updated_at'] = now
+        row['id'] = row['job_hash']
         existing[row['job_hash']] = row
     local_rows = sorted(existing.values(), key=lambda x: int(x.get('score') or 0), reverse=True)
     session['local_job_leads'] = local_rows[:200]
@@ -324,7 +325,7 @@ def get_job_leads(limit: int = 100) -> list[dict]:
         try:
             resp = (
                 client.table('job_leads')
-                .select('created_at,updated_at,title,company,location,url,platform,score,recommendation,detected_role_type,status,matched_terms,risk_signals')
+                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,risk_signals,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
                 .eq('user_id', user['id'])
                 .order('score', desc=True)
                 .order('created_at', desc=True)
@@ -337,6 +338,62 @@ def get_job_leads(limit: int = 100) -> list[dict]:
     rows = _get_local_job_leads()
     rows.sort(key=lambda x: (int(x.get('score') or 0), str(x.get('created_at') or '')), reverse=True)
     return rows[:limit]
+
+
+def get_job_lead(lead_id: str) -> dict | None:
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    if user and client:
+        try:
+            resp = (
+                client.table('job_leads')
+                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,missing_terms,positive_signals,risk_signals,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
+                .eq('user_id', user['id'])
+                .eq('id', lead_id)
+                .limit(1)
+                .execute()
+            )
+            rows = resp.data or []
+            return rows[0] if rows else None
+        except Exception:
+            logging.exception('Failed to query job lead; falling back to session storage')
+    for row in _get_local_job_leads():
+        if str(row.get('id') or row.get('job_hash')) == str(lead_id):
+            return row
+    return None
+
+
+def record_job_lead_outputs(lead_id: str, *, resume_html: str = '', resume_pdf: str = '', cover_letter: str = '', cover_pdf: str = '') -> None:
+    if not lead_id:
+        return
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    patch = {
+        'status': 'generated',
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+        'generated_resume_html': resume_html,
+        'generated_resume_pdf': resume_pdf,
+        'generated_cover_letter': cover_letter,
+        'generated_cover_pdf': cover_pdf,
+    }
+    if user and client:
+        try:
+            (
+                client.table('job_leads')
+                .update(patch)
+                .eq('user_id', user['id'])
+                .eq('id', lead_id)
+                .execute()
+            )
+            return
+        except Exception:
+            logging.exception('Failed to update job lead outputs; falling back to session storage')
+    rows = _get_local_job_leads()
+    for row in rows:
+        if str(row.get('id') or row.get('job_hash')) == str(lead_id):
+            row.update(patch)
+            break
+    session['local_job_leads'] = rows
 
 
 def format_created_at(value: str | None) -> str:
@@ -1148,6 +1205,9 @@ JOBS_PAGE = """
             {% for term in job.matched_terms[:8] %}<span class="term">{{ term }}</span>{% endfor %}
           </div>
           {% endif %}
+          <div class="form-actions">
+            <a class="action-link primary" href="{{ url_for('job_workspace', lead_id=job.id) }}">Open workspace</a>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -1204,6 +1264,95 @@ JOBS_PAGE = """
       {% endfor %}
     </div>
     {% endif %}
+  </div>
+</body>
+</html>
+"""
+
+
+JOB_WORKSPACE_PAGE = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Application Workspace</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+    :root { --ink:#e2e8f0; --muted:#94a3b8; --accent:#67e8f9; --panel:#0f172a; --panel-2:#020617; --stroke:#334155; --bg:#030712; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"DM Sans", sans-serif; color:var(--ink); background:radial-gradient(1000px 600px at 20% 10%, rgba(34,197,94,.16), transparent 40%), radial-gradient(900px 500px at 80% 10%, rgba(6,182,212,.18), transparent 38%), var(--bg); min-height:100vh; }
+    .shell { max-width:1100px; margin:0 auto; padding:28px 20px 60px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+    h1,h2,h3 { font-family:"Space Grotesk", sans-serif; }
+    h1 { margin:0 0 6px; }
+    .hint,.meta { color:var(--muted); font-size:13px; }
+    .card { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; padding:18px; margin-bottom:14px; }
+    .nav-link,button,.action-link { display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:10px; border:1px solid var(--stroke); background:var(--panel-2); color:var(--ink); text-decoration:none; font-size:13px; font-weight:600; cursor:pointer; }
+    button,.primary { background:linear-gradient(135deg,#0e7490,#06b6d4); border-color:#0e7490; color:#ecfeff; }
+    .pill { display:inline-flex; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; margin-right:6px; border:1px solid var(--stroke); }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .terms { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .term { font-size:12px; padding:3px 7px; border-radius:999px; background:var(--panel-2); color:var(--muted); border:1px solid var(--stroke); }
+    pre { white-space:pre-wrap; max-height:420px; overflow:auto; background:var(--panel-2); border:1px solid var(--stroke); border-radius:10px; padding:12px; color:var(--ink); }
+    .form-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div>
+        <h1>{{ lead.title }}</h1>
+        <div class="hint">{% if lead.company %}{{ lead.company }}{% endif %}{% if lead.company and lead.location %} · {% endif %}{% if lead.location %}{{ lead.location }}{% endif %}</div>
+        <div class="hint">Score {{ lead.score }} · {{ lead.recommendation }} · {{ lead.status|title }} · {{ lead.platform }}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
+        <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
+        <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin-top:0">Application workspace</h2>
+        <div>
+          <span class="pill">{{ lead.detected_role_type|replace('_', ' ')|title }}</span>
+          <span class="pill">{{ lead.status|title }}</span>
+        </div>
+        {% if lead.url %}<p><a href="{{ lead.url }}" target="_blank" rel="noopener" style="color:var(--accent)">Open original job post</a></p>{% endif %}
+        {% if lead.matched_terms %}
+        <h3>Matched terms</h3>
+        <div class="terms">{% for term in lead.matched_terms %}<span class="term">{{ term }}</span>{% endfor %}</div>
+        {% endif %}
+        {% if lead.risk_signals %}
+        <h3>Risk signals</h3>
+        <div class="terms">{% for term in lead.risk_signals %}<span class="term">{{ term }}</span>{% endfor %}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('index') }}" class="form-actions">
+          <input type="hidden" name="job_lead_id" value="{{ lead.id }}" />
+          <input type="hidden" name="job_text" value="{{ lead.description }}" />
+          <button type="submit">Generate application pack</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">Generated files</h2>
+        {% if generated_links %}
+        <div class="form-actions">
+          {% for link in generated_links %}<a class="action-link primary" href="{{ link.href }}" target="_blank" rel="noopener">{{ link.label }}</a>{% endfor %}
+        </div>
+        {% else %}
+        <div class="hint">No application pack generated for this job yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Job description</h2>
+      <pre>{{ lead.description }}</pre>
+    </div>
   </div>
 </body>
 </html>
@@ -1343,6 +1492,33 @@ def jobs():
     )
 
 
+@app.route('/jobs/<lead_id>')
+@login_required
+def job_workspace(lead_id: str):
+    lead = get_job_lead(lead_id)
+    if not lead:
+        return Response('Job lead not found.', status=404)
+    generated_links = []
+    for key, label in (
+        ('generated_resume_html', 'Resume HTML'),
+        ('generated_resume_pdf', 'Resume PDF'),
+        ('generated_cover_letter', 'Cover Letter'),
+        ('generated_cover_pdf', 'Cover Letter PDF'),
+    ):
+        filename = lead.get(key)
+        if filename:
+            generated_links.append({
+                'label': label,
+                'href': url_for('download_output', filename=Path(str(filename)).name),
+            })
+    return render_template_string(
+        JOB_WORKSPACE_PAGE,
+        lead=lead,
+        generated_links=generated_links,
+        app_version=get_app_version(),
+    )
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -1387,6 +1563,7 @@ def index():
         try:
             cleanup_old_output_files()
             job_text = request.form.get('job_text', '').strip()
+            job_lead_id = request.form.get('job_lead_id', '').strip()
             job_text_value = job_text
             monthly_used = get_current_month_generation_count()
             if not unlimited and monthly_used >= MAX_MONTHLY_GENERATIONS:
@@ -1417,9 +1594,13 @@ def index():
             )
             html_path = str(html_path)
             pdf_path = str(pdf_path)
-            html_url = url_for('download_output', filename=Path(html_path).name)
-            pdf_url = url_for('download_output', filename=Path(pdf_path).name)
-            preview_url = url_for('preview_output', filename=Path(html_path).name)
+            resume_html_name = Path(html_path).name
+            resume_pdf_name = Path(pdf_path).name
+            cover_name = ''
+            cover_pdf_name = ''
+            html_url = url_for('download_output', filename=resume_html_name)
+            pdf_url = url_for('download_output', filename=resume_pdf_name)
+            preview_url = url_for('preview_output', filename=resume_html_name)
             try:
                 cover_path, cover_pdf_path, cover_text = generate_cover_letter(
                     resume_path=DEFAULT_RESUME,
@@ -1434,10 +1615,19 @@ def index():
                 if cover_name.lower().endswith('.html'):
                     cover_preview_url = url_for('preview_output', filename=cover_name)
                 if cover_pdf_path:
-                    cover_pdf_url = url_for('download_output', filename=Path(cover_pdf_path).name)
+                    cover_pdf_name = Path(cover_pdf_path).name
+                    cover_pdf_url = url_for('download_output', filename=cover_pdf_name)
             except (Exception, SystemExit):
                 logging.exception("Cover letter generation skipped")
                 cover_text = "Cover letter unavailable. Resume generation completed."
+            if job_lead_id:
+                record_job_lead_outputs(
+                    job_lead_id,
+                    resume_html=resume_html_name,
+                    resume_pdf=resume_pdf_name,
+                    cover_letter=cover_name,
+                    cover_pdf=cover_pdf_name,
+                )
             record_generation(
                 job_title=_extract_job_title(job_text),
                 detected_role_type=role_type,
