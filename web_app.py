@@ -365,6 +365,35 @@ def get_job_lead(lead_id: str) -> dict | None:
     return None
 
 
+def update_job_lead_status(lead_id: str, status: str) -> bool:
+    if status not in {'shortlisted', 'generated', 'applied', 'rejected', 'interview'}:
+        return False
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    patch = {'status': status, 'updated_at': datetime.now(timezone.utc).isoformat()}
+    if user and client:
+        try:
+            (
+                client.table('job_leads')
+                .update(patch)
+                .eq('user_id', user['id'])
+                .eq('id', lead_id)
+                .execute()
+            )
+            return True
+        except Exception:
+            logging.exception('Failed to update job lead status; falling back to session storage')
+    rows = _get_local_job_leads()
+    updated = False
+    for row in rows:
+        if str(row.get('id') or row.get('job_hash')) == str(lead_id):
+            row.update(patch)
+            updated = True
+            break
+    session['local_job_leads'] = rows
+    return updated
+
+
 def record_job_lead_outputs(lead_id: str, *, resume_html: str = '', resume_pdf: str = '', cover_letter: str = '', cover_pdf: str = '') -> None:
     if not lead_id:
         return
@@ -1388,6 +1417,13 @@ JOB_WORKSPACE_PAGE = """
           <input type="hidden" name="job_text" value="{{ lead.description }}" />
           <button type="submit">Generate application pack</button>
         </form>
+        <form method="post" action="{{ url_for('update_job_status', lead_id=lead.id) }}" class="form-actions">
+          <button type="submit" name="status" value="shortlisted">Shortlisted</button>
+          <button type="submit" name="status" value="generated">Generated</button>
+          <button type="submit" name="status" value="applied">Applied</button>
+          <button type="submit" name="status" value="interview">Interview</button>
+          <button type="submit" name="status" value="rejected">Rejected</button>
+        </form>
       </div>
 
       <div class="card">
@@ -1593,6 +1629,16 @@ def job_workspace(lead_id: str):
         generated_links=generated_links,
         app_version=get_app_version(),
     )
+
+
+@app.route('/jobs/<lead_id>/status', methods=['POST'])
+@login_required
+def update_job_status(lead_id: str):
+    status = request.form.get('status', '').strip()
+    ok = update_job_lead_status(lead_id, status)
+    if not ok:
+        return Response('Invalid status or job lead not found.', status=400)
+    return redirect(url_for('job_workspace', lead_id=lead_id))
 
 
 @app.route('/dashboard')
