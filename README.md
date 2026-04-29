@@ -5,7 +5,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 ## Features
 
 - Web UI (`Flask`) for pasting a job description and generating tailored documents
-- Job shortlist workflow for ranking and saving pasted LinkedIn/SEEK/Indeed postings before generating application packs
+- Job shortlist workflow for ranking and saving pasted or CSV-imported LinkedIn/SEEK/Indeed postings before generating application packs
 - Per-job application workspace with original posting details, matched signals, score explanations, and generated file links
 - Job-fit assessment with recommendation (`APPLY`, `MAYBE`, `NO`) and gap breakdown
 - Resume generation from `assets/resume.json` + `assets/template.html`
@@ -99,7 +99,7 @@ python web_app.py
 Open:
 
 - `http://localhost:5055`
-- `http://localhost:5055/jobs` for the job shortlist/ranking workflow
+- `http://localhost:5055/jobs` for the job shortlist/ranking workflow. It supports pasted job ads or CSV files with `title`, `company`, `location`, `url`, `platform`, and `description` columns.
 
 ## Screenshot
 

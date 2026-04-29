@@ -1169,9 +1169,11 @@ JOBS_PAGE = """
     </div>
 
     <div class="card">
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <label>Job postings</label>
-        <textarea name="job_posts" placeholder="Title: Graduate Software Engineer&#10;Company: Example Co&#10;Location: Sydney&#10;URL: https://...&#10;&#10;Paste the full job ad here...&#10;---&#10;Title: Cybersecurity Analyst...">{{ job_posts_value }}</textarea>
+        <textarea name="job_posts" placeholder="Title: Graduate Software Engineer&#10;Company: Example Co&#10;Location: Sydney&#10;URL: https://...&#10;&#10;Paste the full job ad here...&#10;---&#10;Title: Cybersecurity Analyst...&#10;&#10;Or upload a CSV with title, company, location, url, platform, description columns.">{{ job_posts_value }}</textarea>
+        <label>Optional CSV import</label>
+        <input type="file" name="job_csv" accept=".csv,text/csv" />
         <div class="prefs-grid">
           <div>
             <label>Preferred locations</label>
@@ -1526,6 +1528,11 @@ def jobs():
     avoid_senior = True
     if request.method == 'POST':
         job_posts_value = request.form.get('job_posts', '').strip()
+        csv_file = request.files.get('job_csv')
+        if csv_file and csv_file.filename:
+            csv_text = csv_file.read().decode('utf-8-sig', errors='replace').strip()
+            if csv_text:
+                job_posts_value = '\n---\n'.join([x for x in (job_posts_value, csv_text) if x])
         preferred_locations = request.form.get('preferred_locations', preferred_locations).strip()
         role_focus = request.form.get('role_focus', role_focus).strip() or 'both'
         prefer_junior = request.form.get('prefer_junior', '1') == '1'

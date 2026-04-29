@@ -150,9 +150,8 @@ def run_job_discovery_smoke(resume: dict) -> None:
     URL: https://www.linkedin.com/jobs/view/example
     Graduate full-stack role using React, TypeScript, Python, REST APIs, CI/CD, and application security.
     ---
-    Title: Senior .NET Lead
-    Company: Enterprise Example
-    8+ years experience leading C# and .NET teams.
+    title,company,location,url,description
+    Senior .NET Lead,Enterprise Example,Sydney,,8+ years experience leading C# and .NET teams.
     """
     ranked = rank_job_postings(
         postings,

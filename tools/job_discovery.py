@@ -8,6 +8,7 @@ human can approve before generating documents or submitting applications.
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import re
 from dataclasses import dataclass
@@ -76,13 +77,67 @@ class JobPosting:
 def parse_job_postings(raw_text: str) -> list[JobPosting]:
     """Parse pasted job postings into rough structured records.
 
-    Supported format is deliberately forgiving. Users can paste multiple postings
-    separated by a line containing `---` or `===`. The first non-empty line is
+    Supported formats:
+    - Multiple copied postings separated by a line containing `---` or `===`.
+    - CSV with headers such as title, company, location, url, platform, description.
+
+    The free-text parser is deliberately forgiving. The first non-empty line is
     treated as title unless it looks like a URL; URL/platform/company/location are
     inferred from obvious labels when present.
     """
+    if _looks_like_csv(raw_text):
+        csv_rows = _parse_csv_postings(raw_text)
+        if csv_rows:
+            return csv_rows
     blocks = [b.strip() for b in re.split(r'(?m)^\s*(?:---|===)\s*$', raw_text or '') if b.strip()]
-    return [_parse_one_block(block) for block in blocks]
+    postings: list[JobPosting] = []
+    for block in blocks:
+        if _looks_like_csv(block):
+            postings.extend(_parse_csv_postings(block))
+        else:
+            postings.append(_parse_one_block(block))
+    return postings
+
+
+def _looks_like_csv(raw_text: str) -> bool:
+    first_line = next((line.strip().lower() for line in (raw_text or '').splitlines() if line.strip()), '')
+    headers = {part.strip() for part in first_line.split(',')}
+    return ',' in first_line and any(key in headers for key in ('title', 'role', 'job title', 'description', 'company'))
+
+
+def _parse_csv_postings(raw_text: str) -> list[JobPosting]:
+    rows: list[JobPosting] = []
+    try:
+        reader = csv.DictReader((raw_text or '').splitlines())
+        for raw_row in reader:
+            row = {str(k or '').strip().lower(): normalize_text(str(v or '')).strip() for k, v in raw_row.items()}
+            title = row.get('title') or row.get('role') or row.get('job title') or row.get('position') or 'Untitled role'
+            company = row.get('company') or row.get('employer') or ''
+            location = row.get('location') or ''
+            url = row.get('url') or row.get('link') or ''
+            platform = row.get('platform') or _detect_platform(url, ' '.join(row.values())) or 'Unknown'
+            description = row.get('description') or row.get('job description') or row.get('details') or ''
+            if not description:
+                description = '\n'.join([f'{k.title()}: {v}' for k, v in row.items() if v])
+            else:
+                description = '\n'.join([
+                    f'Title: {title}',
+                    f'Company: {company}' if company else '',
+                    f'Location: {location}' if location else '',
+                    f'URL: {url}' if url else '',
+                    description,
+                ]).strip()
+            rows.append(JobPosting(
+                title=title,
+                company=company,
+                location=location,
+                url=url,
+                platform=platform,
+                description=description,
+            ))
+    except Exception:
+        return []
+    return rows
 
 
 def _parse_one_block(block: str) -> JobPosting:
