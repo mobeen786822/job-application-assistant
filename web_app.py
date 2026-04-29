@@ -11,6 +11,7 @@ from functools import wraps
 from pathlib import Path
 from flask import Flask, request, render_template_string, send_from_directory, url_for, Response, redirect, session
 from flask_session import Session
+from tools.job_discovery import rank_job_postings
 from tools.resume_bot import (
     assess_job_fit,
     choose_resume_strategy,
@@ -513,6 +514,7 @@ PAGE = """
         <div class="hint">Signed in as {{ user_email }}. This month: {{ monthly_used }}/{{ monthly_limit }} generations.</div>
       </div>
       <div class="header-right">
+        <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
         <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
       </div>
@@ -894,6 +896,7 @@ DASHBOARD_PAGE = """
         <div class="hint">Build: <code>{{ app_version }}</code></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
       </div>
@@ -928,6 +931,155 @@ DASHBOARD_PAGE = """
       <div class="hint">No generations yet.</div>
       {% endif %}
     </div>
+  </div>
+</body>
+</html>
+"""
+
+
+JOBS_PAGE = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Shortlist</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+    :root {
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #67e8f9;
+      --panel: #0f172a;
+      --panel-2: #020617;
+      --stroke: #334155;
+      --shadow: 0 18px 60px -24px rgba(6, 182, 212, 0.45);
+      --bg-base: #030712;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 15% 10%, rgba(34,197,94,0.16) 0%, rgba(34,197,94,0) 38%),
+        radial-gradient(1000px 600px at 80% 12%, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0) 36%),
+        var(--bg-base);
+      min-height: 100vh;
+    }
+    .shell { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    h1, h2, h3 { font-family: "Space Grotesk", sans-serif; }
+    h1 { margin: 0 0 6px; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .nav-link, button, .action-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: var(--panel-2);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button, .primary { background: linear-gradient(135deg, #0e7490, #06b6d4); border-color: #0e7490; color: #ecfeff; }
+    .card { background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px; box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; }
+    label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 6px; }
+    textarea { width: 100%; min-height: 260px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 13px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
+    .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    .job-card { display: grid; grid-template-columns: 120px 1fr; gap: 14px; border-top: 1px solid var(--stroke); padding-top: 16px; margin-top: 16px; }
+    .score { width: 82px; height: 82px; border-radius: 999px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--stroke); font-size: 24px; font-weight: 700; }
+    .pill { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-right: 6px; border: 1px solid var(--stroke); }
+    .apply { background: #052e16; color: #86efac; border-color: #166534; }
+    .review { background: #422006; color: #fde68a; border-color: #854d0e; }
+    .skip { background: #450a0a; color: #fecaca; border-color: #991b1b; }
+    .meta { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
+    .terms { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .term { font-size: 12px; padding: 3px 7px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--stroke); }
+    details { margin-top: 10px; color: var(--muted); }
+    pre { white-space: pre-wrap; max-height: 280px; overflow: auto; background: var(--panel-2); border: 1px solid var(--stroke); border-radius: 10px; padding: 10px; color: var(--ink); }
+    @media (max-width: 760px) { .job-card { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div>
+        <h1>Job Shortlist</h1>
+        <div class="hint">Paste job postings from LinkedIn, SEEK, Indeed, or anywhere else. Separate postings with <code>---</code> or <code>===</code>.</div>
+        <div class="hint">This is approval-first: rank jobs and generate docs before any external application step.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
+        <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <form method="post">
+        <label>Job postings</label>
+        <textarea name="job_posts" placeholder="Title: Graduate Software Engineer&#10;Company: Example Co&#10;Location: Sydney&#10;URL: https://...&#10;&#10;Paste the full job ad here...&#10;---&#10;Title: Cybersecurity Analyst...">{{ job_posts_value }}</textarea>
+        <div class="form-actions">
+          <button type="submit">Rank Shortlist</button>
+        </div>
+      </form>
+    </div>
+
+    {% if ranked_jobs %}
+    <div class="card">
+      <h2 style="margin-top:0">Ranked jobs</h2>
+      {% for job in ranked_jobs %}
+      <div class="job-card">
+        <div>
+          <div class="score">{{ job.score }}</div>
+          <div class="meta">match score</div>
+        </div>
+        <div>
+          <div>
+            <span class="pill {% if job.recommendation == 'APPLY' %}apply{% elif job.recommendation == 'SKIP' %}skip{% else %}review{% endif %}">{{ job.recommendation }}</span>
+            <span class="pill">{{ job.detected_role_type|replace('_', ' ')|title }}</span>
+            <span class="pill">{{ job.platform }}</span>
+          </div>
+          <h3 style="margin:8px 0 4px">{{ job.title }}</h3>
+          <div class="meta">
+            {% if job.company %}{{ job.company }}{% endif %}{% if job.company and job.location %} · {% endif %}{% if job.location %}{{ job.location }}{% endif %}
+            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" style="color:var(--accent)">job link</a>{% endif %}
+          </div>
+          {% if job.positive_signals %}
+          <div class="terms">
+            {% for term in job.positive_signals %}<span class="term">+ {{ term }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if job.risk_signals %}
+          <div class="terms">
+            {% for term in job.risk_signals %}<span class="term">risk: {{ term }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if job.matched_terms %}
+          <div class="terms">
+            {% for term in job.matched_terms %}<span class="term">{{ term }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          <div class="form-actions">
+            <form method="post" action="{{ url_for('index') }}">
+              <input type="hidden" name="job_text" value="{{ job.description }}" />
+              <button type="submit" class="primary">Generate application pack</button>
+            </form>
+          </div>
+          <details>
+            <summary>View pasted job text</summary>
+            <pre>{{ job.description }}</pre>
+          </details>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 </body>
 </html>
@@ -1036,6 +1188,26 @@ def logout():
             logging.exception('Supabase sign_out failed')
     session.clear()
     return redirect(url_for('login'))
+
+
+@app.route('/jobs', methods=['GET', 'POST'])
+@login_required
+def jobs():
+    job_posts_value = ''
+    ranked_jobs = []
+    if request.method == 'POST':
+        job_posts_value = request.form.get('job_posts', '').strip()
+        if job_posts_value:
+            ranked_jobs = rank_job_postings(
+                raw_text=job_posts_value,
+                resume_dict=load_resume_json(DEFAULT_RESUME),
+            )
+    return render_template_string(
+        JOBS_PAGE,
+        job_posts_value=job_posts_value,
+        ranked_jobs=ranked_jobs,
+        app_version=get_app_version(),
+    )
 
 
 @app.route('/dashboard')

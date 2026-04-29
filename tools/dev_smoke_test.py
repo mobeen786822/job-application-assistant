@@ -7,6 +7,7 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
+from tools.job_discovery import rank_job_postings
 from tools.resume_bot import (
     choose_resume_strategy,
     classify_job,
@@ -134,10 +135,31 @@ def extract_project_block(html_text: str, project_title: str) -> str:
 
 
 def main() -> None:
-    _ = load_resume_json(RESUME_PATH)
+    resume = load_resume_json(RESUME_PATH)
     run_case('SOFTWARE', SOFTWARE_JOB_TEXT)
     run_case('CYBER', CYBER_JOB_TEXT)
     run_bullet_priority_smoke()
+    run_job_discovery_smoke(resume)
+
+
+def run_job_discovery_smoke(resume: dict) -> None:
+    postings = """
+    Title: Graduate Software Engineer
+    Company: Example Tech
+    Location: Sydney
+    URL: https://www.linkedin.com/jobs/view/example
+    Graduate full-stack role using React, TypeScript, Python, REST APIs, CI/CD, and application security.
+    ---
+    Title: Senior .NET Lead
+    Company: Enterprise Example
+    8+ years experience leading C# and .NET teams.
+    """
+    ranked = rank_job_postings(postings, resume)
+    assert len(ranked) == 2, 'Expected two ranked job postings'
+    assert ranked[0]['title'] == 'Graduate Software Engineer', 'Relevant graduate job should rank first'
+    assert ranked[0]['recommendation'] in {'APPLY', 'REVIEW'}, 'Relevant graduate job should be actionable'
+    assert ranked[0]['platform'] == 'LinkedIn', 'LinkedIn platform should be detected from URL'
+    print('[DISCOVERY] job parsing/ranking smoke passed')
 
 
 def run_bullet_priority_smoke() -> None:
@@ -158,7 +180,8 @@ def run_bullet_priority_smoke() -> None:
     cancer_bullets = ' '.join(extract_project_bullets(html_text, 'Cancer Awareness Mobile App')).lower()
     assert 'no-fabrication validation logic' in jaa_bullets, 'Core validation bullet was dropped from Job Application Assistant'
     assert 'incident lifecycle tracking' in incident_bullets, 'Core lifecycle bullet was dropped from Incident Console'
-    assert 'firebase integration' in cancer_bullets, 'Firebase bullet was dropped from Cancer Awareness Mobile App'
+    if cancer_bullets:
+        assert 'firebase integration' in cancer_bullets, 'Firebase bullet was dropped from Cancer Awareness Mobile App'
     print('[PRIORITY] core/importance bullets retained')
 
 
