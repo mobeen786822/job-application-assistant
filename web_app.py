@@ -290,6 +290,8 @@ def save_job_leads(ranked_jobs: list[dict]) -> int:
             'missing_terms': job.get('missing_terms') or [],
             'positive_signals': job.get('positive_signals') or [],
             'risk_signals': job.get('risk_signals') or [],
+            'preference_signals': job.get('preference_signals') or [],
+            'reasons': job.get('reasons') or [],
             'status': 'shortlisted',
         })
 
@@ -325,7 +327,7 @@ def get_job_leads(limit: int = 100) -> list[dict]:
         try:
             resp = (
                 client.table('job_leads')
-                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,risk_signals,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
+                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,risk_signals,preference_signals,reasons,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
                 .eq('user_id', user['id'])
                 .order('score', desc=True)
                 .order('created_at', desc=True)
@@ -347,7 +349,7 @@ def get_job_lead(lead_id: str) -> dict | None:
         try:
             resp = (
                 client.table('job_leads')
-                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,missing_terms,positive_signals,risk_signals,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
+                .select('id,created_at,updated_at,title,company,location,url,platform,description,score,recommendation,detected_role_type,status,matched_terms,missing_terms,positive_signals,risk_signals,preference_signals,reasons,generated_resume_html,generated_resume_pdf,generated_cover_letter,generated_cover_pdf')
                 .eq('user_id', user['id'])
                 .eq('id', lead_id)
                 .limit(1)
@@ -1133,6 +1135,9 @@ JOBS_PAGE = """
     .card { background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px; box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; }
     label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 6px; }
     textarea { width: 100%; min-height: 260px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 13px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
+    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 10px; background: var(--panel-2); color: var(--ink); }
+    .prefs-grid { display: grid; grid-template-columns: 1fr 180px 160px 160px; gap: 10px; align-items: end; }
+    @media (max-width: 860px) { .prefs-grid { grid-template-columns: 1fr; } }
     .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
     .job-card { display: grid; grid-template-columns: 120px 1fr; gap: 14px; border-top: 1px solid var(--stroke); padding-top: 16px; margin-top: 16px; }
     .score { width: 82px; height: 82px; border-radius: 999px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--stroke); font-size: 24px; font-weight: 700; }
@@ -1167,6 +1172,34 @@ JOBS_PAGE = """
       <form method="post">
         <label>Job postings</label>
         <textarea name="job_posts" placeholder="Title: Graduate Software Engineer&#10;Company: Example Co&#10;Location: Sydney&#10;URL: https://...&#10;&#10;Paste the full job ad here...&#10;---&#10;Title: Cybersecurity Analyst...">{{ job_posts_value }}</textarea>
+        <div class="prefs-grid">
+          <div>
+            <label>Preferred locations</label>
+            <input name="preferred_locations" value="{{ preferred_locations }}" placeholder="Sydney, Remote" />
+          </div>
+          <div>
+            <label>Role focus</label>
+            <select name="role_focus">
+              <option value="both" {% if role_focus == 'both' %}selected{% endif %}>Software + Cyber</option>
+              <option value="software" {% if role_focus == 'software' %}selected{% endif %}>Software</option>
+              <option value="cyber" {% if role_focus == 'cyber' %}selected{% endif %}>Cybersecurity</option>
+            </select>
+          </div>
+          <div>
+            <label>Graduate/junior</label>
+            <select name="prefer_junior">
+              <option value="1" {% if prefer_junior %}selected{% endif %}>Prefer</option>
+              <option value="0" {% if not prefer_junior %}selected{% endif %}>No preference</option>
+            </select>
+          </div>
+          <div>
+            <label>Senior roles</label>
+            <select name="avoid_senior">
+              <option value="1" {% if avoid_senior %}selected{% endif %}>Avoid</option>
+              <option value="0" {% if not avoid_senior %}selected{% endif %}>Allow</option>
+            </select>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="submit">Rank Shortlist</button>
         </div>
@@ -1204,6 +1237,11 @@ JOBS_PAGE = """
           <div class="terms">
             {% for term in job.matched_terms[:8] %}<span class="term">{{ term }}</span>{% endfor %}
           </div>
+          {% endif %}
+          {% if job.reasons %}
+          <ul class="meta">
+            {% for reason in job.reasons[:3] %}<li>{{ reason }}</li>{% endfor %}
+          </ul>
           {% endif %}
           <div class="form-actions">
             <a class="action-link primary" href="{{ url_for('job_workspace', lead_id=job.id) }}">Open workspace</a>
@@ -1248,6 +1286,11 @@ JOBS_PAGE = """
           <div class="terms">
             {% for term in job.matched_terms %}<span class="term">{{ term }}</span>{% endfor %}
           </div>
+          {% endif %}
+          {% if job.reasons %}
+          <ul class="meta">
+            {% for reason in job.reasons %}<li>{{ reason }}</li>{% endfor %}
+          </ul>
           {% endif %}
           <div class="form-actions">
             <form method="post" action="{{ url_for('index') }}">
@@ -1326,9 +1369,17 @@ JOB_WORKSPACE_PAGE = """
         <h3>Matched terms</h3>
         <div class="terms">{% for term in lead.matched_terms %}<span class="term">{{ term }}</span>{% endfor %}</div>
         {% endif %}
+        {% if lead.preference_signals %}
+        <h3>Preference signals</h3>
+        <div class="terms">{% for term in lead.preference_signals %}<span class="term">{{ term }}</span>{% endfor %}</div>
+        {% endif %}
         {% if lead.risk_signals %}
         <h3>Risk signals</h3>
         <div class="terms">{% for term in lead.risk_signals %}<span class="term">{{ term }}</span>{% endfor %}</div>
+        {% endif %}
+        {% if lead.reasons %}
+        <h3>Why this score?</h3>
+        <ul class="meta">{% for reason in lead.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
         {% endif %}
         <form method="post" action="{{ url_for('index') }}" class="form-actions">
           <input type="hidden" name="job_lead_id" value="{{ lead.id }}" />
@@ -1469,12 +1520,26 @@ def jobs():
     job_posts_value = ''
     ranked_jobs = []
     save_notice = ''
+    preferred_locations = 'Sydney, Remote'
+    role_focus = 'both'
+    prefer_junior = True
+    avoid_senior = True
     if request.method == 'POST':
         job_posts_value = request.form.get('job_posts', '').strip()
+        preferred_locations = request.form.get('preferred_locations', preferred_locations).strip()
+        role_focus = request.form.get('role_focus', role_focus).strip() or 'both'
+        prefer_junior = request.form.get('prefer_junior', '1') == '1'
+        avoid_senior = request.form.get('avoid_senior', '1') == '1'
         if job_posts_value:
             ranked_jobs = rank_job_postings(
                 raw_text=job_posts_value,
                 resume_dict=load_resume_json(DEFAULT_RESUME),
+                preferences={
+                    'preferred_locations': preferred_locations,
+                    'role_focus': role_focus,
+                    'prefer_junior': prefer_junior,
+                    'avoid_senior': avoid_senior,
+                },
             )
             saved_count = save_job_leads(ranked_jobs)
             save_notice = f'Saved {saved_count} ranked job lead(s) to your shortlist.'
@@ -1488,6 +1553,10 @@ def jobs():
         ranked_jobs=ranked_jobs,
         saved_leads=saved_leads,
         save_notice=save_notice,
+        preferred_locations=preferred_locations,
+        role_focus=role_focus,
+        prefer_junior=prefer_junior,
+        avoid_senior=avoid_senior,
         app_version=get_app_version(),
     )
 

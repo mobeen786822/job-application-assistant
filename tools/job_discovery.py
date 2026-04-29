@@ -128,16 +128,16 @@ def _parse_one_block(block: str) -> JobPosting:
     )
 
 
-def rank_job_postings(raw_text: str, resume_dict: dict, limit: int = 25) -> list[dict]:
+def rank_job_postings(raw_text: str, resume_dict: dict, limit: int = 25, preferences: dict | None = None) -> list[dict]:
     resume_text = resume_json_to_text(resume_dict)
     resume_terms = _important_terms(resume_text)
     postings = parse_job_postings(raw_text)
-    ranked = [_score_posting(posting, resume_terms) for posting in postings]
+    ranked = [_score_posting(posting, resume_terms, preferences or {}) for posting in postings]
     ranked.sort(key=lambda row: row['score'], reverse=True)
     return ranked[:limit]
 
 
-def _score_posting(posting: JobPosting, resume_terms: set[str]) -> dict:
+def _score_posting(posting: JobPosting, resume_terms: set[str], preferences: dict) -> dict:
     text = normalize_text(posting.description).lower()
     job_terms = _important_terms(text)
     matched = sorted(job_terms & resume_terms)
@@ -149,8 +149,17 @@ def _score_posting(posting: JobPosting, resume_terms: set[str]) -> dict:
     overlap_score = int((len(matched) / max(1, min(len(job_terms), 40))) * 65)
     positive_score = min(25, len(positive_hits) * 4)
     category_bonus = 10 if classification.get('primary_category') in {'software_engineering', 'cybersecurity', 'frontend', 'backend', 'devops'} else 0
-    penalty = min(35, len(negative_hits) * 8)
-    score = max(0, min(100, overlap_score + positive_score + category_bonus - penalty))
+    preference_hits, preference_bonus, preference_penalty = _score_preferences(posting, classification, preferences, negative_hits)
+    penalty = min(45, len(negative_hits) * 8 + preference_penalty)
+    score = max(0, min(100, overlap_score + positive_score + category_bonus + preference_bonus - penalty))
+    reasons = _build_reasons(
+        matched=matched,
+        positive_hits=positive_hits,
+        negative_hits=negative_hits,
+        preference_hits=preference_hits,
+        classification=classification,
+        score=score,
+    )
 
     if score >= 70 and not negative_hits:
         recommendation = 'APPLY'
@@ -175,7 +184,69 @@ def _score_posting(posting: JobPosting, resume_terms: set[str]) -> dict:
         'missing_terms': missing[:8],
         'positive_signals': positive_hits[:8],
         'risk_signals': negative_hits[:8],
+        'preference_signals': preference_hits[:8],
+        'reasons': reasons,
     }
+
+
+def _score_preferences(posting: JobPosting, classification: dict, preferences: dict, negative_hits: list[str]) -> tuple[list[str], int, int]:
+    text = normalize_text(' '.join([posting.title, posting.company, posting.location, posting.description])).lower()
+    hits: list[str] = []
+    bonus = 0
+    penalty = 0
+
+    preferred_locations = [
+        normalize_text(str(x)).strip().lower()
+        for x in re.split(r'[,\n]', str(preferences.get('preferred_locations') or ''))
+        if normalize_text(str(x)).strip()
+    ]
+    if preferred_locations:
+        if any(loc in text for loc in preferred_locations) or 'remote' in text:
+            hits.append('preferred location/remote')
+            bonus += 8
+        else:
+            penalty += 5
+
+    role_focus = normalize_text(str(preferences.get('role_focus') or 'both')).lower()
+    category = str(classification.get('primary_category') or 'unknown')
+    if role_focus == 'software' and category in {'software_engineering', 'frontend', 'backend', 'devops'}:
+        hits.append('software-focused role')
+        bonus += 8
+    elif role_focus == 'cyber' and category == 'cybersecurity':
+        hits.append('cybersecurity-focused role')
+        bonus += 8
+    elif role_focus in {'software', 'cyber'} and category != 'unknown':
+        penalty += 5
+
+    if preferences.get('prefer_junior'):
+        if any(term in text for term in ('graduate', 'junior', 'entry level', 'entry-level', 'associate')):
+            hits.append('junior/graduate friendly')
+            bonus += 10
+        elif negative_hits:
+            penalty += 8
+
+    if preferences.get('avoid_senior') and negative_hits:
+        hits.append('senior/lead risk penalised')
+        penalty += 10
+
+    return hits, min(30, bonus), min(30, penalty)
+
+
+def _build_reasons(*, matched: list[str], positive_hits: list[str], negative_hits: list[str], preference_hits: list[str], classification: dict, score: int) -> list[str]:
+    reasons = []
+    category = str(classification.get('primary_category') or 'unknown').replace('_', ' ')
+    if category != 'unknown':
+        reasons.append(f'Detected as {category}.')
+    if matched:
+        reasons.append(f'Matched resume terms: {", ".join(matched[:5])}.')
+    if positive_hits:
+        reasons.append(f'Positive signals: {", ".join(positive_hits[:4])}.')
+    if preference_hits:
+        reasons.append(f'Preference match: {", ".join(preference_hits[:3])}.')
+    if negative_hits:
+        reasons.append(f'Risk signals: {", ".join(negative_hits[:3])}.')
+    reasons.append(f'Overall score: {score}/100.')
+    return reasons[:5]
 
 
 def _important_terms(text: str) -> set[str]:

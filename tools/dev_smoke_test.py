@@ -154,11 +154,22 @@ def run_job_discovery_smoke(resume: dict) -> None:
     Company: Enterprise Example
     8+ years experience leading C# and .NET teams.
     """
-    ranked = rank_job_postings(postings, resume)
+    ranked = rank_job_postings(
+        postings,
+        resume,
+        preferences={
+            'preferred_locations': 'Sydney, Remote',
+            'role_focus': 'software',
+            'prefer_junior': True,
+            'avoid_senior': True,
+        },
+    )
     assert len(ranked) == 2, 'Expected two ranked job postings'
     assert ranked[0]['title'] == 'Graduate Software Engineer', 'Relevant graduate job should rank first'
     assert ranked[0]['recommendation'] in {'APPLY', 'REVIEW'}, 'Relevant graduate job should be actionable'
     assert ranked[0]['platform'] == 'LinkedIn', 'LinkedIn platform should be detected from URL'
+    assert ranked[0]['reasons'], 'Ranked jobs should include score explanations'
+    assert ranked[0]['preference_signals'], 'Relevant job should include preference signals'
     print('[DISCOVERY] job parsing/ranking smoke passed')
 
 

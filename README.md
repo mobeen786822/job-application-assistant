@@ -6,7 +6,7 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 
 - Web UI (`Flask`) for pasting a job description and generating tailored documents
 - Job shortlist workflow for ranking and saving pasted LinkedIn/SEEK/Indeed postings before generating application packs
-- Per-job application workspace with original posting details, matched signals, and generated file links
+- Per-job application workspace with original posting details, matched signals, score explanations, and generated file links
 - Job-fit assessment with recommendation (`APPLY`, `MAYBE`, `NO`) and gap breakdown
 - Resume generation from `assets/resume.json` + `assets/template.html`
 - Cover letter generation with HTML preview (or text fallback)
@@ -57,6 +57,8 @@ CREATE TABLE job_leads (
   missing_terms jsonb DEFAULT '[]'::jsonb,
   positive_signals jsonb DEFAULT '[]'::jsonb,
   risk_signals jsonb DEFAULT '[]'::jsonb,
+  preference_signals jsonb DEFAULT '[]'::jsonb,
+  reasons jsonb DEFAULT '[]'::jsonb,
   status text DEFAULT 'shortlisted',
   generated_resume_html text,
   generated_resume_pdf text,
