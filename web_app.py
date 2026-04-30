@@ -342,6 +342,25 @@ def get_job_leads(limit: int = 100) -> list[dict]:
     return rows[:limit]
 
 
+def get_job_lead_summary(limit: int = 6) -> dict:
+    leads = get_job_leads(limit=200)
+    status_counts = {status: 0 for status in ('shortlisted', 'generated', 'applied', 'interview', 'rejected')}
+    recommendation_counts = {rec: 0 for rec in ('APPLY', 'REVIEW', 'SKIP')}
+    for lead in leads:
+        status = str(lead.get('status') or '').lower()
+        if status in status_counts:
+            status_counts[status] += 1
+        recommendation = str(lead.get('recommendation') or '').upper()
+        if recommendation in recommendation_counts:
+            recommendation_counts[recommendation] += 1
+    return {
+        'total': len(leads),
+        'status_counts': status_counts,
+        'recommendation_counts': recommendation_counts,
+        'top_leads': leads[:limit],
+    }
+
+
 def get_job_lead(lead_id: str) -> dict | None:
     user = current_user()
     client = SUPABASE_SERVICE_CLIENT
@@ -979,86 +998,34 @@ DASHBOARD_PAGE = """
   <title>Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
-    :root {
-      --ink: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #67e8f9;
-      --panel: #0f172a;
-      --panel-2: #020617;
-      --stroke: #334155;
-      --shadow: 0 18px 60px -24px rgba(6, 182, 212, 0.45);
-      --bg-base: #030712;
-      --bg-radial-1: rgba(34, 197, 94, 0.16);
-      --bg-radial-2: rgba(6, 182, 212, 0.2);
-    }
+    :root { --ink:#e2e8f0; --muted:#94a3b8; --accent:#67e8f9; --panel:#0f172a; --panel-2:#020617; --stroke:#334155; --shadow:0 18px 60px -24px rgba(6,182,212,.45); --bg-base:#030712; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(1200px 600px at 15% 10%, var(--bg-radial-1) 0%, rgba(34,197,94,0) 38%),
-        radial-gradient(1000px 600px at 80% 12%, var(--bg-radial-2) 0%, rgba(6,182,212,0) 36%),
-        radial-gradient(900px 500px at 50% 85%, rgba(14,116,144,0.2) 0%, rgba(14,116,144,0) 42%),
-        var(--bg-base);
-      min-height: 100vh;
-    }
-    .shell {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 28px 20px 60px;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-    h1 { margin: 0; font-family: "Space Grotesk", sans-serif; }
-    .hint { color: var(--muted); font-size: 13px; }
-    .nav-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--stroke);
-      background: var(--panel-2);
-      color: var(--ink);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .nav-link:hover {
-      border-color: #0e7490;
-    }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--stroke);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
-      padding: 18px;
-      margin-bottom: 14px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      text-align: left;
-      padding: 9px 8px;
-      border-bottom: 1px solid var(--stroke);
-      vertical-align: top;
-    }
-    th {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
+    body { margin:0; font-family:"DM Sans", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; color:var(--ink); background:radial-gradient(1200px 600px at 15% 10%, rgba(34,197,94,.16), transparent 38%), radial-gradient(1000px 600px at 80% 12%, rgba(6,182,212,.2), transparent 36%), var(--bg-base); min-height:100vh; }
+    .shell { max-width:1180px; margin:0 auto; padding:28px 20px 60px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    h1,h2,h3 { font-family:"Space Grotesk", sans-serif; }
+    h1 { margin:0 0 6px; }
+    .hint { color:var(--muted); font-size:13px; }
+    .nav-link { display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:10px; border:1px solid var(--stroke); background:var(--panel-2); color:var(--ink); text-decoration:none; font-size:13px; font-weight:600; }
+    .nav-link:hover { border-color:#0e7490; }
+    .card,.stat { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; box-shadow:var(--shadow); padding:18px; margin-bottom:14px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+    .stat { margin-bottom:0; }
+    .stat-value { font-size:28px; font-weight:700; font-family:"Space Grotesk", sans-serif; margin-top:6px; }
+    .stat-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; }
+    .section-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+    .quick-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .pill { display:inline-flex; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; margin-right:6px; border:1px solid var(--stroke); }
+    .apply { background:#052e16; color:#86efac; border-color:#166534; }
+    .review { background:#422006; color:#fde68a; border-color:#854d0e; }
+    .skip { background:#450a0a; color:#fecaca; border-color:#991b1b; }
+    .lead-list { display:grid; gap:10px; margin-top:12px; }
+    .lead-item { background:var(--panel-2); border:1px solid var(--stroke); border-radius:12px; padding:12px; }
+    .lead-title { font-weight:700; margin:6px 0 4px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--stroke); vertical-align:top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; }
+    @media (max-width:860px){ .stats-grid,.section-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -1066,8 +1033,8 @@ DASHBOARD_PAGE = """
     <div class="header">
       <div>
         <h1>Dashboard</h1>
-        <div class="hint">{{ user_email }}</div>
-        <div class="hint">Build: <code>{{ app_version }}</code></div>
+        <div class="hint">Application command centre for {{ user_email }}</div>
+        <div class="hint">Track monthly usage, shortlist progress, and recent generated application packs. Build: <code>{{ app_version }}</code></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
@@ -1075,35 +1042,59 @@ DASHBOARD_PAGE = """
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
       </div>
     </div>
-    <div class="card">
-      <strong>Generations this month:</strong> {{ monthly_used }}/{{ monthly_limit }}
+
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">Generations this month</div><div class="stat-value">{{ monthly_used }}/{{ monthly_limit }}</div></div>
+      <div class="stat"><div class="stat-label">Saved job leads</div><div class="stat-value">{{ job_summary.total }}</div></div>
+      <div class="stat"><div class="stat-label">Ready to apply</div><div class="stat-value">{{ job_summary.recommendation_counts.APPLY }}</div></div>
+      <div class="stat"><div class="stat-label">Applied / interview</div><div class="stat-value">{{ job_summary.status_counts.applied + job_summary.status_counts.interview }}</div></div>
     </div>
+
     <div class="card">
-      <h3 style="margin-top:0">Past Generations</h3>
-      {% if generations %}
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Job title</th>
-            <th>Detected role type</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in generations %}
-          <tr>
-            <td>{{ item.created_at }}</td>
-            <td>{{ item.job_title or '-' }}</td>
-            <td>{{ item.detected_role_type or '-' }}</td>
-            <td>{{ item.status or '-' }}</td>
-          </tr>
+      <h3 style="margin-top:0">Next actions</h3>
+      <div class="hint">Use the shortlist to rank new roles, or jump straight into resume generation when you already know the job is worth applying for.</div>
+      <div class="quick-actions">
+        <a class="nav-link" href="{{ url_for('jobs') }}">Rank jobs</a>
+        <a class="nav-link" href="{{ url_for('index') }}">Generate resume</a>
+      </div>
+    </div>
+
+    <div class="section-grid">
+      <div class="card">
+        <h3 style="margin-top:0">Shortlist snapshot</h3>
+        <div class="hint">Shortlisted: {{ job_summary.status_counts.shortlisted }} · Generated: {{ job_summary.status_counts.generated }} · Applied: {{ job_summary.status_counts.applied }} · Interview: {{ job_summary.status_counts.interview }} · Rejected: {{ job_summary.status_counts.rejected }}</div>
+        {% if job_summary.top_leads %}
+        <div class="lead-list">
+          {% for lead in job_summary.top_leads %}
+          <div class="lead-item">
+            <span class="pill {% if lead.recommendation == 'APPLY' %}apply{% elif lead.recommendation == 'SKIP' %}skip{% else %}review{% endif %}">{{ lead.recommendation }}</span>
+            <span class="pill">{{ lead.status|title }}</span>
+            <div class="lead-title">{{ lead.title }}</div>
+            <div class="hint">{% if lead.company %}{{ lead.company }}{% endif %}{% if lead.company and lead.location %} · {% endif %}{% if lead.location %}{{ lead.location }}{% endif %} · Score {{ lead.score }}</div>
+            <div class="quick-actions"><a class="nav-link" href="{{ url_for('job_workspace', lead_id=lead.id) }}">Open workspace</a></div>
+          </div>
           {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <div class="hint">No generations yet.</div>
-      {% endif %}
+        </div>
+        {% else %}
+        <div class="hint" style="margin-top:12px">No saved job leads yet. Rank a few jobs to build your pipeline.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Past generations</h3>
+        {% if generations %}
+        <table>
+          <thead><tr><th>Date</th><th>Job title</th><th>Detected role type</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for item in generations %}
+            <tr><td>{{ item.created_at }}</td><td>{{ item.job_title or '-' }}</td><td>{{ item.detected_role_type or '-' }}</td><td>{{ item.status or '-' }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="hint">No generations yet.</div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </body>
@@ -1667,14 +1658,19 @@ def dashboard():
     unlimited = has_unlimited_usage(user)
     monthly_used = get_current_month_generation_count()
     generations = get_generation_history(limit=100)
+    job_summary = get_job_lead_summary(limit=6)
     for item in generations:
         item['created_at'] = format_created_at(item.get('created_at'))
+    for lead in job_summary['top_leads']:
+        lead['created_at'] = format_created_at(lead.get('created_at'))
+        lead['updated_at'] = format_created_at(lead.get('updated_at'))
     return render_template_string(
         DASHBOARD_PAGE,
         user_email=(user or {}).get('email', ''),
         monthly_used=monthly_used,
         monthly_limit='Unlimited' if unlimited else MAX_MONTHLY_GENERATIONS,
         generations=generations,
+        job_summary=job_summary,
         app_version=get_app_version(),
     )
 

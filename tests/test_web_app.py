@@ -200,6 +200,18 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'Applied', response.data)
         self.assertIn(b'Open workspace', response.data)
 
+    def test_dashboard_shows_shortlist_snapshot(self):
+        self.sign_in()
+        self.client.post('/jobs', data={'job_posts': SAMPLE_JOB})
+
+        response = self.client.get('/dashboard')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Application command centre', response.data)
+        self.assertIn(b'Saved job leads', response.data)
+        self.assertIn(b'Shortlist snapshot', response.data)
+        self.assertIn(b'Junior Software Developer', response.data)
+
     def test_record_generation_counts_current_month(self):
         self.sign_in()
         with self.client:
