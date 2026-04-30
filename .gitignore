@@ -9,3 +9,4 @@ tmp_job.txt
 .venv/
 .venv-1/
 .flask_session/
+supabase/.temp/
