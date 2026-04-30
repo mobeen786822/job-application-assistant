@@ -1165,7 +1165,31 @@ JOBS_PAGE = """
       background-size: 6px 6px, 6px 6px;
       background-repeat: no-repeat;
     }
-    .prefs-grid { display: grid; grid-template-columns: 1fr 180px 160px 160px; gap: 10px; align-items: end; }
+    .prefs-grid { display: grid; grid-template-columns: 1fr 1.1fr 0.9fr 0.9fr; gap: 10px; align-items: end; }
+    .choice-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .choice-option { position: relative; flex: 1 1 auto; min-width: 74px; }
+    .choice-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .choice-option span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 9px 11px;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, color .15s ease;
+    }
+    .choice-option input:checked + span {
+      border-color: #0e7490;
+      background: linear-gradient(135deg, rgba(14,116,144,.75), rgba(6,182,212,.55));
+      color: #ecfeff;
+    }
+    .choice-option span:hover { border-color: #0e7490; color: var(--ink); }
     @media (max-width: 860px) { .prefs-grid { grid-template-columns: 1fr; } }
     .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
     .job-card { display: grid; grid-template-columns: 120px 1fr; gap: 14px; border-top: 1px solid var(--stroke); padding-top: 16px; margin-top: 16px; }
@@ -1223,25 +1247,25 @@ JOBS_PAGE = """
           </div>
           <div>
             <label>Role focus</label>
-            <select name="role_focus">
-              <option value="both" {% if role_focus == 'both' %}selected{% endif %}>Software + Cyber</option>
-              <option value="software" {% if role_focus == 'software' %}selected{% endif %}>Software</option>
-              <option value="cyber" {% if role_focus == 'cyber' %}selected{% endif %}>Cybersecurity</option>
-            </select>
+            <div class="choice-group" role="radiogroup" aria-label="Role focus">
+              <label class="choice-option"><input type="radio" name="role_focus" value="both" {% if role_focus == 'both' %}checked{% endif %}><span>Both</span></label>
+              <label class="choice-option"><input type="radio" name="role_focus" value="software" {% if role_focus == 'software' %}checked{% endif %}><span>Software</span></label>
+              <label class="choice-option"><input type="radio" name="role_focus" value="cyber" {% if role_focus == 'cyber' %}checked{% endif %}><span>Cyber</span></label>
+            </div>
           </div>
           <div>
             <label>Graduate/junior</label>
-            <select name="prefer_junior">
-              <option value="1" {% if prefer_junior %}selected{% endif %}>Prefer</option>
-              <option value="0" {% if not prefer_junior %}selected{% endif %}>No preference</option>
-            </select>
+            <div class="choice-group" role="radiogroup" aria-label="Graduate or junior preference">
+              <label class="choice-option"><input type="radio" name="prefer_junior" value="1" {% if prefer_junior %}checked{% endif %}><span>Prefer</span></label>
+              <label class="choice-option"><input type="radio" name="prefer_junior" value="0" {% if not prefer_junior %}checked{% endif %}><span>Neutral</span></label>
+            </div>
           </div>
           <div>
             <label>Senior roles</label>
-            <select name="avoid_senior">
-              <option value="1" {% if avoid_senior %}selected{% endif %}>Avoid</option>
-              <option value="0" {% if not avoid_senior %}selected{% endif %}>Allow</option>
-            </select>
+            <div class="choice-group" role="radiogroup" aria-label="Senior role preference">
+              <label class="choice-option"><input type="radio" name="avoid_senior" value="1" {% if avoid_senior %}checked{% endif %}><span>Avoid</span></label>
+              <label class="choice-option"><input type="radio" name="avoid_senior" value="0" {% if not avoid_senior %}checked{% endif %}><span>Allow</span></label>
+            </div>
           </div>
         </div>
         <div class="form-actions">
