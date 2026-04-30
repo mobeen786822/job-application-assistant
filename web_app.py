@@ -704,7 +704,7 @@ PAGE = """
       <div>
         <h1>Resume Tailor</h1>
         <div class="hint">Paste a job description and generate a tailored HTML + PDF. Build: <code>{{ app_version }}</code></div>
-        <div class="hint">Signed in as {{ user_email }}. This month: {{ monthly_used }}/{{ monthly_limit }} generations.</div>
+        <div class="hint">Signed in as {{ user_email }}. {% if unlimited %}Unlimited generation access enabled.{% else %}This month: {{ monthly_used }}/{{ monthly_limit }} generations.{% endif %}</div>
       </div>
       <div class="header-right">
         <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
@@ -1044,7 +1044,7 @@ DASHBOARD_PAGE = """
     </div>
 
     <div class="stats-grid">
-      <div class="stat"><div class="stat-label">Generations this month</div><div class="stat-value">{{ monthly_used }}/{{ monthly_limit }}</div></div>
+      <div class="stat"><div class="stat-label">Generations this month</div><div class="stat-value">{% if unlimited %}{{ monthly_used }} used{% else %}{{ monthly_used }}/{{ monthly_limit }}{% endif %}</div></div>
       <div class="stat"><div class="stat-label">Saved job leads</div><div class="stat-value">{{ job_summary.total }}</div></div>
       <div class="stat"><div class="stat-label">Ready to apply</div><div class="stat-value">{{ job_summary.recommendation_counts.APPLY }}</div></div>
       <div class="stat"><div class="stat-label">Applied / interview</div><div class="stat-value">{{ job_summary.status_counts.applied + job_summary.status_counts.interview }}</div></div>
@@ -1669,6 +1669,7 @@ def dashboard():
         user_email=(user or {}).get('email', ''),
         monthly_used=monthly_used,
         monthly_limit='Unlimited' if unlimited else MAX_MONTHLY_GENERATIONS,
+        unlimited=unlimited,
         generations=generations,
         job_summary=job_summary,
         app_version=get_app_version(),
@@ -1798,6 +1799,7 @@ def index():
         user_email=(user or {}).get('email', ''),
         monthly_used=monthly_used,
         monthly_limit=monthly_limit_display,
+        unlimited=unlimited,
     )
 
 

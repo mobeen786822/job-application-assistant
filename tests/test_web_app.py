@@ -212,6 +212,19 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'Shortlist snapshot', response.data)
         self.assertIn(b'Junior Software Developer', response.data)
 
+    def test_dashboard_hides_unlimited_fraction_for_unlimited_users(self):
+        original_unlimited = web_app.UNLIMITED_USAGE_EMAILS
+        web_app.UNLIMITED_USAGE_EMAILS = {'tester@example.com'}
+        try:
+            self.sign_in()
+            response = self.client.get('/dashboard')
+        finally:
+            web_app.UNLIMITED_USAGE_EMAILS = original_unlimited
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'used', response.data)
+        self.assertNotIn(b'/Unlimited', response.data)
+
     def test_record_generation_counts_current_month(self):
         self.sign_in()
         with self.client:
