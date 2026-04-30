@@ -151,12 +151,14 @@ Arguments:
 - `--out-dir` (optional): output folder
 - `--label` (optional): filename label
 
-## Development Smoke Test
+## Development Tests
 
-Run quick regression checks (strategy order, bullet safety, link formatting):
+Run the Flask/Supabase integration tests and quick resume-engine smoke checks:
 
 ```powershell
+python -m unittest discover -s tests -v
 python tools/dev_smoke_test.py
+python tools/check_supabase_schema.py
 ```
 
 ## Output Files

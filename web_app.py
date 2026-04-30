@@ -1175,11 +1175,16 @@ JOBS_PAGE = """
     .review { background: #422006; color: #fde68a; border-color: #854d0e; }
     .skip { background: #450a0a; color: #fecaca; border-color: #991b1b; }
     .meta { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
+    .workflow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .step { background: var(--panel-2); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px; }
+    .step strong { display: block; margin-bottom: 4px; }
+    .empty-state { text-align: center; padding: 28px 18px; }
+    .empty-state h2 { margin: 0 0 8px; }
     .terms { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
     .term { font-size: 12px; padding: 3px 7px; border-radius: 999px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--stroke); }
     details { margin-top: 10px; color: var(--muted); }
     pre { white-space: pre-wrap; max-height: 280px; overflow: auto; background: var(--panel-2); border: 1px solid var(--stroke); border-radius: 10px; padding: 10px; color: var(--ink); }
-    @media (max-width: 760px) { .job-card { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { .job-card { grid-template-columns: 1fr; } .workflow { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -1187,13 +1192,21 @@ JOBS_PAGE = """
     <div class="header">
       <div>
         <h1>Job Shortlist</h1>
-        <div class="hint">Paste job postings from LinkedIn, SEEK, Indeed, or anywhere else. Separate postings with <code>---</code> or <code>===</code>.</div>
-        <div class="hint">This is approval-first: rank jobs, save a shortlist, and generate docs before any external application step.</div>
+        <div class="hint">Turn a pile of job ads into a ranked application pipeline.</div>
+        <div class="hint">Paste one or many postings, shortlist the best fits, then generate a tracked resume/cover-letter pack from each saved lead.</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
         <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="workflow">
+        <div class="step"><strong>1. Collect</strong><div class="hint">Paste job ads or upload a CSV batch.</div></div>
+        <div class="step"><strong>2. Rank</strong><div class="hint">Score roles against your resume, preferences, and seniority target.</div></div>
+        <div class="step"><strong>3. Apply</strong><div class="hint">Open a saved lead to generate docs and track status.</div></div>
       </div>
     </div>
 
@@ -1232,7 +1245,8 @@ JOBS_PAGE = """
           </div>
         </div>
         <div class="form-actions">
-          <button type="submit">Rank Shortlist</button>
+          <button type="submit">Rank and Save Shortlist</button>
+          <span class="hint">Saved jobs appear below and stay available after refresh/login.</span>
         </div>
       </form>
     </div>
@@ -1247,6 +1261,7 @@ JOBS_PAGE = """
     {% if saved_leads %}
     <div class="card">
       <h2 style="margin-top:0">Saved shortlist</h2>
+      <div class="hint">Open a workspace to generate an application pack, attach generated files to the job, and update application status.</div>
       {% for job in saved_leads %}
       <div class="job-card">
         <div>
@@ -1324,10 +1339,7 @@ JOBS_PAGE = """
           </ul>
           {% endif %}
           <div class="form-actions">
-            <form method="post" action="{{ url_for('index') }}">
-              <input type="hidden" name="job_text" value="{{ job.description }}" />
-              <button type="submit" class="primary">Generate application pack</button>
-            </form>
+            <span class="hint">Saved above. Use the saved shortlist workspace to generate and track this application.</span>
           </div>
           <details>
             <summary>View pasted job text</summary>
@@ -1336,6 +1348,13 @@ JOBS_PAGE = """
         </div>
       </div>
       {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not saved_leads and not ranked_jobs %}
+    <div class="card empty-state">
+      <h2>Build your shortlist</h2>
+      <div class="hint">Paste a job ad above to see match scores, APPLY/REVIEW/SKIP recommendations, and a persistent saved lead list.</div>
     </div>
     {% endif %}
   </div>
