@@ -120,7 +120,20 @@ Open:
 - `ANTHROPIC_API_KEY` - enables AI tailoring, fit assessment, and AI cover letters via Anthropic
 - `ANTHROPIC_MODEL` - optional model name override used by Anthropic calls
 - `AI_PROVIDER` - optional provider override (`openai` or `anthropic`); otherwise auto-selects based on available keys
+- `SUPABASE_URL` - Supabase project URL, required for login/signup and saved history
+- `SUPABASE_ANON_KEY` - Supabase anon public key, required for auth
+- `SUPABASE_SERVICE_KEY` - Supabase service role key, used server-side for per-user generation/job-lead records. Never expose this in frontend code or public logs.
 - `APP_VERSION` - optional build/version label shown in UI
+
+## Supabase Setup
+
+Apply the schema in Supabase before using the SaaS/job-shortlist features:
+
+1. Open Supabase Dashboard -> your project -> **SQL Editor**.
+2. Paste and run `supabase/apply_schema.sql`.
+3. Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_KEY` to `.env` on the server.
+
+`supabase/apply_schema.sql` is idempotent, so it is safe to rerun after deploys or on a fresh project.
 
 ## CLI Usage
 
