@@ -1156,6 +1156,7 @@ JOBS_PAGE = """
     label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 6px; }
     textarea { width: 100%; min-height: 260px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 13px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
     input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 10px; background: var(--panel-2); color: var(--ink); }
+    select { padding-right: 36px; background-position: right 12px center; }
     .prefs-grid { display: grid; grid-template-columns: 1fr 180px 160px 160px; gap: 10px; align-items: end; }
     @media (max-width: 860px) { .prefs-grid { grid-template-columns: 1fr; } }
     .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
