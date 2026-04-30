@@ -1155,7 +1155,7 @@ JOBS_PAGE = """
     .card { background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px; box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; }
     label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 12px 0 6px; }
     textarea { width: 100%; min-height: 260px; font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 13px; padding: 12px 14px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
-    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 10px; background: var(--panel-2); color: var(--ink); }
+    input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--panel-2); color: var(--ink); }
     select {
       appearance: none;
       -webkit-appearance: none;
