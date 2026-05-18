@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import secrets
 import subprocess
 import tempfile
 import time
@@ -74,11 +75,34 @@ UNLIMITED_USAGE_EMAILS = {
 }
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'change-me-in-production')
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _is_production_env() -> bool:
+    return (os.environ.get('APP_ENV') or os.environ.get('FLASK_ENV') or '').strip().lower() in {'prod', 'production'}
+
+
+def _validated_secret_key(secret_key: str | None, is_production: bool) -> str:
+    if is_production and (not secret_key or secret_key == 'change-me-in-production'):
+        raise RuntimeError('FLASK_SECRET_KEY must be set to a strong non-default value in production.')
+    return secret_key or 'dev-only-change-me'
+
+
+_production = _is_production_env()
+app.config['SECRET_KEY'] = _validated_secret_key(os.environ.get('FLASK_SECRET_KEY'), _production)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = str(APP_ROOT / '.flask_session')
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', _production)
 Session(app)
 
 try:
@@ -128,6 +152,48 @@ def login_required(handler):
     return wrapped
 
 
+def _csrf_token() -> str:
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['csrf_token'] = token
+    return str(token)
+
+
+@app.context_processor
+def inject_security_context():
+    return {'csrf_token': _csrf_token}
+
+
+@app.before_request
+def validate_csrf_token():
+    if request.method != 'POST':
+        return None
+    expected = session.get('csrf_token')
+    provided = request.form.get('csrf_token') or request.headers.get('X-CSRF-Token')
+    if not expected or not provided or not secrets.compare_digest(str(expected), str(provided)):
+        return Response('CSRF token missing or invalid.', status=400)
+    return None
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+        "img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "script-src 'self' 'unsafe-inline'; frame-src 'self'; form-action 'self'",
+    )
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    if app.config.get('SESSION_COOKIE_SECURE'):
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
+
+
 def _safe_next_path(next_value: str | None) -> str:
     if next_value and next_value.startswith('/') and not next_value.startswith('//'):
         return next_value
@@ -148,6 +214,63 @@ def _get_local_generations() -> list[dict]:
 
 def _get_local_job_leads() -> list[dict]:
     return list(session.get('local_job_leads') or [])
+
+
+def _session_output_files() -> set[str]:
+    return {str(name) for name in (session.get('owned_output_files') or []) if str(name).strip()}
+
+
+def _remember_output_files(*filenames: str) -> None:
+    owned = _session_output_files()
+    for filename in filenames:
+        safe_name = Path(str(filename or '')).name
+        if safe_name:
+            owned.add(safe_name)
+    session['owned_output_files'] = sorted(owned)[-200:]
+
+
+def _safe_output_path(filename: str) -> Path | None:
+    if not filename or Path(filename).name != filename:
+        return None
+    output_root = Path(OUTPUT_DIR).resolve()
+    candidate = (output_root / filename).resolve()
+    try:
+        candidate.relative_to(output_root)
+    except ValueError:
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def _user_owns_output_file(filename: str) -> bool:
+    safe_name = Path(str(filename or '')).name
+    if not safe_name or safe_name != filename:
+        return False
+    if safe_name in _session_output_files():
+        return True
+
+    user = current_user()
+    client = SUPABASE_SERVICE_CLIENT
+    output_columns = ('generated_resume_html', 'generated_resume_pdf', 'generated_cover_letter', 'generated_cover_pdf')
+    if user and client:
+        try:
+            resp = (
+                client.table('job_leads')
+                .select(','.join(output_columns))
+                .eq('user_id', user['id'])
+                .execute()
+            )
+            for row in resp.data or []:
+                if any(Path(str(row.get(column) or '')).name == safe_name for column in output_columns):
+                    return True
+        except Exception:
+            logging.exception('Failed to verify output ownership; falling back to session storage')
+
+    for row in _get_local_job_leads():
+        if any(Path(str(row.get(column) or '')).name == safe_name for column in output_columns):
+            return True
+    return False
 
 
 def _job_lead_hash(job: dict) -> str:
@@ -392,14 +515,14 @@ def update_job_lead_status(lead_id: str, status: str) -> bool:
     patch = {'status': status, 'updated_at': datetime.now(timezone.utc).isoformat()}
     if user and client:
         try:
-            (
+            resp = (
                 client.table('job_leads')
                 .update(patch)
                 .eq('user_id', user['id'])
                 .eq('id', lead_id)
                 .execute()
             )
-            return True
+            return bool(getattr(resp, 'data', None)) or int(getattr(resp, 'count', 0) or 0) > 0
         except Exception:
             logging.exception('Failed to update job lead status; falling back to session storage')
     rows = _get_local_job_leads()
@@ -716,6 +839,7 @@ PAGE = """
     <div class="grid">
       <div class="card">
         <form method="post" id="resume-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <label>Job description</label>
           <textarea name="job_text" placeholder="Paste the full job description here...">{{ job_text_value }}</textarea>
           <div class="form-actions">
@@ -973,6 +1097,7 @@ AUTH_PAGE = """
     <div class="alert ok">{{ success_msg }}</div>
     {% endif %}
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="next" value="{{ next_path }}" />
       <label>Email</label>
       <input type="email" name="email" required autocomplete="email" />
@@ -1236,6 +1361,7 @@ JOBS_PAGE = """
 
     <div class="card">
       <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <label>Job postings</label>
         <textarea name="job_posts" placeholder="Title: Graduate Software Engineer&#10;Company: Example Co&#10;Location: Sydney&#10;URL: https://...&#10;&#10;Paste the full job ad here...&#10;---&#10;Title: Cybersecurity Analyst...&#10;&#10;Or upload a CSV with title, company, location, url, platform, description columns.">{{ job_posts_value }}</textarea>
         <label>Optional CSV import</label>
@@ -1456,11 +1582,13 @@ JOB_WORKSPACE_PAGE = """
         <ul class="meta">{% for reason in lead.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
         {% endif %}
         <form method="post" action="{{ url_for('index') }}" class="form-actions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <input type="hidden" name="job_lead_id" value="{{ lead.id }}" />
           <input type="hidden" name="job_text" value="{{ lead.description }}" />
           <button type="submit">Generate application pack</button>
         </form>
         <form method="post" action="{{ url_for('update_job_status', lead_id=lead.id) }}" class="form-actions">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button type="submit" name="status" value="shortlisted">Shortlisted</button>
           <button type="submit" name="status" value="generated">Generated</button>
           <button type="submit" name="status" value="applied">Applied</button>
@@ -1791,6 +1919,7 @@ def index():
             except (Exception, SystemExit):
                 logging.exception("Cover letter generation skipped")
                 cover_text = "Cover letter unavailable. Resume generation completed."
+            _remember_output_files(resume_html_name, resume_pdf_name, cover_name, cover_pdf_name)
             if job_lead_id:
                 record_job_lead_outputs(
                     job_lead_id,
@@ -1839,14 +1968,19 @@ def index():
 @app.route('/outputs/<path:filename>')
 @login_required
 def download_output(filename: str):
-    return send_from_directory(OUTPUT_DIR, filename, as_attachment=False)
+    safe_name = Path(str(filename or '')).name
+    path = _safe_output_path(safe_name)
+    if not path or safe_name != filename or not _user_owns_output_file(safe_name):
+        return Response('Not found', status=404)
+    return send_from_directory(OUTPUT_DIR, safe_name, as_attachment=False)
 
 
 @app.route('/preview/<path:filename>')
 @login_required
 def preview_output(filename: str):
-    path = Path(OUTPUT_DIR) / filename
-    if not path.exists():
+    safe_name = Path(str(filename or '')).name
+    path = _safe_output_path(safe_name)
+    if not path or safe_name != filename or not _user_owns_output_file(safe_name):
         return Response('Not found', status=404)
     html = path.read_text(encoding='utf-8', errors='replace')
     inject = """

@@ -1,5 +1,7 @@
+import tempfile
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import web_app
@@ -153,6 +155,9 @@ class WebAppTests(unittest.TestCase):
         self.fake_db = FakeSupabaseClient()
         self.original_service_client = web_app.SUPABASE_SERVICE_CLIENT
         self.original_auth_client = web_app.SUPABASE_AUTH_CLIENT
+        self.original_output_dir = web_app.OUTPUT_DIR
+        self.output_tmp = tempfile.TemporaryDirectory()
+        web_app.OUTPUT_DIR = self.output_tmp.name
         web_app.SUPABASE_SERVICE_CLIENT = self.fake_db
         web_app.SUPABASE_AUTH_CLIENT = object()
         web_app.app.config.update(TESTING=True, SECRET_KEY='test-secret')
@@ -161,13 +166,25 @@ class WebAppTests(unittest.TestCase):
     def tearDown(self):
         web_app.SUPABASE_SERVICE_CLIENT = self.original_service_client
         web_app.SUPABASE_AUTH_CLIENT = self.original_auth_client
+        web_app.OUTPUT_DIR = self.original_output_dir
+        self.output_tmp.cleanup()
 
-    def sign_in(self):
+    def sign_in(self, user_id='user-123', email='tester@example.com'):
         with self.client.session_transaction() as session:
-            session['user_id'] = 'user-123'
-            session['user_email'] = 'tester@example.com'
+            session['user_id'] = user_id
+            session['user_email'] = email
             session['sb_access_token'] = 'access-token'
             session['sb_refresh_token'] = 'refresh-token'
+
+    def csrf_token(self, path='/jobs'):
+        self.client.get(path)
+        with self.client.session_transaction() as session:
+            return session['csrf_token']
+
+    def post_with_csrf(self, path, data=None, token_path=None, **kwargs):
+        payload = dict(data or {})
+        payload['csrf_token'] = self.csrf_token(token_path or path)
+        return self.client.post(path, data=payload, **kwargs)
 
     def test_jobs_requires_login(self):
         response = self.client.get('/jobs')
@@ -177,7 +194,7 @@ class WebAppTests(unittest.TestCase):
     def test_jobs_post_saves_shortlist_and_status_persists(self):
         self.sign_in()
 
-        response = self.client.post('/jobs', data={'job_posts': SAMPLE_JOB})
+        response = self.post_with_csrf('/jobs', data={'job_posts': SAMPLE_JOB})
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Saved 1 ranked job lead', response.data)
@@ -190,7 +207,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn('Junior', lead['title'])
 
         lead_id = lead['id']
-        response = self.client.post(f'/jobs/{lead_id}/status', data={'status': 'applied'})
+        response = self.post_with_csrf(f'/jobs/{lead_id}/status', data={'status': 'applied'}, token_path=f'/jobs/{lead_id}')
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.fake_db.tables['job_leads'][0]['status'], 'applied')
@@ -202,7 +219,7 @@ class WebAppTests(unittest.TestCase):
 
     def test_dashboard_shows_shortlist_snapshot(self):
         self.sign_in()
-        self.client.post('/jobs', data={'job_posts': SAMPLE_JOB})
+        self.post_with_csrf('/jobs', data={'job_posts': SAMPLE_JOB})
 
         response = self.client.get('/dashboard')
 
@@ -211,6 +228,93 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'Saved job leads', response.data)
         self.assertIn(b'Shortlist snapshot', response.data)
         self.assertIn(b'Junior Software Developer', response.data)
+
+    def test_tokenless_post_is_rejected_across_key_routes(self):
+        self.sign_in()
+        self.post_with_csrf('/jobs', data={'job_posts': SAMPLE_JOB})
+        lead_id = self.fake_db.tables['job_leads'][0]['id']
+
+        cases = [
+            ('/login', {'email': 'tester@example.com', 'password': 'password'}),
+            ('/signup', {'email': 'new@example.com', 'password': 'password'}),
+            ('/', {'job_text': SAMPLE_JOB}),
+            (f'/jobs/{lead_id}/status', {'status': 'applied'}),
+            ('/', {'job_text': SAMPLE_JOB, 'job_lead_id': lead_id}),
+        ]
+        for path, data in cases:
+            with self.subTest(path=path, data=data):
+                response = self.client.post(path, data=data)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(b'CSRF', response.data)
+
+    def test_output_files_require_current_user_ownership(self):
+        self.sign_in()
+        output_dir = Path(web_app.OUTPUT_DIR)
+        (output_dir / 'owned.html').write_text('<html><body>owned</body></html>', encoding='utf-8')
+        (output_dir / 'other.html').write_text('<html><body>other</body></html>', encoding='utf-8')
+        self.fake_db.tables['job_leads'].extend([
+            {'id': 'lead-owned', 'user_id': 'user-123', 'generated_resume_html': 'owned.html'},
+            {'id': 'lead-other', 'user_id': 'user-456', 'generated_resume_html': 'other.html'},
+        ])
+
+        owner_response = self.client.get('/outputs/owned.html')
+        owner_preview_response = self.client.get('/preview/owned.html')
+        cross_user_output_response = self.client.get('/outputs/other.html')
+        cross_user_preview_response = self.client.get('/preview/other.html')
+        traversal_response = self.client.get('/preview/../owned.html')
+
+        try:
+            self.assertEqual(owner_response.status_code, 200)
+            self.assertEqual(owner_preview_response.status_code, 200)
+            self.assertEqual(cross_user_output_response.status_code, 404)
+            self.assertEqual(cross_user_preview_response.status_code, 404)
+            self.assertEqual(traversal_response.status_code, 404)
+        finally:
+            owner_response.close()
+            owner_preview_response.close()
+            cross_user_output_response.close()
+            cross_user_preview_response.close()
+            traversal_response.close()
+
+    def test_security_headers_are_set(self):
+        response = self.client.get('/login')
+
+        self.assertEqual(response.headers['X-Frame-Options'], 'DENY')
+        self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
+        self.assertIn("frame-ancestors 'none'", response.headers['Content-Security-Policy'])
+        self.assertIn('camera=()', response.headers['Permissions-Policy'])
+
+    def test_production_secret_fails_closed_for_missing_or_default_secret(self):
+        for value in (None, '', 'change-me-in-production'):
+            with self.subTest(value=value):
+                with self.assertRaises(RuntimeError):
+                    web_app._validated_secret_key(value, True)
+        self.assertEqual(web_app._validated_secret_key('strong-production-secret', True), 'strong-production-secret')
+
+    def test_secure_cookie_and_hsts_when_production_secure_enabled(self):
+        original_secure = web_app.app.config['SESSION_COOKIE_SECURE']
+        try:
+            web_app.app.config['SESSION_COOKIE_SECURE'] = True
+            response = self.client.get('/login')
+        finally:
+            web_app.app.config['SESSION_COOKIE_SECURE'] = original_secure
+
+        self.assertEqual(web_app.app.config['SESSION_COOKIE_HTTPONLY'], True)
+        self.assertEqual(web_app.app.config['SESSION_COOKIE_SAMESITE'], 'Lax')
+        self.assertIn('max-age=31536000', response.headers['Strict-Transport-Security'])
+
+    def test_cross_user_status_update_is_rejected(self):
+        self.fake_db.tables['job_leads'].append({
+            'id': 'other-lead',
+            'user_id': 'user-456',
+            'status': 'shortlisted',
+        })
+        self.sign_in(user_id='user-123')
+
+        response = self.post_with_csrf('/jobs/other-lead/status', data={'status': 'applied'}, token_path='/jobs')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.fake_db.tables['job_leads'][0]['status'], 'shortlisted')
 
     def test_dashboard_hides_unlimited_fraction_for_unlimited_users(self):
         original_unlimited = web_app.UNLIMITED_USAGE_EMAILS
