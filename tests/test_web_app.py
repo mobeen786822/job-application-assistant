@@ -281,7 +281,12 @@ class WebAppTests(unittest.TestCase):
 
         self.assertEqual(response.headers['X-Frame-Options'], 'DENY')
         self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
-        self.assertIn("frame-ancestors 'none'", response.headers['Content-Security-Policy'])
+        csp = response.headers['Content-Security-Policy']
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertNotIn("'unsafe-inline'", csp)
+        self.assertIn("style-src 'self' 'nonce-", csp)
+        self.assertIn("script-src 'self' 'nonce-", csp)
+        self.assertIn(b'<style nonce="', response.data)
         self.assertIn('camera=()', response.headers['Permissions-Policy'])
 
     def test_production_secret_fails_closed_for_missing_or_default_secret(self):

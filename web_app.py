@@ -11,7 +11,7 @@ import importlib.util
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
-from flask import Flask, request, render_template_string, send_from_directory, url_for, Response, redirect, session
+from flask import Flask, request, render_template_string, send_from_directory, url_for, Response, redirect, session, g
 from flask_session import Session
 from tools.job_discovery import rank_job_postings
 from tools.resume_bot import (
@@ -160,9 +160,17 @@ def _csrf_token() -> str:
     return str(token)
 
 
+def _csp_nonce() -> str:
+    nonce = getattr(g, 'csp_nonce', None)
+    if not nonce:
+        nonce = secrets.token_urlsafe(16)
+        g.csp_nonce = nonce
+    return nonce
+
+
 @app.context_processor
 def inject_security_context():
-    return {'csrf_token': _csrf_token}
+    return {'csrf_token': _csrf_token, 'csp_nonce': _csp_nonce}
 
 
 @app.before_request
@@ -178,13 +186,15 @@ def validate_csrf_token():
 
 @app.after_request
 def add_security_headers(response):
+    nonce = _csp_nonce()
     response.headers.setdefault(
         'Content-Security-Policy',
         "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
         "img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "script-src 'self' 'unsafe-inline'; frame-src 'self'; form-action 'self'",
+        f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
+        f"script-src 'self' 'nonce-{nonce}'; frame-src 'self'; form-action 'self'",
     )
+    response.headers.pop('Server', None)
     response.headers.setdefault('X-Frame-Options', 'DENY')
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
@@ -622,7 +632,7 @@ PAGE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Resume Tailor</title>
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root {
       --ink: #e2e8f0;
@@ -669,6 +679,8 @@ PAGE = """
 
     h1 { font-family: "Space Grotesk", sans-serif; font-size: 26px; margin: 0 0 6px; letter-spacing: -0.5px; }
     .hint { color: var(--muted); font-size: 13.5px; }
+    .spacer-sm { height: 12px; }
+
 
     .card {
       background: var(--panel);
@@ -726,6 +738,8 @@ PAGE = """
     .nav-link:hover {
       border-color: #0e7490;
     }
+    .nav-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 
     .loading { display: none; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
     .spinner {
@@ -916,11 +930,11 @@ PAGE = """
           </div>
           <iframe class="preview" id="preview" src="{{ preview_url }}"></iframe>
           {% if cover_preview_url %}
-          <div style="height:12px"></div>
+          <div class="spacer-sm"></div>
           <label>Cover letter</label>
           <iframe class="preview" id="cover-preview" src="{{ cover_preview_url }}"></iframe>
           {% elif cover_text %}
-          <div style="height:12px"></div>
+          <div class="spacer-sm"></div>
           <label>Cover letter</label>
           <div class="cover-box">{{ cover_text }}</div>
           {% endif %}
@@ -933,7 +947,7 @@ PAGE = """
     </div>
   </div>
 </body>
-<script>
+<script nonce="{{ csp_nonce() }}">
   const form = document.getElementById('resume-form');
   const submitButtons = form.querySelectorAll('button[type="submit"]');
   const clearBtn = document.getElementById('clear-btn');
@@ -999,7 +1013,7 @@ AUTH_PAGE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }}</title>
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root {
       --ink: #e2e8f0;
@@ -1121,7 +1135,7 @@ DASHBOARD_PAGE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dashboard</title>
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root { --ink:#e2e8f0; --muted:#94a3b8; --accent:#67e8f9; --panel:#0f172a; --panel-2:#020617; --stroke:#334155; --shadow:0 18px 60px -24px rgba(6,182,212,.45); --bg-base:#030712; }
     * { box-sizing: border-box; }
@@ -1131,6 +1145,10 @@ DASHBOARD_PAGE = """
     h1,h2,h3 { font-family:"Space Grotesk", sans-serif; }
     h1 { margin:0 0 6px; }
     .hint { color:var(--muted); font-size:13px; }
+    .nav-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .heading-flush { margin-top:0; }
+    .mt-sm { margin-top:12px; }
+
     .nav-link { display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:10px; border:1px solid var(--stroke); background:var(--panel-2); color:var(--ink); text-decoration:none; font-size:13px; font-weight:600; }
     .nav-link:hover { border-color:#0e7490; }
     .card,.stat { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; box-shadow:var(--shadow); padding:18px; margin-bottom:14px; }
@@ -1147,6 +1165,10 @@ DASHBOARD_PAGE = """
     .lead-list { display:grid; gap:10px; margin-top:12px; }
     .lead-item { background:var(--panel-2); border:1px solid var(--stroke); border-radius:12px; padding:12px; }
     .lead-title { font-weight:700; margin:6px 0 4px; }
+    .accent-link { color:var(--accent); }
+    .heading-compact { margin:8px 0 4px; }
+    .heading-flush { margin-top:0; }
+
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th,td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--stroke); vertical-align:top; }
     th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:1px; }
@@ -1161,7 +1183,7 @@ DASHBOARD_PAGE = """
         <div class="hint">Application command centre for {{ user_email }}</div>
         <div class="hint">Track monthly usage, shortlist progress, and recent generated application packs. Build: <code>{{ app_version }}</code></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="nav-actions">
         <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
@@ -1176,7 +1198,7 @@ DASHBOARD_PAGE = """
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Next actions</h3>
+      <h3 class="heading-flush">Next actions</h3>
       <div class="hint">Use the shortlist to rank new roles, or jump straight into resume generation when you already know the job is worth applying for.</div>
       <div class="quick-actions">
         <a class="nav-link" href="{{ url_for('jobs') }}">Rank jobs</a>
@@ -1186,7 +1208,7 @@ DASHBOARD_PAGE = """
 
     <div class="section-grid">
       <div class="card">
-        <h3 style="margin-top:0">Shortlist snapshot</h3>
+        <h3 class="heading-flush">Shortlist snapshot</h3>
         <div class="hint">Shortlisted: {{ job_summary.status_counts.shortlisted }} · Generated: {{ job_summary.status_counts.generated }} · Applied: {{ job_summary.status_counts.applied }} · Interview: {{ job_summary.status_counts.interview }} · Rejected: {{ job_summary.status_counts.rejected }}</div>
         {% if job_summary.top_leads %}
         <div class="lead-list">
@@ -1201,12 +1223,12 @@ DASHBOARD_PAGE = """
           {% endfor %}
         </div>
         {% else %}
-        <div class="hint" style="margin-top:12px">No saved job leads yet. Rank a few jobs to build your pipeline.</div>
+        <div class="hint mt-sm">No saved job leads yet. Rank a few jobs to build your pipeline.</div>
         {% endif %}
       </div>
 
       <div class="card">
-        <h3 style="margin-top:0">Past generations</h3>
+        <h3 class="heading-flush">Past generations</h3>
         {% if generations %}
         <table>
           <thead><tr><th>Date</th><th>Job title</th><th>Detected role type</th><th>Status</th></tr></thead>
@@ -1234,7 +1256,7 @@ JOBS_PAGE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Job Shortlist</title>
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root {
       --ink: #e2e8f0;
@@ -1344,7 +1366,7 @@ JOBS_PAGE = """
         <div class="hint">Turn a pile of job ads into a ranked application pipeline.</div>
         <div class="hint">Paste one or many postings, shortlist the best fits, then generate a tracked resume/cover-letter pack from each saved lead.</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="nav-actions">
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
         <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
@@ -1410,7 +1432,7 @@ JOBS_PAGE = """
 
     {% if saved_leads %}
     <div class="card">
-      <h2 style="margin-top:0">Saved shortlist</h2>
+      <h2 class="heading-flush">Saved shortlist</h2>
       <div class="hint">Open a workspace to generate an application pack, attach generated files to the job, and update application status.</div>
       {% for job in saved_leads %}
       <div class="job-card">
@@ -1424,10 +1446,10 @@ JOBS_PAGE = """
             <span class="pill">{{ job.status|title }}</span>
             <span class="pill">{{ job.platform }}</span>
           </div>
-          <h3 style="margin:8px 0 4px">{{ job.title }}</h3>
+          <h3 class="heading-compact">{{ job.title }}</h3>
           <div class="meta">
             {% if job.company %}{{ job.company }}{% endif %}{% if job.company and job.location %} · {% endif %}{% if job.location %}{{ job.location }}{% endif %}
-            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" style="color:var(--accent)">job link</a>{% endif %}
+            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" class="accent-link">job link</a>{% endif %}
           </div>
           {% if job.matched_terms %}
           <div class="terms">
@@ -1450,7 +1472,7 @@ JOBS_PAGE = """
 
     {% if ranked_jobs %}
     <div class="card">
-      <h2 style="margin-top:0">Latest ranked jobs</h2>
+      <h2 class="heading-flush">Latest ranked jobs</h2>
       {% for job in ranked_jobs %}
       <div class="job-card">
         <div>
@@ -1463,10 +1485,10 @@ JOBS_PAGE = """
             <span class="pill">{{ job.detected_role_type|replace('_', ' ')|title }}</span>
             <span class="pill">{{ job.platform }}</span>
           </div>
-          <h3 style="margin:8px 0 4px">{{ job.title }}</h3>
+          <h3 class="heading-compact">{{ job.title }}</h3>
           <div class="meta">
             {% if job.company %}{{ job.company }}{% endif %}{% if job.company and job.location %} · {% endif %}{% if job.location %}{{ job.location }}{% endif %}
-            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" style="color:var(--accent)">job link</a>{% endif %}
+            {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener" class="accent-link">job link</a>{% endif %}
           </div>
           {% if job.positive_signals %}
           <div class="terms">
@@ -1520,7 +1542,7 @@ JOB_WORKSPACE_PAGE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Application Workspace</title>
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
     :root { --ink:#e2e8f0; --muted:#94a3b8; --accent:#67e8f9; --panel:#0f172a; --panel-2:#020617; --stroke:#334155; --bg:#030712; }
     * { box-sizing: border-box; }
@@ -1530,6 +1552,10 @@ JOB_WORKSPACE_PAGE = """
     h1,h2,h3 { font-family:"Space Grotesk", sans-serif; }
     h1 { margin:0 0 6px; }
     .hint,.meta { color:var(--muted); font-size:13px; }
+    .nav-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .accent-link { color:var(--accent); }
+    .heading-flush { margin-top:0; }
+
     .card { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; padding:18px; margin-bottom:14px; }
     .nav-link,button,.action-link { display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:10px; border:1px solid var(--stroke); background:var(--panel-2); color:var(--ink); text-decoration:none; font-size:13px; font-weight:600; cursor:pointer; }
     button,.primary { background:linear-gradient(135deg,#0e7490,#06b6d4); border-color:#0e7490; color:#ecfeff; }
@@ -1550,7 +1576,7 @@ JOB_WORKSPACE_PAGE = """
         <div class="hint">{% if lead.company %}{{ lead.company }}{% endif %}{% if lead.company and lead.location %} · {% endif %}{% if lead.location %}{{ lead.location }}{% endif %}</div>
         <div class="hint">Score {{ lead.score }} · {{ lead.recommendation }} · {{ lead.status|title }} · {{ lead.platform }}</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="nav-actions">
         <a class="nav-link" href="{{ url_for('jobs') }}">Job Shortlist</a>
         <a class="nav-link" href="{{ url_for('index') }}">Resume Tool</a>
         <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
@@ -1559,12 +1585,12 @@ JOB_WORKSPACE_PAGE = """
 
     <div class="grid">
       <div class="card">
-        <h2 style="margin-top:0">Application workspace</h2>
+        <h2 class="heading-flush">Application workspace</h2>
         <div>
           <span class="pill">{{ lead.detected_role_type|replace('_', ' ')|title }}</span>
           <span class="pill">{{ lead.status|title }}</span>
         </div>
-        {% if lead.url %}<p><a href="{{ lead.url }}" target="_blank" rel="noopener" style="color:var(--accent)">Open original job post</a></p>{% endif %}
+        {% if lead.url %}<p><a href="{{ lead.url }}" target="_blank" rel="noopener" class="accent-link">Open original job post</a></p>{% endif %}
         {% if lead.matched_terms %}
         <h3>Matched terms</h3>
         <div class="terms">{% for term in lead.matched_terms %}<span class="term">{{ term }}</span>{% endfor %}</div>
@@ -1598,7 +1624,7 @@ JOB_WORKSPACE_PAGE = """
       </div>
 
       <div class="card">
-        <h2 style="margin-top:0">Generated files</h2>
+        <h2 class="heading-flush">Generated files</h2>
         {% if generated_links %}
         <div class="form-actions">
           {% for link in generated_links %}<a class="action-link primary" href="{{ link.href }}" target="_blank" rel="noopener">{{ link.label }}</a>{% endfor %}
@@ -1610,7 +1636,7 @@ JOB_WORKSPACE_PAGE = """
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Job description</h2>
+      <h2 class="heading-flush">Job description</h2>
       <pre>{{ lead.description }}</pre>
     </div>
   </div>
@@ -1965,6 +1991,11 @@ def index():
     )
 
 
+def _nonce_inline_style_tags(html: str) -> str:
+    nonce = _csp_nonce()
+    return html.replace('<style>', f'<style nonce="{nonce}">')
+
+
 @app.route('/outputs/<path:filename>')
 @login_required
 def download_output(filename: str):
@@ -1972,6 +2003,8 @@ def download_output(filename: str):
     path = _safe_output_path(safe_name)
     if not path or safe_name != filename or not _user_owns_output_file(safe_name):
         return Response('Not found', status=404)
+    if path.suffix.lower() in {'.html', '.htm'}:
+        return Response(_nonce_inline_style_tags(path.read_text(encoding='utf-8', errors='replace')), mimetype='text/html')
     return send_from_directory(OUTPUT_DIR, safe_name, as_attachment=False)
 
 
@@ -1982,14 +2015,14 @@ def preview_output(filename: str):
     path = _safe_output_path(safe_name)
     if not path or safe_name != filename or not _user_owns_output_file(safe_name):
         return Response('Not found', status=404)
-    html = path.read_text(encoding='utf-8', errors='replace')
-    inject = """
-<style>
-  body { overflow-x: hidden !important; }
-  .page { width: 100% !important; max-width: 900px !important; margin: 0 auto !important; padding: 24px 22px !important; }
-  @media screen {
-    .page { padding: 24px 22px !important; box-shadow: none !important; }
-  }
+    html = _nonce_inline_style_tags(path.read_text(encoding='utf-8', errors='replace'))
+    inject = f"""
+<style nonce="{_csp_nonce()}">
+  body {{ overflow-x: hidden !important; }}
+  .page {{ width: 100% !important; max-width: 900px !important; margin: 0 auto !important; padding: 24px 22px !important; }}
+  @media screen {{
+    .page {{ padding: 24px 22px !important; box-shadow: none !important; }}
+  }}
 </style>
 """
     if '</head>' in html:

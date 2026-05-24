@@ -123,6 +123,9 @@ Open:
 - `SUPABASE_URL` - Supabase project URL, required for login/signup and saved history
 - `SUPABASE_ANON_KEY` - Supabase anon public key, required for auth
 - `SUPABASE_SERVICE_KEY` - Supabase service role key, used server-side for per-user generation/job-lead records. Never expose this in frontend code or public logs.
+- `APP_ENV` / `FLASK_ENV` - set to `production` in production so secure defaults are enabled.
+- `FLASK_SECRET_KEY` - required in production; use a strong non-default random value.
+- `SESSION_COOKIE_SECURE` - optional explicit cookie override. Defaults to `true` when `APP_ENV=production`; leave unset/false for local HTTP-only development.
 - `APP_VERSION` - optional build/version label shown in UI
 
 ## Supabase Setup
@@ -150,6 +153,18 @@ Arguments:
 - `--job` (optional): path to job description text file
 - `--out-dir` (optional): output folder
 - `--label` (optional): filename label
+
+## Production Security Settings
+
+Run production behind HTTPS with a production WSGI server instead of the Flask/Werkzeug development server:
+
+```bash
+APP_ENV=production \
+FLASK_SECRET_KEY='<strong-random-secret>' \
+gunicorn --bind 127.0.0.1:5055 web_app:app
+```
+
+Put Gunicorn behind Nginx, Caddy, Cloudflare, or an equivalent TLS-terminating reverse proxy. Configure that proxy to hide or overwrite upstream `Server` headers (for Nginx: `server_tokens off;` plus `proxy_hide_header Server;`, and use a headers module if a custom replacement header is required).
 
 ## Development Tests
 
