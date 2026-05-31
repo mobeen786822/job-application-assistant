@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "basics": {
     "name": "Mobeen Khan",
     "email": "mobeenk89@gmail.com",
@@ -7,8 +7,8 @@
     "github": "https://github.com/mobeen786822",
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
-  "headline": "Graduate Software Engineer | Application Security & Secure Full-Stack Development",
-  "summary": "Built and launched Bunkerify, a cybersecurity assessment platform aligned to the ACSC Essential Eight, then extended that product focus into secure full-stack web and mobile engineering. Graduate Software Engineer with a Master of Computer Science (Cybersecurity) and a Bachelor of Computer Science (Software Engineering and Cybersecurity), building applications with JavaScript/TypeScript, React, Python, and REST APIs. Delivered production-style systems including an AI-assisted resume tailoring platform and a full-stack incident management console, with a strong focus on system integrity, secure CI/CD pipelines, and dependency hygiene.",
+  "headline": "Graduate Software Engineer | Application Security | DevSecOps & AI-Enabled Full-Stack Development",
+  "summary": "Graduate Software Engineer with a Master of Computer Science in Cybersecurity and hands-on experience building secure full-stack, AI-assisted, and application security projects. Built and launched security-focused platforms including Bunkerify, Khan Security Testing, a web vulnerability scanner, an LLM security tester, and an AI-assisted job application platform. Strong practical focus on React/TypeScript, Python, Flask/FastAPI, REST APIs, Supabase/Firebase, CI/CD security pipelines, dependency remediation, secure deployment, and translating security findings into working product improvements.",
   "education": [
     {
       "degree": "Bachelor of Computer Science",
@@ -22,7 +22,7 @@
       "institution": "University of Wollongong",
       "start": "03/2025",
       "end": "Present",
-      "details": ""
+      "details": "Cybersecurity specialization; relevant coursework/projects include software testing and analysis, machine learning/AI, secure systems, and applied security review work."
     }
   ],
   "projects": [
@@ -33,90 +33,191 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["Python", "Flask", "Anthropic Claude API", "OpenAI API", "Supabase", "Flask-Session", "GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "Tailscale"],
+      "technologies": [
+        "Python",
+        "Flask",
+        "Anthropic Claude API",
+        "OpenAI API",
+        "Supabase",
+        "Flask-Session",
+        "GitHub Actions",
+        "Bandit",
+        "Semgrep",
+        "Gitleaks",
+        "pip-audit",
+        "Tailscale"
+      ],
       "bullets": [
         {
           "text": "Designed and developed a full-stack AI-assisted resume tailoring platform that generates structured HTML and PDF outputs from job descriptions using Anthropic Claude and OpenAI APIs with dual-provider fallback logic.",
           "core": true,
           "importance": 3,
-          "tags": ["full-stack", "ai", "architecture"]
+          "tags": [
+            "full-stack",
+            "ai",
+            "architecture"
+          ]
         },
         {
           "text": "Implemented strict no-fabrication validation logic and a structured JSON resume format with weighted bullet points and importance scores to enforce factual consistency across generated outputs.",
           "core": true,
           "importance": 3,
-          "tags": ["ai", "validation", "integrity", "api"]
+          "tags": [
+            "ai",
+            "validation",
+            "integrity",
+            "api"
+          ]
         },
         {
           "text": "Extended the platform into a multi-user SaaS with Supabase Auth, server-side Flask sessions, and a per-user generation dashboard tracking usage history.",
           "core": true,
           "importance": 3,
-          "tags": ["saas", "auth", "supabase"]
+          "tags": [
+            "saas",
+            "auth",
+            "supabase"
+          ]
         },
         {
           "text": "Implemented monthly usage limits enforced server-side — blocking generation requests at 10/month per user without hitting the AI API, with usage tracked in Supabase with RLS-enforced data isolation.",
           "core": true,
           "importance": 3,
-          "tags": ["saas", "rate-limiting", "security"]
+          "tags": [
+            "saas",
+            "rate-limiting",
+            "security"
+          ]
         },
         {
           "text": "Built a GitHub Actions CI/CD security pipeline with Bandit, Semgrep, Gitleaks, and pip-audit — scanning for vulnerabilities, secrets, and CVEs on every push to main.",
           "core": true,
           "importance": 3,
-          "tags": ["security", "ci-cd", "devsecops"]
+          "tags": [
+            "security",
+            "ci-cd",
+            "devsecops"
+          ]
         },
         {
           "text": "Identified and resolved a medium severity Bandit finding (B104 interface binding vulnerability) surfaced by the pipeline, documenting the fix in the project README.",
           "core": false,
           "importance": 2,
-          "tags": ["security", "remediation"]
+          "tags": [
+            "security",
+            "remediation"
+          ]
         },
         {
           "text": "Deployed the application with VPN-only access (Tailscale) on a cloud VM to restrict public exposure and protect user data.",
           "core": false,
           "importance": 2,
-          "tags": ["deployment", "security", "vpn"]
+          "tags": [
+            "deployment",
+            "security",
+            "vpn"
+          ]
         }
       ]
     },
     {
-      "name": "Production Support Incident Console",
+      "name": "Portfolio",
       "links": {
-        "github": "https://github.com/mobeen786822/Production-Support-Incident-Console",
-        "live": "https://incident-console-ui.onrender.com/",
-        "website": ""
+        "github": "https://github.com/mobeen786822/Portfolio",
+        "live": "https://www.mobeenkhan.com",
+        "website": "https://www.mobeenkhan.com"
       },
-      "technologies": ["React", "TypeScript", "Vite", "FastAPI", "Python", "SQLAlchemy", "JWT", "Docker", "Nginx", "GitHub Actions", "Bandit", "Gitleaks", "pip-audit"],
+      "technologies": [
+        "JavaScript",
+        "React",
+        "Vite",
+        "Tailwind CSS",
+        "Framer Motion",
+        "GitHub",
+        "Responsive Design",
+        "Application Security Review"
+      ],
       "bullets": [
         {
-          "text": "Developed a full-stack incident management console with a React/TypeScript frontend and FastAPI/Python backend, containerised with Docker and deployed via Render.",
+          "text": "Built and maintained a professional portfolio website to present software engineering, cybersecurity, AI, and DevSecOps projects with clear project narratives, links, and technical positioning.",
           "core": true,
           "importance": 3,
-          "tags": ["full-stack", "incident", "ops"]
+          "tags": [
+            "portfolio",
+            "frontend",
+            "career"
+          ]
         },
         {
-          "text": "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, SLA breach indicators, and root-cause analysis capture.",
+          "text": "Implemented a responsive, polished front-end using modern JavaScript tooling and a reusable visual system to keep project showcases consistent across desktop and mobile.",
           "core": true,
-          "importance": 3,
-          "tags": ["lifecycle", "incident", "systems"]
-        },
-        {
-          "text": "Built a full-stack GitHub Actions security pipeline covering Python (Bandit, pip-audit) and JavaScript (npm audit, Gitleaks) with a consolidated fail-gate enforcing zero HIGH findings before merge.",
-          "core": true,
-          "importance": 3,
-          "tags": ["security", "ci-cd", "devsecops"]
-        },
-        {
-          "text": "Discovered 8 CVEs in backend Python dependencies via pip-audit; replaced python-jose (no upstream fix path) with PyJWT and migrated the JWT authentication implementation to eliminate the vulnerability chain.",
-          "core": true,
-          "importance": 3,
-          "tags": ["security", "remediation", "dependencies"]
-        },
-        {
-          "text": "Resolved a high severity frontend vulnerability identified by npm audit by upgrading the Vite toolchain to v7 and associated plugin dependencies.",
-          "core": false,
           "importance": 2,
-          "tags": ["security", "remediation", "frontend"]
+          "tags": [
+            "frontend",
+            "responsive",
+            "ui"
+          ]
+        },
+        {
+          "text": "Completed a website and local repository security review, then marked the project secured across public-facing and local scopes with Sentinel artefacts retained for audit/reference.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "review",
+            "remediation"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Khan Security Testing",
+      "links": {
+        "github": "https://github.com/mobeen786822/khan-security-testing",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "React",
+        "TypeScript",
+        "Vite",
+        "Tailwind CSS",
+        "Application Security",
+        "Penetration Testing",
+        "Security Readiness",
+        "LinkedIn Outreach",
+        "Sentinel Security Review"
+      ],
+      "bullets": [
+        {
+          "text": "Built a conversion-focused React/TypeScript landing page for SaaS-focused penetration testing and security readiness services, positioning technical security testing for founders and product teams.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "frontend",
+            "business"
+          ]
+        },
+        {
+          "text": "Created a practical outreach funnel with SaaS founder messaging, service positioning, and LinkedIn DM templates to turn security testing capability into a client acquisition workflow.",
+          "core": true,
+          "importance": 2,
+          "tags": [
+            "security",
+            "go-to-market",
+            "communication"
+          ]
+        },
+        {
+          "text": "Completed and documented security review coverage for both the public-facing website and local repository, with Sentinel artefacts linked for evidence and follow-up tracking.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "review",
+            "evidence"
+          ]
         }
       ]
     },
@@ -127,78 +228,209 @@
         "live": "",
         "website": "https://www.bunkerify.com"
       },
-      "technologies": ["JavaScript", "Next.js", "Supabase", "Vercel", "SendGrid", "Tailwind CSS", "ACSC Essential Eight", "Web Vulnerability Scanner"],
+      "technologies": [
+        "JavaScript",
+        "Next.js",
+        "Supabase",
+        "Vercel",
+        "SendGrid",
+        "Tailwind CSS",
+        "ACSC Essential Eight",
+        "Web Vulnerability Scanner"
+      ],
       "bullets": [
         {
           "text": "Built and launched a cybersecurity assessment platform aligned to the ACSC Essential Eight maturity model, deployed on Vercel with Supabase for data persistence.",
           "core": true,
           "importance": 3,
-          "tags": ["security", "essential-eight", "saas"]
+          "tags": [
+            "security",
+            "essential-eight",
+            "saas"
+          ]
         },
         {
           "text": "Designed a 19-question structured assessment with automated scoring, category-level risk breakdowns, and CTI-backed findings.",
           "core": false,
           "importance": 2,
-          "tags": ["risk", "assessment"]
+          "tags": [
+            "risk",
+            "assessment"
+          ]
         },
         {
           "text": "Automated HTML report delivery using SendGrid transactional email and integrated Calendly booking to convert assessments into consultations.",
           "core": false,
           "importance": 2,
-          "tags": ["integration", "email", "workflow"]
+          "tags": [
+            "integration",
+            "email",
+            "workflow"
+          ]
         },
         {
           "text": "Deployed a live marketing funnel with a landing page and LinkedIn launch assets to drive inbound leads.",
           "core": false,
           "importance": 1,
-          "tags": ["marketing", "launch"]
+          "tags": [
+            "marketing",
+            "launch"
+          ]
         },
         {
           "text": "Integrated a live web vulnerability scanner into the results page — triggered after the Essential Eight assessment, with findings stored in Supabase and included in the HTML email report.",
           "core": true,
           "importance": 3,
-          "tags": ["integration", "security", "full-stack"]
+          "tags": [
+            "integration",
+            "security",
+            "full-stack"
+          ]
         },
         {
           "text": "Implemented an email gate for new users prior to scanning, with direct scan access for returning authenticated users.",
           "core": false,
           "importance": 2,
-          "tags": ["saas", "auth", "conversion"]
+          "tags": [
+            "saas",
+            "auth",
+            "conversion"
+          ]
         }
       ]
     },
     {
-      "name": "Local LLM Benchmark — Ollama",
+      "name": "Production Support Incident Console",
       "links": {
-        "github": "https://github.com/mobeen786822/local-llm-benchmark",
-        "live": "",
+        "github": "https://github.com/mobeen786822/Production-Support-Incident-Console",
+        "live": "https://incident-console-ui.onrender.com/",
         "website": ""
       },
-      "technologies": ["Python", "Ollama", "Llama 3.2", "Phi-3 Mini", "Gemma 2", "Ubuntu", "VirtualBox"],
+      "technologies": [
+        "React",
+        "TypeScript",
+        "Vite",
+        "FastAPI",
+        "Python",
+        "SQLAlchemy",
+        "JWT",
+        "Docker",
+        "Nginx",
+        "GitHub Actions",
+        "Bandit",
+        "Gitleaks",
+        "pip-audit"
+      ],
       "bullets": [
         {
-          "text": "Benchmarked three small language models (Llama 3.2, Phi-3 Mini, Gemma 2) running entirely offline via Ollama on a CPU-only Ubuntu VM, with no GPU or cloud API dependency.",
+          "text": "Developed a full-stack incident management console with a React/TypeScript frontend and FastAPI/Python backend, containerised with Docker and deployed via Render.",
           "core": true,
           "importance": 3,
-          "tags": ["ai", "local-ai", "benchmarking"]
+          "tags": [
+            "full-stack",
+            "incident",
+            "ops"
+          ]
         },
         {
-          "text": "Designed a Python benchmarking script evaluating all 3 models across 4 task types (summarisation, JSON extraction, code generation, and multi-step reasoning) — 12 data points total.",
+          "text": "Implemented structured incident lifecycle tracking with severity classification, status transitions, ownership, SLA breach indicators, and root-cause analysis capture.",
           "core": true,
           "importance": 3,
-          "tags": ["python", "benchmarking", "ai"]
+          "tags": [
+            "lifecycle",
+            "incident",
+            "systems"
+          ]
         },
         {
-          "text": "Identified task-specific failure modes including two 120s timeouts that would not surface in quality-only evaluations, informing model selection recommendations by task type.",
+          "text": "Built a full-stack GitHub Actions security pipeline covering Python (Bandit, pip-audit) and JavaScript (npm audit, Gitleaks) with a consolidated fail-gate enforcing zero HIGH findings before merge.",
           "core": true,
           "importance": 3,
-          "tags": ["ai", "reliability", "findings"]
+          "tags": [
+            "security",
+            "ci-cd",
+            "devsecops"
+          ]
         },
         {
-          "text": "Documented speed vs quality tradeoffs: Gemma 2 fastest at 4.8 tok/s, Llama 3.2 most reliable (4/4 tasks), Phi-3 Mini best code quality but unreliable on structured output.",
+          "text": "Discovered 8 CVEs in backend Python dependencies via pip-audit; replaced python-jose (no upstream fix path) with PyJWT and migrated the JWT authentication implementation to eliminate the vulnerability chain.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "remediation",
+            "dependencies"
+          ]
+        },
+        {
+          "text": "Resolved a high severity frontend vulnerability identified by npm audit by upgrading the Vite toolchain to v7 and associated plugin dependencies.",
           "core": false,
           "importance": 2,
-          "tags": ["ai", "benchmarking", "findings"]
+          "tags": [
+            "security",
+            "remediation",
+            "frontend"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Web Vulnerability Scanner",
+      "links": {
+        "github": "",
+        "live": "https://web-vulnerability-scanner-lqy5.onrender.com/",
+        "website": ""
+      },
+      "technologies": [
+        "Python",
+        "Flask",
+        "React",
+        "Vite",
+        "Tailwind CSS",
+        "Bandit",
+        "pip-audit",
+        "GitHub Actions"
+      ],
+      "bullets": [
+        {
+          "text": "Built a full-stack web vulnerability scanner with 6 scanner modules covering security headers, SSL/TLS, sensitive path exposure, cookie flags, open redirects, and information disclosure.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "appsec",
+            "full-stack"
+          ]
+        },
+        {
+          "text": "Implemented concurrent URL scanning via ThreadPoolExecutor — each URL scanned in parallel with a shared requests.Session for efficiency, supporting single and batch scan modes.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "python",
+            "concurrency",
+            "architecture"
+          ]
+        },
+        {
+          "text": "Built a React/Tailwind dashboard with severity-coded findings (CRITICAL/HIGH/MEDIUM/LOW/INFO), collapsible per-URL sections, and client-side JSON report export.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "react",
+            "frontend",
+            "dashboard"
+          ]
+        },
+        {
+          "text": "Added a GitHub Actions CI/CD security pipeline with Bandit SAST, Gitleaks secrets detection, and pip-audit dependency scanning with fail-gate on HIGH findings.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "security",
+            "ci-cd",
+            "devsecops"
+          ]
         }
       ]
     },
@@ -209,67 +441,54 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["Python", "Flask", "React", "Vite", "Tailwind CSS", "Ollama", "Anthropic API"],
+      "technologies": [
+        "Python",
+        "Flask",
+        "React",
+        "Vite",
+        "Tailwind CSS",
+        "Ollama",
+        "Anthropic API"
+      ],
       "bullets": [
         {
           "text": "Built a full-stack security testing tool that probes LLMs for prompt injection, jailbreaking, system prompt extraction, data exfiltration, and role confusion attacks across 15 test cases.",
           "core": true,
           "importance": 3,
-          "tags": ["security", "ai", "appsec"]
+          "tags": [
+            "security",
+            "ai",
+            "appsec"
+          ]
         },
         {
           "text": "Compared Llama 3.2 (local via Ollama) against Claude Haiku — Llama achieved 15/15 resistant while Haiku returned 3 FAIL and 5 PARTIAL, with HIGH severity prompt injection failures.",
           "core": true,
           "importance": 3,
-          "tags": ["security", "ai", "findings"]
+          "tags": [
+            "security",
+            "ai",
+            "findings"
+          ]
         },
         {
           "text": "Built a React/Tailwind dashboard with per-category breakdowns, severity badges, expandable prompt/response rows, and JSON report export.",
           "core": false,
           "importance": 2,
-          "tags": ["react", "frontend", "dashboard"]
+          "tags": [
+            "react",
+            "frontend",
+            "dashboard"
+          ]
         },
         {
           "text": "Designed an extensible JSON attack library so new test cases and categories can be added without modifying backend or frontend code.",
           "core": false,
           "importance": 2,
-          "tags": ["architecture", "extensibility"]
-        }
-      ]
-    },
-
-    {
-      "name": "Web Vulnerability Scanner",
-      "links": {
-        "github": "",
-        "live": "https://web-vulnerability-scanner-lqy5.onrender.com/",
-        "website": ""
-      },
-      "technologies": ["Python", "Flask", "React", "Vite", "Tailwind CSS", "Bandit", "pip-audit", "GitHub Actions"],
-      "bullets": [
-        {
-          "text": "Built a full-stack web vulnerability scanner with 6 scanner modules covering security headers, SSL/TLS, sensitive path exposure, cookie flags, open redirects, and information disclosure.",
-          "core": true,
-          "importance": 3,
-          "tags": ["security", "appsec", "full-stack"]
-        },
-        {
-          "text": "Implemented concurrent URL scanning via ThreadPoolExecutor — each URL scanned in parallel with a shared requests.Session for efficiency, supporting single and batch scan modes.",
-          "core": true,
-          "importance": 3,
-          "tags": ["python", "concurrency", "architecture"]
-        },
-        {
-          "text": "Built a React/Tailwind dashboard with severity-coded findings (CRITICAL/HIGH/MEDIUM/LOW/INFO), collapsible per-URL sections, and client-side JSON report export.",
-          "core": false,
-          "importance": 2,
-          "tags": ["react", "frontend", "dashboard"]
-        },
-        {
-          "text": "Added a GitHub Actions CI/CD security pipeline with Bandit SAST, Gitleaks secrets detection, and pip-audit dependency scanning with fail-gate on HIGH findings.",
-          "core": false,
-          "importance": 2,
-          "tags": ["security", "ci-cd", "devsecops"]
+          "tags": [
+            "architecture",
+            "extensibility"
+          ]
         }
       ]
     },
@@ -280,25 +499,184 @@
         "live": "https://cyber-content-bot-ui.onrender.com",
         "website": ""
       },
-      "technologies": ["Python", "Flask", "React", "TypeScript", "Vite", "Tailwind CSS", "Anthropic Claude API", "GitHub Actions"],
+      "technologies": [
+        "Python",
+        "Flask",
+        "React",
+        "TypeScript",
+        "Vite",
+        "Tailwind CSS",
+        "Anthropic Claude API",
+        "GitHub Actions"
+      ],
       "bullets": [
         {
           "text": "Built an automated cybersecurity content pipeline that aggregates HIGH/CRITICAL CVEs from NVD, actively exploited vulnerabilities from CISA KEV, and AI security research from arXiv — then uses Claude Haiku to draft LinkedIn posts for review.",
           "core": true,
           "importance": 3,
-          "tags": ["ai", "automation", "security"]
+          "tags": [
+            "ai",
+            "automation",
+            "security"
+          ]
         },
         {
           "text": "Implemented tone control (professional/conversational/technical) and a React/TypeScript dashboard for draft review and one-click clipboard copy — deployed live on Render.",
           "core": true,
           "importance": 3,
-          "tags": ["python", "react", "automation"]
+          "tags": [
+            "python",
+            "react",
+            "automation"
+          ]
         },
         {
           "text": "Resolved 6 CVEs in dependencies (Flask, Flask-CORS, Requests) and a HIGH severity Bandit B201 finding (hardcoded Flask debug mode) surfaced by the CI/CD security pipeline.",
           "core": false,
           "importance": 2,
-          "tags": ["security", "remediation", "devsecops"]
+          "tags": [
+            "security",
+            "remediation",
+            "devsecops"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Local LLM Benchmark — Ollama",
+      "links": {
+        "github": "https://github.com/mobeen786822/local-llm-benchmark",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "Python",
+        "Ollama",
+        "Llama 3.2",
+        "Phi-3 Mini",
+        "Gemma 2",
+        "Ubuntu",
+        "VirtualBox"
+      ],
+      "bullets": [
+        {
+          "text": "Benchmarked three small language models (Llama 3.2, Phi-3 Mini, Gemma 2) running entirely offline via Ollama on a CPU-only Ubuntu VM, with no GPU or cloud API dependency.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "ai",
+            "local-ai",
+            "benchmarking"
+          ]
+        },
+        {
+          "text": "Designed a Python benchmarking script evaluating all 3 models across 4 task types (summarisation, JSON extraction, code generation, and multi-step reasoning) — 12 data points total.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "python",
+            "benchmarking",
+            "ai"
+          ]
+        },
+        {
+          "text": "Identified task-specific failure modes including two 120s timeouts that would not surface in quality-only evaluations, informing model selection recommendations by task type.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "ai",
+            "reliability",
+            "findings"
+          ]
+        },
+        {
+          "text": "Documented speed vs quality tradeoffs: Gemma 2 fastest at 4.8 tok/s, Llama 3.2 most reliable (4/4 tasks), Phi-3 Mini best code quality but unreliable on structured output.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ai",
+            "benchmarking",
+            "findings"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CSCI933 Machine Learning / Shakespeare RAG Coursework",
+      "links": {
+        "github": "",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "Python",
+        "Machine Learning",
+        "Regression Models",
+        "Neural Networks",
+        "Feature Engineering",
+        "RAG",
+        "JSONL Datasets",
+        "Shakespeare Dataset"
+      ],
+      "bullets": [
+        {
+          "text": "Completed machine learning coursework comparing statistical regression models and neural network approaches on the Bike Sharing dataset, including data understanding, feature engineering, model evaluation, and report preparation.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "machine-learning",
+            "python",
+            "data-analysis"
+          ]
+        },
+        {
+          "text": "Built and organized starter code for a Shakespeare small-language-model/RAG assignment, including chunking, retrieval, indexing, baseline generation, evaluation, and sample output workflows.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ai",
+            "rag",
+            "python"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CSCI926 Software Testing and Analysis Group Project",
+      "links": {
+        "github": "",
+        "live": "",
+        "website": ""
+      },
+      "technologies": [
+        "Software Testing",
+        "Verification and Validation",
+        "Static Analysis",
+        "Test Planning",
+        "Presentation",
+        "Technical Reporting",
+        "LaTeX"
+      ],
+      "bullets": [
+        {
+          "text": "Completed a software testing and analysis group project covering verification and validation activities, test planning, reporting, and presentation of testing evidence for a real-world software project.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "testing",
+            "software-quality",
+            "teamwork"
+          ]
+        },
+        {
+          "text": "Studied and applied testing concepts including symbolic execution, test adequacy, functional testing, fuzzing, combinatorial testing, structural testing, and data-flow/control-flow models.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "testing",
+            "software-engineering",
+            "quality"
+          ]
         }
       ]
     },
@@ -309,25 +687,40 @@
         "live": "",
         "website": ""
       },
-      "technologies": ["React Native", "TypeScript", "Firebase"],
+      "technologies": [
+        "React Native",
+        "TypeScript",
+        "Firebase"
+      ],
       "bullets": [
         {
           "text": "Built a cross-platform mobile application using React Native and TypeScript with a focus on privacy-conscious data handling for sensitive health-related user interactions.",
           "core": false,
           "importance": 2,
-          "tags": ["mobile", "react-native", "privacy"]
+          "tags": [
+            "mobile",
+            "react-native",
+            "privacy"
+          ]
         },
         {
           "text": "Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.",
           "core": true,
           "importance": 3,
-          "tags": ["firebase", "authentication", "backend"]
+          "tags": [
+            "firebase",
+            "authentication",
+            "backend"
+          ]
         },
         {
           "text": "Added geolocation and media upload capabilities with structured in-app navigation.",
           "core": false,
           "importance": 1,
-          "tags": ["mobile", "features"]
+          "tags": [
+            "mobile",
+            "features"
+          ]
         }
       ]
     }
@@ -343,19 +736,27 @@
           "text": "Contributed to front-end and back-end feature development for a dynamic web platform.",
           "core": false,
           "importance": 1,
-          "tags": ["frontend", "backend"]
+          "tags": [
+            "frontend",
+            "backend"
+          ]
         },
         {
           "text": "Implemented responsive UI components and API-driven features to enhance usability and data interaction.",
           "core": false,
           "importance": 1,
-          "tags": ["ui", "api"]
+          "tags": [
+            "ui",
+            "api"
+          ]
         },
         {
           "text": "Collaborated with stakeholders to translate functional requirements into maintainable code.",
           "core": false,
           "importance": 1,
-          "tags": ["collaboration"]
+          "tags": [
+            "collaboration"
+          ]
         }
       ]
     },
@@ -369,31 +770,184 @@
           "text": "Implemented custom front-end features for an eCommerce website with focus on clean layout and responsiveness.",
           "core": false,
           "importance": 1,
-          "tags": ["frontend", "responsive"]
+          "tags": [
+            "frontend",
+            "responsive"
+          ]
         },
         {
           "text": "Supported server-side functionality for product displays, transactional workflows, and content updates.",
           "core": false,
           "importance": 1,
-          "tags": ["backend"]
+          "tags": [
+            "backend"
+          ]
         },
         {
           "text": "Enhanced mobile usability and cross-device consistency across the platform.",
           "core": false,
           "importance": 1,
-          "tags": ["mobile", "ux"]
+          "tags": [
+            "mobile",
+            "ux"
+          ]
         }
       ]
     }
   ],
   "skills": {
-    "languages": ["JavaScript", "TypeScript", "Python", "Java", "C++", "SQL", "PL/SQL"],
-    "frontend": ["React", "React Native", "Next.js", "Vite", "Tailwind CSS", "Framer Motion", "React Router", "HTML", "CSS"],
-    "backend": ["FastAPI", "Flask", "REST API Integration", "SQLAlchemy", "Axios", "Supabase", "Firebase", "Cloud Firestore", "NoSQL", "Docker", "Nginx"],
-    "testing": ["Jest", "Vitest", "React Testing Library", "ESLint"],
-    "security": ["Cybersecurity", "System Security", "Cloud Security (Foundational)", "Networking", "Kali Linux", "Nmap", "Metasploit", "Wireshark", "Burp Suite", "Penetration Testing", "Vulnerability Assessment", "Incident Response", "Threat Intelligence", "Network Segmentation", "Log Analysis", "Firewall Configuration"],
-    "devsecops": ["GitHub Actions", "Bandit", "Semgrep", "Gitleaks", "pip-audit", "npm audit", "SAST", "Dependency Scanning", "Secrets Detection", "CI/CD Security"],
-    "tools": ["Git", "Docker", "Tailscale", "Ollama"]
+    "languages": [
+      "JavaScript",
+      "TypeScript",
+      "Python",
+      "Java",
+      "C++",
+      "SQL",
+      "PL/SQL"
+    ],
+    "frontend": [
+      "React",
+      "React Native",
+      "Next.js",
+      "Vite",
+      "Tailwind CSS",
+      "Framer Motion",
+      "React Router",
+      "HTML",
+      "CSS",
+      "Responsive Design"
+    ],
+    "backend": [
+      "FastAPI",
+      "Flask",
+      "REST API Integration",
+      "SQLAlchemy",
+      "Axios",
+      "Supabase",
+      "Firebase",
+      "Cloud Firestore",
+      "NoSQL",
+      "Docker",
+      "Nginx",
+      "REST APIs",
+      "Authentication",
+      "Session Management"
+    ],
+    "testing": [
+      "Jest",
+      "Vitest",
+      "React Testing Library",
+      "ESLint"
+    ],
+    "security": [
+      "Cybersecurity",
+      "System Security",
+      "Cloud Security (Foundational)",
+      "Networking",
+      "Kali Linux",
+      "Nmap",
+      "Metasploit",
+      "Wireshark",
+      "Burp Suite",
+      "Penetration Testing",
+      "Vulnerability Assessment",
+      "Incident Response",
+      "Threat Intelligence",
+      "Network Segmentation",
+      "Log Analysis",
+      "Firewall Configuration",
+      "Application Security",
+      "Secure Code Review",
+      "Security Headers",
+      "SSRF Risk Awareness",
+      "Prompt Injection Testing",
+      "LLM Security",
+      "ACSC Essential Eight"
+    ],
+    "devsecops": [
+      "GitHub Actions",
+      "Bandit",
+      "Semgrep",
+      "Gitleaks",
+      "pip-audit",
+      "npm audit",
+      "SAST",
+      "Dependency Scanning",
+      "Secrets Detection",
+      "CI/CD Security",
+      "Security Review",
+      "Vulnerability Remediation",
+      "CVSS/CVE Triage"
+    ],
+    "tools": [
+      "Git",
+      "Docker",
+      "Tailscale",
+      "Ollama",
+      "Obsidian",
+      "WSL2",
+      "Render",
+      "Vercel"
+    ],
+    "ai_ml": [
+      "Anthropic Claude API",
+      "OpenAI API",
+      "Ollama",
+      "RAG",
+      "Prompt Engineering",
+      "Machine Learning",
+      "Neural Networks"
+    ]
   },
-  "certifications": ["AWS Academy Graduate – AWS Academy Cloud Foundations award"]
+  "certifications": [
+    "AWS Academy Graduate – AWS Academy Cloud Foundations award"
+  ],
+  "target_roles": [
+    "Graduate Software Engineer",
+    "Junior Full-Stack Developer",
+    "Application Security Engineer",
+    "DevSecOps Graduate / Junior DevSecOps Engineer",
+    "Cybersecurity Analyst",
+    "AI Security / Secure AI Tooling Graduate"
+  ],
+  "resume_profiles": {
+    "software_engineering": [
+      "Job Application Assistant",
+      "Portfolio",
+      "Production Support Incident Console",
+      "Cyber Content Bot",
+      "Cancer Awareness Mobile App"
+    ],
+    "application_security": [
+      "Khan Security Testing",
+      "Bunkerify",
+      "Web Vulnerability Scanner",
+      "LLM Security Tester",
+      "Job Application Assistant"
+    ],
+    "devsecops": [
+      "Job Application Assistant",
+      "Production Support Incident Console",
+      "Cyber Content Bot",
+      "Web Vulnerability Scanner"
+    ],
+    "ai_security": [
+      "LLM Security Tester",
+      "Cyber Content Bot",
+      "Local LLM Benchmark — Ollama",
+      "Job Application Assistant"
+    ],
+    "graduate_cybersecurity": [
+      "Khan Security Testing",
+      "Bunkerify",
+      "Web Vulnerability Scanner",
+      "LLM Security Tester",
+      "CSCI926 Software Testing and Analysis Group Project"
+    ]
+  },
+  "career_assets": {
+    "brag_bank": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/04 Areas/Brag Bank.md",
+    "resume_bullets_todo": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/04 Areas/Brag Bank & Resume Bullets TODO.md",
+    "project_dashboard": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/03 Projects/Projects Dashboard.md"
+  }
 }
