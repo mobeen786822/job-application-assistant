@@ -1,333 +1,81 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mobeen Khan — CV</title>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resume Template</title>
 <style>
-  @page { size: A4; margin: 0; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10.5pt;
-    line-height: 1.5;
-    color: #1a1a1a;
-    background: #fff;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .page {
-    width: 210mm;
-    min-height: 297mm;
-    margin: 0 auto;
-    padding: 28mm 24mm 24mm 24mm;
-  }
-
-  @media screen {
-    .page {
-      max-width: 800px;
-      padding: 48px 40px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.08);
-      margin: 20px auto;
-    }
-  }
-
-  .header { margin-bottom: 20px; border-bottom: 2px solid #1a5276; padding-bottom: 16px; }
-  .header h1 { font-size: 22pt; font-weight: 700; color: #1a5276; margin-bottom: 4px; }
-  .tagline { font-size: 11pt; color: #555; margin-bottom: 10px; }
-
-  .contact-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 9.5pt; }
-  .contact-row a { color: #1a5276; text-decoration: none; }
-
-  .section { margin-top: 14px; margin-bottom: 18px; }
-  .page > .section:first-of-type { margin-top: 0; }
-  .section-title {
-    font-size: 10pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #1a5276;
-    border-bottom: 1px solid #d5d5d5;
-    padding-bottom: 4px;
-    margin-bottom: 10px;
-  }
-
-  .summary { font-size: 10.5pt; line-height: 1.6; }
-
-  .entry { margin-bottom: 14px; }
-  .project{
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .project + .project{
-    margin-top: 8px;
-  }
-  .project:nth-of-type(2){
-    margin-top: 14px;
-  }
-  .entry-header { display: flex; justify-content: space-between; }
-  .entry-title { font-weight: 700; }
-  .entry-date { font-size: 9.5pt; color: #666; }
-  .entry-subtitle { color: #555; margin-bottom: 4px; }
-
-  ul { padding-left: 18px; }
-  li { margin-bottom: 3px; }
-
-  .skills-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-  .skill-tag {
-    background: #eaf2f8;
-    color: #1a5276;
-    font-size: 9.5pt;
-    padding: 3px 10px;
-    border-radius: 4px;
-  }
-
-  .two-col { display: flex; gap: 40px; }
-  .two-col > div { flex: 1; }
-
-  @media print {
-    .section-projects .entry {
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-  }
-
+:root {
+  --navy:#071426; --navy2:#0d2138; --ink:#172033; --muted:#5e6b7d;
+  --line:#d8dee8; --paper:#f7f9fc; --white:#ffffff; --gold:#c7a65a;
+  --blue:#2e5f93; --soft:#eef2f7;
+}
+* { box-sizing:border-box; }
+html { background:#dfe6f0; }
+body { margin:0; font:13.2px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:#dfe6f0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+a { color:inherit; text-decoration:none; border-bottom:1px solid rgba(199,166,90,.55); }
+.page { max-width:980px; margin:28px auto; background:white; box-shadow:0 24px 90px rgba(7,20,38,.18); }
+.hero { display:block; padding:34px 42px 28px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:white; border-bottom:5px solid var(--gold); }
+.eyebrow { color:#d7c38a; letter-spacing:.18em; text-transform:uppercase; font-size:10px; font-weight:800; margin:0 0 10px; }
+h1 { margin:0; font-size:38px; line-height:1; letter-spacing:-.035em; }
+.headline { margin:10px 0 14px; color:#dbe5f2; font-size:15px; font-weight:650; }
+.contact { display:flex; flex-wrap:wrap; gap:8px 14px; color:#dbe5f2; font-size:12px; }
+.contact span { display:inline-flex; align-items:center; gap:6px; }
+.content { display:grid; grid-template-columns:1fr 285px; gap:30px; padding:30px 42px 38px; }
+.section { margin:0 0 22px; }
+.section-title { margin:0 0 11px; color:#0c1b2f; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; display:flex; align-items:center; gap:10px; }
+.section-title:before { content:""; width:22px; height:3px; background:var(--gold); border-radius:999px; flex:0 0 auto; }
+h3 { margin:0; font-size:15.5px; color:#0c1b2f; }
+h4 { margin:0 0 7px; font-size:11px; color:#26364d; text-transform:uppercase; letter-spacing:.09em; }
+p { margin:0 0 8px; }
+ul { margin:8px 0 0 18px; padding:0; }
+li { margin:4px 0; }
+.summary { padding:16px 18px; background:#f4f7fb; border-left:4px solid var(--gold); border-radius:14px; }
+.project, .role, .section-projects > .entry { padding:14px 0; border-bottom:1px solid var(--line); break-inside:avoid; page-break-inside:avoid; }
+.project, .section-projects > .entry { padding-bottom:26px; margin-bottom:14px; }
+.project:first-of-type, .role:first-of-type, .section-projects > .entry:first-of-type { padding-top:0; }
+.project-head { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+.project-links { color:var(--muted); font-size:11px; white-space:nowrap; }
+.chips { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin:12px 0 12px; }
+.chips span { display:inline-flex; align-items:center; justify-content:center; min-height:22px; padding:4px 9px 4px; border-radius:999px; background:#edf2f8; color:#26364d; font-size:10.5px; font-weight:650; line-height:1; text-align:center; vertical-align:middle; }
+.chips span:nth-child(3n+1) { background:#f3ead4; color:#614b16; }
+.sidebar { border-left:1px solid var(--line); padding-left:24px; }
+.card { background:#f7f9fc; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:14px; }
+.edu-item { margin:0 0 16px; }
+.edu-degree { display:block; margin-bottom:4px; line-height:1.2; }
+.edu-location, .edu-dates, .edu-detail { display:block; margin:0 0 4px; line-height:1.28; }
+.edu-location, .edu-dates, .company, .dates { color:var(--muted); }
+.edu-detail { color:var(--ink); }
+.role { display:grid; grid-template-columns:1fr auto; gap:2px 12px; }
+.role ul { grid-column:1 / -1; }
+.cert { border:1px solid rgba(199,166,90,.5); background:#fbf6e9; color:#493714; padding:11px 12px; border-radius:14px; font-weight:650; }
+@page { size:A4; margin:10mm; }
+@media print {
+  html, body { background:#fff; font-size:9.2pt; line-height:1.35; }
+  .page { margin:0; max-width:none; box-shadow:none; }
+  .hero { padding:10mm 11mm 8mm; }
+  h1 { font-size:24pt; }
+  .headline { font-size:10pt; }
+  .content { grid-template-columns:1fr 62mm; gap:8mm; padding:8mm 11mm 10mm; }
+  .section { margin-bottom:5mm; }
+  .project, .role, .section-projects > .entry { padding:3.6mm 0; }
+  .project, .section-projects > .entry { padding-bottom:6.5mm; margin-bottom:3.5mm; }
+  .summary { padding:3.5mm 4mm; border-radius:3mm; }
+  .card { padding:3.2mm; border-radius:3mm; margin-bottom:3mm; }
+  .chips { gap:1.8mm; margin:3mm 0 3mm; }
+  .chips span { min-height:5.2mm; font-size:7.2pt; padding:1.6pt 4.8pt; line-height:1; }
+}
 </style>
 </head>
-
 <body>
-<div class="page">
-
-<!-- HEADER -->
-<div class="header">
-  <h1>Mobeen Khan</h1>
-  <div class="tagline">Cybersecurity-Focused Software Engineer | Full-Stack Development | ACSC Essential Eight | Production Systems</div>
-  <div class="contact-row">
-    <span>📞 0412 381 611</span>
-    <span>·</span>
-    <span>📧 mobeenk89@gmail.com</span>
-    <span>·</span>
-    <a href="https://www.mobeenkhan.com">🌐 Portfolio</a>
-    <span>·</span>
-    <a href="https://github.com/mobeen786822">🐙 Github</a>
-    <span>·</span>
-    <a href="https://linkedin.com/in/mobeen-khan-6b3340197">💼 LinkedIn</a>
-    <span>·</span>
-    <span>📍 Sydney, NSW</span>
-  </div>
-</div>
-
-<!-- SUMMARY -->
-<div class="section">
-  <div class="section-title">Professional Summary</div>
-  <p class="summary">
-    Computer Science graduate with a major in Cybersecurity and Software Engineering, currently completing a Master's in Cybersecurity at the University of Wollongong. Strong foundation in system security, ethical hacking, AI-driven threat detection, and network security. Brings a security-first mindset to development, with hands-on academic experience in penetration testing, vulnerability assessment, and secure system design.
-  </p>
-</div>
-
-<!-- EDUCATION -->
-<div class="section">
-  <div class="section-title">Education</div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Master of Computer Science (Cybersecurity)</span>
-      <span class="entry-date">2025 – Present</span>
-    </div>
-    <div class="entry-subtitle">University of Wollongong</div>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Bachelor of Computer Science</span>
-      <span class="entry-date">2021 – 2024</span>
-    </div>
-    <div class="entry-subtitle">University of Wollongong · Cybersecurity &amp; Software Engineering</div>
-    <ul>
-      <li>Advanced coursework in system security, ethical hacking, artificial intelligence for cybersecurity, network security, and penetration testing</li>
-    </ul>
-  </div>
-</div>
-
-<!-- TECHNICAL SKILLS -->
-<div class="section">
-  <div class="section-title">Technical Skills</div>
-  <div class="skills-grid">
-    <span class="skill-tag">System Security</span>
-    <span class="skill-tag">Network Security</span>
-    <span class="skill-tag">Threat Modelling</span>
-    <span class="skill-tag">Vulnerability Assessment</span>
-    <span class="skill-tag">Penetration Testing</span>
-    <span class="skill-tag">Incident Response</span>
-    <span class="skill-tag">Ethical Hacking</span>
-    <span class="skill-tag">Reconnaissance &amp; Footprinting</span>
-    <span class="skill-tag">Network Sniffing</span>
-    <span class="skill-tag">Social Engineering</span>
-    <span class="skill-tag">Malware Analysis</span>
-    <span class="skill-tag">AI for Cybersecurity</span>
-    <span class="skill-tag">Machine Learning</span>
-    <span class="skill-tag">Anomaly Detection</span>
-    <span class="skill-tag">Intrusion Detection Systems (IDS)</span>
-    <span class="skill-tag">Linux (Ubuntu, Kali)</span>
-    <span class="skill-tag">Windows Security</span>
-    <span class="skill-tag">Cloud Security (Foundational)</span>
-    <span class="skill-tag">Python</span>
-    <span class="skill-tag">Java</span>
-    <span class="skill-tag">JavaScript / React</span>
-    <span class="skill-tag">SQL</span>
-    <span class="skill-tag">Git</span>
-  </div>
-</div>
-
-<!-- CYBERSECURITY TOOLS -->
-<div class="section">
-  <div class="section-title">Cybersecurity Tools</div>
-  <div class="two-col">
+<main class="page">
+  <header class="hero">
     <div>
-      <ul>
-        <li>Kali Linux</li>
-        <li>Nmap</li>
-        <li>Metasploit</li>
-        <li>Wireshark</li>
-        <li>Burp Suite</li>
-        <li>Penetration Testing</li>
-      </ul>
+      <p class="eyebrow">Professional Resume</p>
+      <h1>Resume</h1>
+      <p class="headline">Professional resume template</p>
     </div>
-    <div>
-      <ul>
-        <li>Vulnerability Assessment</li>
-        <li>Incident Response</li>
-        <li>Threat Intelligence</li>
-        <li>Network Segmentation</li>
-        <li>Log Analysis</li>
-        <li>Firewall Configuration</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- PROJECTS -->
-<div class="section">
-  <div class="section-title">Projects</div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Bunkerify</span>
-      <span class="entry-date">Live deployment</span>
-    </div>
-    <ul>
-      <li>Built and deployed Bunkerify on Vercel using Next.js, Supabase (PostgreSQL + auth), and SendGrid for transactional email delivery.</li>
-      <li>Designed a custom scoring engine from scratch mapping 19 assessment questions to ACSC Essential Eight categories with weighted Maturity Level 0-3 calculations per category.</li>
-      <li>Implemented automated HTML email reports triggered on assessment completion, delivering personalised risk breakdowns and CTAs.</li>
-      <li>Integrated Calendly booking workflow to convert assessment completions into consultations.</li>
-      <li>Deployed a live marketing funnel with a landing page and LinkedIn launch assets to drive inbound leads.</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Job Application Assistant</span>
-      <span class="entry-date">Public repo: github.com/mobeen786822/job-application-assistant</span>
-    </div>
-    <ul>
-      <li>Built a private web tool that tailors a resume to a pasted job description and renders recruiter-ready HTML output.</li>
-      <li>Added a two-step workflow with fit and gap analysis first, then optional proceed-to-generate for resume and cover letter.</li>
-      <li>Implemented full matched-vs-missing requirement breakdown to support apply/no-apply decisions before final document generation.</li>
-      <li>Integrated styled resume and cover letter previews with download actions and responsive UX improvements for remote access.</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Production Support Incident Console</span>
-      <span class="entry-date">Public repo: <a href="https://github.com/mobeen786822/Production-Support-Incident-Console" target="_blank" rel="noopener">Github Repo</a> | <a href="https://incident-console-ui.onrender.com/" target="_blank" rel="noopener">Live demo</a></span>
-    </div>
-    <ul>
-      <li>Built a web-based incident management console that simulates production support workflows across triage, mitigation, resolution, and closure.</li>
-      <li>Implemented SLA-aware incident tracking with severity, status transitions, ownership controls, and timeline logging for operational visibility.</li>
-      <li>Added runbook execution and root-cause capture to support consistent incident handling and post-incident analysis.</li>
-      <li>Created reporting views for response and resolution trends to support service reliability improvements.</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Cancer Awareness Mobile App</span>
-      <span class="entry-date">University Coursework</span>
-    </div>
-    <ul>
-      <li>Built a cross-platform mobile app using React Native and TypeScript.</li>
-      <li>Implemented Firebase integration for authentication, cloud data storage, and messaging workflows.</li>
-      <li>Added geolocation and media upload capabilities with structured in-app navigation.</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Security Monitoring &amp; Traffic Analysis Labs</span>
-      <span class="entry-date">University Coursework</span>
-    </div>
-    <ul>
-      <li>Captured and analysed network traffic using Wireshark to identify suspicious patterns and indicators of compromise in controlled lab environments</li>
-      <li>Applied intrusion detection concepts and documented findings, mitigations, and recommended controls</li>
-      <li>Produced clear technical write-ups suitable for incident triage and stakeholder reporting</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Penetration Testing Exercise (Ethical Hacking)</span>
-      <span class="entry-date">University Coursework</span>
-    </div>
-    <ul>
-      <li>Performed reconnaissance and enumeration using Nmap, then validated vulnerabilities in a sandboxed environment</li>
-      <li>Mapped findings to remediation actions (patching, configuration hardening, least privilege) and summarised risk impact</li>
-      <li>Practised safe exploitation techniques with strict scope boundaries and documentation of evidence</li>
-    </ul>
-  </div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">AI for Cybersecurity: Threat &amp; Anomaly Detection</span>
-      <span class="entry-date">University Coursework</span>
-    </div>
-    <ul>
-      <li>Applied machine learning concepts to cybersecurity datasets for anomaly detection and classification (coursework)</li>
-      <li>Performed feature selection and model evaluation to improve detection accuracy while minimising false positives</li>
-      <li>Interpreted model outputs and communicated limitations, assumptions, and practical security implications</li>
-    </ul>
-  </div>
-</div>
-
-<!-- WORK EXPERIENCE -->
-<div class="section">
-  <div class="section-title">Work Experience</div>
-
-  <div class="entry">
-    <div class="entry-header">
-      <span class="entry-title">Web Developer (Volunteer/Part-Time)</span>
-      <span class="entry-date">Jan 2018 – Mar 2019</span>
-    </div>
-    <div class="entry-subtitle">Hentley · eCommerce Platform</div>
-    <ul>
-      <li>Implemented frontend features on a live eCommerce website handling real user transactions and stakeholder feedback</li>
-      <li>Supported server-side functionality for product displays and transactional workflows</li>
-      <li>Improved mobile responsiveness and cross-browser compatibility across the platform</li>
-    </ul>
-  </div>
-</div>
-
-<!-- INTERESTS -->
-<div class="section">
-  <div class="section-title">Areas of Interest</div>
-  <p class="summary">
-    Security operations · SOC environments · Threat detection · Incident response · Ethical hacking · Cloud security · Privacy and secure system design
-  </p>
-</div>
-
-</div>
+  </header>
+</main>
 </body>
 </html>

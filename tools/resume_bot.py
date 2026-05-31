@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import difflib
 import html
 import hashlib
@@ -2686,160 +2686,197 @@ def render_html(
     if not (experience or volunteer):
         raise SystemExit('Resume rendering error: Professional Experience section is empty.')
 
-    contact_items = []
-    for c in contact:
-        formatted = _format_contact_item(c)
-        if formatted:
-            contact_items.append(formatted)
+    def format_date(value: str) -> str:
+        return normalize_text(str(value or '')).replace(' - ', ' — ').replace('–', '—')
 
-    tagline = headline
+    def render_project_links(links: dict) -> str:
+        if not isinstance(links, dict):
+            return ''
+        parts = []
+        for key, label in (('github', 'GitHub'), ('live', 'Live'), ('website', 'Website')):
+            url = normalize_text(str(links.get(key, ''))).strip()
+            if not url:
+                continue
+            href = url if url.lower().startswith(('http://', 'https://')) else f'https://{url}'
+            parts.append(f'<a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{label}</a>')
+        return ' · '.join(parts)
 
-    summary_text = summary
+    def render_bullets(entry: dict) -> str:
+        bullets = [b for b in (entry.get('bullets') or []) if str(b).strip()]
+        if not bullets:
+            return ''
+        return '<ul>' + ''.join(f'<li>{linkify_text(str(b))}</li>' for b in bullets) + '</ul>'
+
+    def render_project_entries(entries):
+        blocks = []
+        for entry in entries or []:
+            title = linkify_text_compact_links(entry.get('title', ''))
+            links_html = render_project_links(entry.get('links', {}))
+            techs = []
+            for tech in entry.get('technologies', []) or []:
+                clean = clean_skill_token(str(tech))
+                if clean and clean not in techs:
+                    techs.append(clean)
+            chips = ''.join(f'<span>{html.escape(tech)}</span>' for tech in techs[:10])
+            chip_block = f'<div class="chips">{chips}</div>' if chips else ''
+            blocks.append(
+                '<div class="entry">'
+                '<div class="project-head">'
+                f'<h3><span class="entry-title">{title}</span></h3>'
+                f'<div class="entry-subtitle project-links">{links_html}</div>'
+                '</div>'
+                f'{chip_block}'
+                f'{render_bullets(entry)}'
+                '</div>'
+            )
+        return ''.join(blocks)
+
+    def render_role_entries(entries):
+        blocks = []
+        for entry in entries or []:
+            title = linkify_text_compact_links(entry.get('title', ''))
+            subtitle = linkify_text_compact_links(entry.get('subtitle', ''))
+            date = format_date(entry.get('date', ''))
+            subtitle_block = f'<p class="company entry-subtitle">{subtitle}</p>' if subtitle else ''
+            date_block = f'<p class="dates entry-date">{html.escape(date)}</p>' if date else ''
+            blocks.append(
+                '<div class="entry role">'
+                '<div>'
+                f'<h3><span class="entry-title">{title}</span></h3>'
+                f'{subtitle_block}'
+                '</div>'
+                f'{date_block}'
+                f'{render_bullets(entry)}'
+                '</div>'
+            )
+        return ''.join(blocks)
+
+    def render_education(entries):
+        blocks = []
+        for entry in entries or []:
+            title = linkify_text_compact_links(entry.get('title', ''))
+            school = linkify_text_compact_links(entry.get('school', ''))
+            date = format_date(entry.get('date', ''))
+            details = entry.get('bullets') or []
+            detail_html = ''.join(f'<p class="edu-detail">{linkify_text(str(item))}</p>' for item in details if str(item).strip())
+            school_block = f'<p class="edu-location entry-subtitle">{school}</p>' if school else ''
+            date_block = f'<p class="edu-dates entry-date">{html.escape(date)}</p>' if date else ''
+            blocks.append(
+                '<div class="entry edu-item">'
+                f'<strong class="edu-degree"><span class="entry-title">{title}</span></strong>'
+                f'{school_block}'
+                f'{date_block}'
+                f'{detail_html}'
+                '</div>'
+            )
+        return ''.join(blocks)
+
+    def ordered_skill_groups():
+        selected = {str(s).strip().lower() for s in (skills or []) if str(s).strip()}
+        groups = grouped_skills if isinstance(grouped_skills, dict) else {}
+        if groups:
+            ordered = []
+            for group, values in groups.items():
+                cleaned = []
+                for raw in values or []:
+                    skill = clean_skill_token(str(raw))
+                    if not skill:
+                        continue
+                    if selected and skill.lower() not in selected and len(selected) <= 24:
+                        continue
+                    if skill not in cleaned:
+                        cleaned.append(skill)
+                if cleaned:
+                    ordered.append((str(group).replace('_', ' ').title(), cleaned))
+            if ordered:
+                return ordered
+        return [('Core Skills', [clean_skill_token(str(s)) for s in (skills or []) if clean_skill_token(str(s))])]
+
+    def render_skill_groups():
+        blocks = []
+        for group, values in ordered_skill_groups():
+            chips = ''.join(f'<span>{html.escape(skill)}</span>' for skill in values)
+            blocks.append(
+                '<div class="skill-block">'
+                f'<h4>{html.escape(group)}</h4>'
+                f'<div class="chips compact">{chips}</div>'
+                '</div>'
+            )
+        return ''.join(blocks)
+
+    summary_text = normalize_text(str(summary or '')).strip()
     if summary_text and summary_text[-1] not in '.!?':
         summary_text += '.'
 
-    def join_contact(items):
-        if not items:
-            return ''
-        parts = []
-        for i, item in enumerate(items):
-            parts.append(item)
-        return ' <span>|</span> '.join(parts)
-
-    def render_entries(entries, with_subtitle=False, entry_class='entry'):
-        def render_project_links(links: dict) -> str:
-            if not isinstance(links, dict):
-                return ''
-            parts = []
-            for key, icon, label in (
-                ('github', '🐙', 'GitHub'),
-                ('live', '🌐', 'Live'),
-                ('website', '🔗', 'Website'),
-            ):
-                url = normalize_text(str(links.get(key, ''))).strip()
-                if not url:
-                    continue
-                href = url if url.lower().startswith(('http://', 'https://')) else f'https://{url}'
-                parts.append(f'{icon} <a href="{html.escape(href, quote=True)}" target="_blank" rel="noopener">{label}</a>')
-            return ' | '.join(parts)
-
-        html_parts = []
-        for e in entries:
-            html_parts.append(f'<div class="{entry_class}">')
-            html_parts.append('<div class="entry-header">')
-            html_parts.append(f'<span class="entry-title">{linkify_text_compact_links(e.get("title", ""))}</span>')
-            if e.get('date'):
-                html_parts.append(f'<span class="entry-date">{e["date"]}</span>')
-            html_parts.append('</div>')
-            links_html = render_project_links(e.get('links', {}))
-            if links_html:
-                html_parts.append(f'<div class="entry-subtitle">{links_html}</div>')
-            if with_subtitle and e.get('school'):
-                html_parts.append(f'<div class="entry-subtitle">{linkify_text(e["school"])}</div>')
-            elif e.get('subtitle'):
-                html_parts.append(f'<div class="entry-subtitle">{linkify_text_compact_links(e["subtitle"])}</div>')
-            if e.get('bullets'):
-                html_parts.append('<ul>')
-                for b in e['bullets']:
-                    html_parts.append(f'<li>{linkify_text(b)}</li>')
-                html_parts.append('</ul>')
-            html_parts.append('</div>')
-        return '\n'.join(html_parts)
-    edu_html = render_entries(education, with_subtitle=True)
-    skills_html = ''.join([f'<span class="skill-tag">{html.escape(s)}</span>' for s in (skills or []) if s])
-    proj_html = render_entries(projects, entry_class='entry project')
     combined_experience = (experience or []) + (volunteer or [])
-    exp_html = render_entries(combined_experience)
-    cert_items = ''.join([f'<li>{linkify_text(c)}</li>' for c in certificates]) if certificates else ''
+    cert_items = [normalize_text(str(c or '')).strip() for c in certificates or [] if str(c or '').strip()]
+    cert_html = ''.join(f'<p class="cert">{linkify_text(c)}</p>' for c in cert_items)
 
-    section_html_map = {
-        'Professional Summary': (
-            '<div class="section"><div class="section-title">Professional Summary</div>'
-            f'<p class="summary">{linkify_text(summary_text)}</p></div>'
-        ),
-        'Key Skills / Technical Skills': (
-            '<div class="section"><div class="section-title">Key Skills</div>'
-            f'<div class="skills-grid">{skills_html}</div></div>'
-        ),
-        'Professional Experience': (
-            '<div class="section"><div class="section-title">Professional Experience</div>'
-            f'{exp_html}</div>'
-        ),
-        'Projects': (
-            '<div class="section section-projects"><div class="section-title">Projects</div>'
-            f'{proj_html}</div>'
-        ),
-        'Education': (
-            '<div class="section"><div class="section-title">Education</div>'
-            f'{edu_html}</div>'
-        ),
-        'Certifications': (
-            '<div class="section"><div class="section-title">Certificates</div>'
-            f'<ul>{cert_items}</ul></div>' if cert_items else ''
-        ),
+    body_sections = {
+        'Professional Summary': '<div class="section"><div class="section-title">Profile</div>' + f'<p class="summary">{linkify_text(summary_text)}</p></div>',
+        'Projects': '<div class="section section-projects"><div class="section-title">Projects</div>' + f'{render_project_entries(projects)}</div>',
+        'Professional Experience': '<div class="section"><div class="section-title">Experience</div>' + f'{render_role_entries(combined_experience)}</div>',
     }
-    ordered_titles = section_order[:] if section_order else DEFAULT_SECTION_ORDER[:]
-    body_sections = []
-    for title in ordered_titles:
-        block = section_html_map.get(title)
-        if block:
-            body_sections.append(block)
 
-    header_block = header_html if header_html else f"""
-<div class="header">
-  <h1>{name}</h1>
-  <div class="tagline">{tagline}</div>
-  <div class="contact-row">{join_contact(contact_items)}</div>
-</div>
-"""
+    # The clean resume layout keeps education/skills in the sidebar and uses the
+    # mock-up's main-column order for consistent HTML preview and PDF output.
+    main_blocks = [
+        body_sections['Professional Summary'],
+        body_sections['Projects'],
+        body_sections['Professional Experience'],
+    ]
 
-    html_doc = f"""<!DOCTYPE html>
-<html lang=\"en\">
+    page_header = header_html if header_html else render_header_html(name=name, headline=headline, contact=contact)
+    sidebar_cert = f'<section class="section"><div class="section-title">Certification</div>{cert_html}</section>' if cert_html else ''
+
+    html_doc = f'''<!doctype html>
+<html lang="en">
 <head>
-<meta charset=\"UTF-8\">
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-<title>{name} - Resume</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{html.escape(name)} — Resume</title>
 <style>
 {style_css}
 </style>
 </head>
-
 <body>
-<div class=\"page\">
-
-{header_block}
-{''.join(body_sections)}
-
-</div>
+<main class="page">
+  {page_header}
+  <div class="content">
+    <div>
+      {''.join(main_blocks)}
+    </div>
+    <aside class="sidebar">
+      <div class="section card"><div class="section-title">Education</div>{render_education(education)}</div>
+      <div class="section card"><div class="section-title">Skills</div>{render_skill_groups()}</div>
+      {sidebar_cert}
+    </aside>
+  </div>
+</main>
 </body>
 </html>
-"""
+'''
     return html_doc
 
 
+
 def render_header_html(name: str, headline: str, contact):
-    contact_items = []
-    for c in contact:
-        formatted = _format_contact_item(c)
-        if formatted:
-            contact_items.append(formatted)
+    contact_html = []
+    for raw in contact or []:
+        value = normalize_text(str(raw or '')).strip()
+        if value:
+            contact_html.append(f'<span>{linkify_text_compact_links(value)}</span>')
+    return f'''
+<header class="hero">
+  <div>
+    <p class="eyebrow">Professional Resume</p>
+    <h1>{html.escape(name or '')}</h1>
+    <p class="headline">{html.escape(headline or '')}</p>
+    <div class="contact">{''.join(contact_html)}</div>
+  </div>
+</header>
+'''
 
-    def join_contact(items):
-        if not items:
-            return ''
-        parts = []
-        for item in items:
-            parts.append(item)
-        return ' <span>|</span> '.join(parts)
-
-    tagline = headline or ''
-    return f"""
-<div class="header">
-  <h1>{name}</h1>
-  <div class="tagline">{tagline}</div>
-  <div class="contact-row">{join_contact(contact_items)}</div>
-</div>
-"""
 
 
 def extract_template_header(template_text: str) -> str | None:
