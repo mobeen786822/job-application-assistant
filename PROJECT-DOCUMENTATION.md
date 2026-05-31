@@ -32,6 +32,12 @@ This tool automates that workflow by:
 
 **Alternatively (technical focus):** "A deterministic, role-aware resume tailoring engine that combines AI prompt-engineering with rule-based validation to ensure factual consistency, deployed as a multi-user SaaS with Supabase authentication and per-user generation quotas."
 
+**Recent updates since commit `f5fdc0d60cff4d9f82c5b3c7b15353bdbde3f69f`:**
+- `build_summary()` now uses the current role profile keys (`appsec`, `devsecops`, `pentester`, `mobile`, `ai_ml`, and general software/graduate variants) when generating the professional summary.
+- Pentester resumes now correctly render offensive-security summary wording instead of falling back due to an outdated profile key mismatch.
+- AI/ML-targeted resumes now use dedicated summary language centered on ML systems, LLM evaluation, and reliable deployment workflows.
+- `filter_projects_for_role()` now supports normalized partial-title matching so priority projects such as `Local LLM Benchmark` are retained even when configured and stored titles are not exact string matches.
+
 ---
 
 ## ARCHITECTURE & DESIGN
@@ -523,11 +529,12 @@ AI_PROVIDER=openai     # Use GPT-4o (more expensive)
 **Feature 4: Role-Aware Deterministic Strategy Engine**
 
 Based on job classification, system selects different resume orderings:
-- **APPSEC_DEVSECOPS**: Puts "Projects" before "Experience" (project demos matter more for appsec)
-- **PENTEST**: Same strategy as APPSEC
+- **APPSEC / DEVSECOPS**: Puts "Projects" before "Experience" (project demos and security tooling matter more for security-heavy roles)
+- **PENTESTER**: Uses the same security-first ordering, with offensive-security summary wording
 - **SOFTWARE_GENERAL**: Puts "Experience" before "Projects" (chronological work history expected)
+- **AI_ML**: Keeps software-style structure while prioritizing ML/LLM-relevant projects when present
 
-Strategy also picks which projects to include, which skills to deprioritize, different max_skills limits (14 for security, 10 for software).
+Strategy also picks which projects to include, which skills to deprioritize, different max_skills limits (14 for security, 10 for software), and now tolerates partial project-title matches during priority selection.
 
 **Feature 5: Heuristic Fallback is Production-Ready**
 
@@ -1331,12 +1338,19 @@ def choose_resume_strategy(classification: dict) -> dict:
     """Return role-aware strategy configuration."""
     profile = _detect_role_profile(job_text, classification)
     
-    if profile == 'appsec_devsecops':
+    if profile in {'appsec', 'devsecops'}:
         return {
             'section_order': ['Summary', 'Skills', 'Projects', 'Experience', ...],
             'project_priority': ['Bunkerify', 'Job Application Assistant', ...],
             'max_skills': 14,  # Security roles value breadth
             'prefer_cyber_terms': True,
+        }
+    elif profile == 'ai_ml':
+        return {
+            'section_order': ['Summary', 'Skills', 'Experience', 'Projects', ...],
+            'project_priority': ['Local LLM Benchmark', 'Job Application Assistant', ...],
+            'max_skills': 10,
+            'prefer_cyber_terms': False,
         }
     elif profile == 'software_engineering':
         return {
@@ -1811,9 +1825,9 @@ except Exception as e:
   - Monthly quota enforcement
   - SaaS UX (dashboard, generation history)
 - ✅ **Role-aware strategy engine**
-  - APPSEC_DEVSECOPS, PENTEST, SOFTWARE_GENERAL, MOBILE, GRADUATE
+  - APPSEC, DEVSECOPS, PENTESTER, SOFTWARE_GENERAL, MOBILE, AI_ML, GRADUATE
   - Project reordering, skill prioritization
-  - Section ordering (experience vs projects)
+  - Section ordering (experience vs projects) plus role-specific summary wording
 - ✅ **Validation & safety guardrails**
   - Tagline hallucination detection
   - Bullet importance weighting
@@ -1938,7 +1952,7 @@ The challenge: LLMs generate plausible-sounding text; Claude invents skills not 
 
 **2. Role-Aware Deterministic Strategy Engine (Domain-Specific Algorithms)**
 
-The challenge: same resume tailored to cybersecurity vs. software engineering roles needs completely different orderings and emphasis (projects before experience for security, opposite for software). No universal rule; requires domain knowledge. Solution: implement separate strategies (APPSEC_DEVSECOPS, SOFTWARE_GENERAL, PENTEST, etc.) with hand-tuned parameters (project priority, max_skills=14 vs 10, skill_priority_groups). Why it's tricky: hardcoding strategies doesn't scale; fine-tuning all parameters is manual. Result: ~89% role classification accuracy, but generalizing to new roles requires code change. Future improvement: data-driven approach (compute optimal strategies from 1000+ dataset).
+The challenge: same resume tailored to cybersecurity vs. software engineering vs. AI/ML roles needs different ordering, summary wording, and project emphasis. No universal rule; requires domain knowledge. Solution: implement separate strategies (`appsec`, `devsecops`, `pentester`, `software_engineering`, `ai_ml`, etc.) with hand-tuned parameters (project priority, max_skills=14 vs 10, skill_priority_groups) and role-specific professional summaries. Project filtering now also uses normalized partial-title matching so intended projects like `Local LLM Benchmark` survive minor naming differences. Why it's tricky: hardcoding strategies doesn't scale; fine-tuning all parameters is manual. Result: ~89% role classification accuracy, but generalizing to new roles still requires code change. Future improvement: data-driven approach (compute optimal strategies from 1000+ dataset).
 
 **3. Graceful Degradation Under Outages (Resilience)**
 

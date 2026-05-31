@@ -11,12 +11,19 @@ AI-powered resume and cover letter tailoring tool that generates job-specific PD
 - Resume generation from `assets/resume.json` + `assets/template.html`
 - Cover letter generation with HTML preview (or text fallback)
 - CLI support for resume generation
-- Deterministic role-aware strategy engine (software vs cybersecurity emphasis)
+- Deterministic role-aware strategy engine spanning software, AppSec, DevSecOps, pentesting, mobile, and AI/ML-focused roles
 - Strict hallucination guards:
   - no new bullets
   - no new technologies
   - no cloud-provider substitution (for example `Firebase -> AWS`)
 - Optional AI "light rephrase" layer with hard validation and deterministic fallback
+
+## Recent Changes
+
+- Updated role-specific professional summaries to align with current detected profiles (`appsec`, `devsecops`, `pentester`, `mobile`, `ai_ml`, and general software/graduate roles).
+- Fixed pentester summary selection so offensive-security resumes use the correct wording instead of falling back to a generic software summary.
+- Added dedicated AI/ML summary wording focused on machine learning systems, LLM evaluation, and reliable model deployment workflows.
+- Relaxed project title matching during role-based filtering so intended projects such as `Local LLM Benchmark` are preserved even when titles only partially match the configured priority list.
 
 ## SaaS Extension
 
