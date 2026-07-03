@@ -7,8 +7,8 @@
     "github": "https://github.com/mobeen786822",
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
-  "headline": "Graduate Software Engineer | Application Security | DevSecOps & AI-Enabled Full-Stack Development",
-  "summary": "Graduate Software Engineer with a Master of Computer Science in Cybersecurity and hands-on experience building secure full-stack, AI-assisted, and application security projects. Built and launched security-focused platforms including Bunkerify, Khan Security Testing, a web vulnerability scanner, an LLM security tester, and an AI-assisted job application platform. Strong practical focus on React/TypeScript, Python, Flask/FastAPI, REST APIs, Supabase/Firebase, CI/CD security pipelines, dependency remediation, secure deployment, and translating security findings into working product improvements.",
+  "headline": "IT Helpdesk Support Officer | Troubleshooting | Secure Systems",
+  "summary": "Computer Science graduate with hands-on software support, incident workflow, technical documentation, networking, and secure systems project experience. Built support-oriented tools covering incident triage, lifecycle tracking, root-cause capture, secure deployment, and vulnerability remediation, with a practical focus on clear communication, reliable troubleshooting, and careful escalation of technical issues.",
   "education": [
     {
       "degree": "Bachelor of Computer Science",
@@ -117,6 +117,16 @@
             "security",
             "vpn"
           ]
+        },
+        {
+          "text": "Maintained structured project documentation and validation checks so generated outputs stay consistent, traceable, and easy to review before use.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "documentation",
+            "validation",
+            "support"
+          ]
         }
       ]
     },
@@ -135,7 +145,10 @@
         "Framer Motion",
         "GitHub",
         "Responsive Design",
-        "Application Security Review"
+        "Application Security Review",
+        "GitHub Pages",
+        "Portfolio Case Studies",
+        "Security Review Evidence"
       ],
       "bullets": [
         {
@@ -167,6 +180,17 @@
             "review",
             "remediation"
           ]
+        },
+        {
+          "text": "Expanded the portfolio into a central project evidence hub with security, AI, DevSecOps, and support case studies, including safe interactive demos and documented local-run paths where public hosting would be risky or unnecessary.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "portfolio",
+            "case-study",
+            "security",
+            "communication"
+          ]
         }
       ]
     },
@@ -186,7 +210,9 @@
         "Penetration Testing",
         "Security Readiness",
         "LinkedIn Outreach",
-        "Sentinel Security Review"
+        "Sentinel Security Review",
+        "SaaS Security",
+        "Remediation Guidance"
       ],
       "bullets": [
         {
@@ -217,6 +243,16 @@
             "security",
             "review",
             "evidence"
+          ]
+        },
+        {
+          "text": "Documented review outcomes and follow-up items in a repeatable security review workflow, keeping evidence available for later audit and remediation tracking.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "documentation",
+            "review",
+            "remediation"
           ]
         }
       ]
@@ -303,7 +339,7 @@
       "name": "Production Support Incident Console",
       "links": {
         "github": "https://github.com/mobeen786822/Production-Support-Incident-Console",
-        "live": "https://incident-console-ui.onrender.com/",
+        "live": "",
         "website": ""
       },
       "technologies": [
@@ -319,11 +355,17 @@
         "GitHub Actions",
         "Bandit",
         "Gitleaks",
-        "pip-audit"
+        "pip-audit",
+        "Incident Triage",
+        "Root-Cause Analysis",
+        "Technical Documentation",
+        "Troubleshooting Workflow",
+        "Portfolio Case Study",
+        "SRE Workflows"
       ],
       "bullets": [
         {
-          "text": "Developed a full-stack incident management console with a React/TypeScript frontend and FastAPI/Python backend, containerised with Docker and deployed via Render.",
+          "text": "Developed a full-stack incident management console with a React/TypeScript frontend and FastAPI/Python backend, containerised with Docker and preserved as a portfolio case study/local-run project after public Render hosting was archived.",
           "core": true,
           "importance": 3,
           "tags": [
@@ -340,6 +382,17 @@
             "lifecycle",
             "incident",
             "systems"
+          ]
+        },
+        {
+          "text": "Designed the console around support-team workflows including ticket ownership, severity triage, status updates, SLA indicators, and root-cause notes to make issue handling easier to track and escalate.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "support",
+            "triage",
+            "documentation",
+            "escalation"
           ]
         },
         {
@@ -371,14 +424,25 @@
             "remediation",
             "frontend"
           ]
+        },
+        {
+          "text": "Pivoted the project presentation from an always-on hosted service to a safer portfolio simulation/case study, keeping the operational workflow visible while avoiding unnecessary public infrastructure exposure.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "security",
+            "portfolio",
+            "operations",
+            "deployment"
+          ]
         }
       ]
     },
     {
       "name": "Web Vulnerability Scanner",
       "links": {
-        "github": "",
-        "live": "https://web-vulnerability-scanner-lqy5.onrender.com/",
+        "github": "https://github.com/mobeen786822/web-vulnerability-scanner",
+        "live": "",
         "website": ""
       },
       "technologies": [
@@ -389,7 +453,11 @@
         "Tailwind CSS",
         "Bandit",
         "pip-audit",
-        "GitHub Actions"
+        "GitHub Actions",
+        "Security Headers",
+        "SSL/TLS Review",
+        "Responsible Tooling",
+        "Safe Demo Design"
       ],
       "bullets": [
         {
@@ -431,6 +499,17 @@
             "ci-cd",
             "devsecops"
           ]
+        },
+        {
+          "text": "Reworked the public presentation into a safe sample-results demo/case study instead of an unrestricted live scanner, with real arbitrary URL scanning deferred behind future auth, rate limits, and allowlist controls.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "responsible-disclosure",
+            "portfolio",
+            "risk-management"
+          ]
         }
       ]
     },
@@ -448,7 +527,11 @@
         "Vite",
         "Tailwind CSS",
         "Ollama",
-        "Anthropic API"
+        "Anthropic API",
+        "Prompt Injection",
+        "Jailbreak Testing",
+        "Recorded Results Demo",
+        "Responsible AI Testing"
       ],
       "bullets": [
         {
@@ -489,6 +572,17 @@
             "architecture",
             "extensibility"
           ]
+        },
+        {
+          "text": "Presented the tool through a safe interactive recorded-results demo in the portfolio, keeping real model/API execution protected for local or controlled environments.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ai-security",
+            "portfolio",
+            "risk-management",
+            "demo"
+          ]
         }
       ]
     },
@@ -496,7 +590,7 @@
       "name": "Cyber Content Bot",
       "links": {
         "github": "https://github.com/mobeen786822/cyber-content-bot",
-        "live": "https://cyber-content-bot-ui.onrender.com",
+        "live": "",
         "website": ""
       },
       "technologies": [
@@ -507,7 +601,12 @@
         "Vite",
         "Tailwind CSS",
         "Anthropic Claude API",
-        "GitHub Actions"
+        "GitHub Actions",
+        "CISA KEV",
+        "NVD",
+        "arXiv",
+        "Discord Webhooks",
+        "Portfolio Demo"
       ],
       "bullets": [
         {
@@ -521,7 +620,7 @@
           ]
         },
         {
-          "text": "Implemented tone control (professional/conversational/technical) and a React/TypeScript dashboard for draft review and one-click clipboard copy — deployed live on Render.",
+          "text": "Implemented tone control (professional/conversational/technical) and a React/TypeScript dashboard for draft review and one-click clipboard copy, with portfolio presentation shifted to a safe interactive demo using sample threat-intel data.",
           "core": true,
           "importance": 3,
           "tags": [
@@ -538,6 +637,17 @@
             "security",
             "remediation",
             "devsecops"
+          ]
+        },
+        {
+          "text": "Designed the workflow for scheduled Discord delivery through GitHub Actions/webhooks so generated cybersecurity briefings can be reviewed before posting publicly.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "automation",
+            "security",
+            "github-actions",
+            "communication"
           ]
         }
       ]
@@ -556,7 +666,10 @@
         "Phi-3 Mini",
         "Gemma 2",
         "Ubuntu",
-        "VirtualBox"
+        "VirtualBox",
+        "Benchmark Methodology",
+        "Offline AI",
+        "Portfolio Results Explorer"
       ],
       "bullets": [
         {
@@ -597,6 +710,17 @@
             "ai",
             "benchmarking",
             "findings"
+          ]
+        },
+        {
+          "text": "Added the benchmark as an interactive portfolio results explorer, making offline model tradeoffs easier to review without requiring a hosted backend or cloud inference.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ai",
+            "portfolio",
+            "benchmarking",
+            "communication"
           ]
         }
       ]
@@ -862,7 +986,9 @@
       "SSRF Risk Awareness",
       "Prompt Injection Testing",
       "LLM Security",
-      "ACSC Essential Eight"
+      "ACSC Essential Eight",
+      "Vulnerability Remediation",
+      "Security Review"
     ],
     "devsecops": [
       "GitHub Actions",
@@ -887,7 +1013,13 @@
       "Obsidian",
       "WSL2",
       "Render",
-      "Vercel"
+      "Vercel",
+      "Windows",
+      "Technical Documentation",
+      "Troubleshooting",
+      "Issue Triage",
+      "Incident Tracking",
+      "Remote Access (Tailscale)"
     ],
     "ai_ml": [
       "Anthropic Claude API",
@@ -903,6 +1035,9 @@
     "AWS Academy Graduate – AWS Academy Cloud Foundations award"
   ],
   "target_roles": [
+    "Technical Support Analyst",
+    "Junior IT Support Officer",
+    "IT Helpdesk Support Officer",
     "Graduate Software Engineer",
     "Junior Full-Stack Developer",
     "Application Security Engineer",
@@ -943,11 +1078,17 @@
       "Web Vulnerability Scanner",
       "LLM Security Tester",
       "CSCI926 Software Testing and Analysis Group Project"
+    ],
+    "it_support": [
+      "Production Support Incident Console",
+      "Job Application Assistant",
+      "Khan Security Testing"
     ]
   },
   "career_assets": {
     "brag_bank": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/04 Areas/Brag Bank.md",
     "resume_bullets_todo": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/04 Areas/Brag Bank & Resume Bullets TODO.md",
-    "project_dashboard": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/03 Projects/Projects Dashboard.md"
+    "project_dashboard": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/03 Projects/Projects Dashboard.md",
+    "bug_bounty_kickstart": "C:/Users/mobee/Documents/Obsidian/Mobs Brain Vault/04 Areas/Bug Bounty Holiday Kickstart.md"
   }
 }
