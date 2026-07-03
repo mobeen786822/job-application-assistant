@@ -378,7 +378,7 @@ def linkify_text_compact_links(text: str) -> str:
         raw_l = raw.lower()
         if 'github.com/' in raw_l:
             icon = '&#x1F419;'
-            label = 'Github Repo'
+            label = 'Github'
         elif 'github.com' in raw_l:
             icon = '&#x1F419;'
             label = 'Github'
@@ -916,13 +916,10 @@ def assess_job_fit_with_ai(job_text: str, resume_text: str) -> dict:
         "Rules:\n"
         "- recommendation: one of APPLY, MAYBE, NO\n"
         "- confidence: integer 0-100\n"
-        "- rationale: one short sentence explaining the decision without hype\n"
-        "- matched_requirements: concise requirement statements that are explicitly evidenced in both job description and resume\n"
-        "- missing_requirements: concise requirement statements present in job description but not explicitly evidenced in resume\n"
-        "- Treat years of experience, commercial/professional experience, degree requirements, location/work rights, and seniority as important gates.\n"
-        "- Do not count adjacent personal/project experience as commercial/professional experience unless the resume explicitly says so.\n"
-        "- Prefer MAYBE over APPLY when core requirements are only partially evidenced.\n"
-        "- Keep each array item short and specific\n"
+        "- rationale: one short sentence\n"
+        "- matched_requirements: array of concise requirement statements found in both job description and resume\n"
+        "- missing_requirements: array of concise requirement statements present in job description but not evidenced in resume\n"
+        "- keep each array item short and specific\n"
         "- Do not invent resume facts.\n\n"
         f"Job description:\n{job_text}\n\n"
         f"Resume:\n{resume_text}\n"
@@ -1280,7 +1277,19 @@ def _detect_role_profile(job_text: str, classification: dict | None = None) -> s
     is_junior = any(_normalize_term(term) in norm for term in ('junior', 'entry level', 'entry-level', 'entrylevel', 'associate'))
     has_graduate = any(_normalize_term(term) in norm for term in JUNIOR_GRADUATE_ROLE_TERMS)
     has_ai_ml = any(_normalize_term(term) in norm for term in AI_ML_ROLE_TERMS)
+    has_it_support = any(
+        _normalize_term(term) in norm
+        for term in (
+            'helpdesk', 'help desk', 'service desk', 'desktop support', 'it support',
+            'support officer', 'support queue', 'support queues', 'zendesk',
+            'active directory', 'office 365', 'microsoft 365', 'windows server',
+            'windows 11', 'remote desktop', 'intune', 'entra', 'tcp/ip', 'tcp ip',
+            'printer', 'telephony', 'hardware and software', 'user adds', 'moves', 'changes'
+        )
+    )
 
+    if has_it_support:
+        return 'it_support'
     if any(_normalize_term(term) in norm for term in PENTEST_ROLE_TERMS):
         return 'pentester'
     if any(_normalize_term(term) in norm for term in APPSEC_DEVSECOPS_ROLE_TERMS):
@@ -1323,6 +1332,8 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
         who_i_am = 'Offensive Security-focused Software Engineer'
     elif profile == 'mobile':
         who_i_am = 'Mobile-focused Software Engineer'
+    elif profile == 'it_support':
+        who_i_am = 'IT Support-focused Computer Science graduate'
     elif profile in {'graduate', 'graduate_developer', 'junior_swe', 'software_engineering'}:
         who_i_am = 'Software Engineer'
 
@@ -1350,6 +1361,11 @@ def build_summary(classification: dict, resume_json: dict, job_text: str = '') -
         sentence_two = (
             "I build full-stack systems with AI-assisted features across React frontends, "
             "Python/API backends, and reliable deployment pipelines."
+        )
+    elif profile == 'it_support':
+        sentence_two = (
+            "I bring practical troubleshooting, technical documentation, networking fundamentals, "
+            "secure systems awareness, and hands-on software support project experience."
         )
     elif profile == 'mobile':
         sentence_two = (
@@ -1380,6 +1396,8 @@ def build_dynamic_headline(profile: str) -> str:
         return 'Junior Software Engineer | Full-Stack Development | Secure Delivery'
     if profile == 'ai_ml':
         return 'AI/ML Engineer | Machine Learning Systems | Secure Data Pipelines'
+    if profile == 'it_support':
+        return 'IT Helpdesk Support Officer | Troubleshooting | Secure Systems'
     if profile == 'software_engineering':
         return 'Software Engineer | Full-Stack Development | Secure Systems'
     return 'Software Engineer | Full-Stack Systems | Secure Engineering'
@@ -1407,10 +1425,10 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             ],
             'skill_priority_groups': ['security', 'backend', 'testing', 'frontend', 'languages', 'tools'],
             'min_bullets_per_project': 2,
-            'max_bullets_per_project': 3,
-            'max_bullets_per_experience': 2,
-            'max_skills': 14,
-            'min_skills': 10,
+            'max_bullets_per_project': 2,
+            'max_bullets_per_experience': 1,
+            'max_skills': 10,
+            'min_skills': 8,
             'prefer_cyber_terms': True,
             'target_max_pages': 1.5,
             'role_profile': profile,
@@ -1541,6 +1559,34 @@ def choose_resume_strategy(classification: dict, job_text: str = '') -> dict:
             'role_profile': profile,
         }
 
+    if profile == 'it_support':
+        return {
+            'name': 'IT_SUPPORT',
+            'tagline': build_dynamic_headline(profile),
+            'section_order': [
+                'Professional Summary',
+                'Key Skills / Technical Skills',
+                'Professional Experience',
+                'Projects',
+                'Education',
+                'Certifications',
+            ],
+            'project_priority': [
+                'Production Support Incident Console',
+                'Job Application Assistant',
+                'Khan Security Testing',
+            ],
+            'skill_priority_groups': ['tools', 'security', 'backend', 'testing', 'languages', 'frontend'],
+            'min_bullets_per_project': 2,
+            'max_bullets_per_project': 2,
+            'max_bullets_per_experience': 1,
+            'max_skills': 10,
+            'min_skills': 8,
+            'prefer_cyber_terms': True,
+            'target_max_pages': 1.0,
+            'role_profile': profile,
+        }
+
     if profile == 'mobile':
         return {
             'name': 'MOBILE',
@@ -1645,6 +1691,11 @@ def _project_priority_by_role(role_profile: str) -> list[str]:
             'llm security tester',
             'web vulnerability scanner',
             'production support incident console',
+        ],
+        'it_support': [
+            'production support incident console',
+            'job application assistant',
+            'khan security testing',
         ],
     }
     return mapping.get(profile, mapping['graduate_developer'])
@@ -1935,6 +1986,27 @@ def select_skills_deterministic(
     selected = []
     selected_keys = set()
 
+    if role_norm == 'it_support':
+        preferred_support_skills = [
+            'Windows', 'Technical Documentation', 'Troubleshooting', 'Issue Triage',
+            'Incident Tracking', 'Networking', 'Log Analysis', 'Incident Response',
+            'Vulnerability Remediation', 'Security Review', 'Tailscale',
+            'Remote Access (Tailscale)', 'Git', 'Docker', 'REST APIs',
+            'Authentication', 'Session Management', 'GitHub Actions', 'Bandit',
+            'Gitleaks', 'pip-audit', 'SQL', 'Python'
+        ]
+        for wanted in preferred_support_skills:
+            wanted_key = _normalize_skill_match_text(wanted)
+            for candidate in ordered_skills:
+                key = _normalize_skill_match_text(candidate)
+                if key == wanted_key and key not in selected_keys and len(selected) < max_skills:
+                    selected.append(candidate)
+                    selected_keys.add(key)
+                    break
+        final_selected = selected[:max_skills]
+        print(f"[skills-selector] selected {len(final_selected)} skills: {final_selected}")
+        return final_selected
+
     if role_norm == 'software_engineering':
         for must_have in SOFTWARE_BASELINE_SKILLS:
             for candidate in ordered_skills:
@@ -1945,7 +2017,7 @@ def select_skills_deterministic(
                         selected_keys.add(key)
                     break
 
-    if any(t in jd_norm for t in mobile_terms):
+    if role_norm != 'it_support' and any(t in jd_norm for t in mobile_terms):
         for candidate in ordered_skills:
             if _normalize_skill_match_text(candidate) == 'react native':
                 key = _normalize_skill_match_text(candidate)
@@ -2639,12 +2711,11 @@ def _format_contact_item(item: str) -> str:
         href = raw if low.startswith(('http://', 'https://')) else f'https://{raw}'
         label = 'Link'
         if 'github.com' in low:
-            label = '🐙 GitHub'
+            label = '🐙 Github'
         elif 'linkedin.com' in low:
             label = '💼 LinkedIn'
         elif 'mobeenkhan.com' in low:
-            domain = re.sub(r'^https?://', '', raw, flags=re.IGNORECASE).strip('/')
-            label = f'🌐 {domain or "mobeenkhan.com"}'
+            label = '🌐 Portfolio'
         else:
             domain = re.sub(r'^https?://', '', raw, flags=re.IGNORECASE).strip('/')
             if domain:
@@ -2652,7 +2723,7 @@ def _format_contact_item(item: str) -> str:
         return f'<a href="{html.escape(href, quote=True)}">{label}</a>'
 
     if '@' in raw and ' ' not in raw:
-        return f'📧 {html.escape(raw)}'
+        return f'<a href="mailto:{html.escape(raw, quote=True)}">📧 Email</a>'
 
     if re.search(r'^\+?[0-9][0-9\s\-]{6,}$', raw):
         return html.escape(raw)
@@ -2696,7 +2767,7 @@ def render_html(
         if not isinstance(links, dict):
             return ''
         parts = []
-        for key, label in (('github', 'GitHub'), ('live', 'Live'), ('website', 'Website')):
+        for key, label in (('github', 'Github'), ('live', 'Live'), ('website', 'Website')):
             url = normalize_text(str(links.get(key, ''))).strip()
             if not url:
                 continue
@@ -2723,14 +2794,14 @@ def render_html(
             chips = ''.join(f'<span>{html.escape(tech)}</span>' for tech in techs[:10])
             chip_block = f'<div class="chips">{chips}</div>' if chips else ''
             blocks.append(
-                '<div class="entry">'
+                '<article class="project">'
                 '<div class="project-head">'
-                f'<h3><span class="entry-title">{title}</span></h3>'
-                f'<div class="entry-subtitle project-links">{links_html}</div>'
+                f'<h3>{title}</h3>'
+                f'<div class="project-links">{links_html}</div>'
                 '</div>'
                 f'{chip_block}'
                 f'{render_bullets(entry)}'
-                '</div>'
+                '</article>'
             )
         return ''.join(blocks)
 
@@ -2743,14 +2814,14 @@ def render_html(
             subtitle_block = f'<p class="company entry-subtitle">{subtitle}</p>' if subtitle else ''
             date_block = f'<p class="dates entry-date">{html.escape(date)}</p>' if date else ''
             blocks.append(
-                '<div class="entry role">'
+                '<article class="role">'
                 '<div>'
-                f'<h3><span class="entry-title">{title}</span></h3>'
+                f'<h3>{title}</h3>'
                 f'{subtitle_block}'
                 '</div>'
                 f'{date_block}'
                 f'{render_bullets(entry)}'
-                '</div>'
+                '</article>'
             )
         return ''.join(blocks)
 
@@ -2763,10 +2834,10 @@ def render_html(
             details = entry.get('bullets') or []
             detail_html = ''.join(f'<p class="edu-detail">{linkify_text(str(item))}</p>' for item in details if str(item).strip())
             school_block = f'<p class="edu-location entry-subtitle">{school}</p>' if school else ''
-            date_block = f'<p class="edu-dates entry-date">{html.escape(date)}</p>' if date else ''
+            date_block = f'<small>{html.escape(date)}</small>' if date else ''
             blocks.append(
-                '<div class="entry edu-item">'
-                f'<strong class="edu-degree"><span class="entry-title">{title}</span></strong>'
+                '<div class="edu-item">'
+                f'<strong>{title}</strong>'
                 f'{school_block}'
                 f'{date_block}'
                 f'{detail_html}'
@@ -2815,22 +2886,14 @@ def render_html(
     cert_items = [normalize_text(str(c or '')).strip() for c in certificates or [] if str(c or '').strip()]
     cert_html = ''.join(f'<p class="cert">{linkify_text(c)}</p>' for c in cert_items)
 
-    body_sections = {
-        'Professional Summary': '<div class="section"><div class="section-title">Profile</div>' + f'<p class="summary">{linkify_text(summary_text)}</p></div>',
-        'Projects': '<div class="section section-projects"><div class="section-title">Projects</div>' + f'{render_project_entries(projects)}</div>',
-        'Professional Experience': '<div class="section"><div class="section-title">Experience</div>' + f'{render_role_entries(combined_experience)}</div>',
-    }
-
-    # The clean resume layout keeps education/skills in the sidebar and uses the
-    # mock-up's main-column order for consistent HTML preview and PDF output.
-    main_blocks = [
-        body_sections['Professional Summary'],
-        body_sections['Projects'],
-        body_sections['Professional Experience'],
-    ]
+    profile_section = '<section><h2>Profile</h2>' + f'<p class="summary">{linkify_text(summary_text)}</p></section>'
+    skills_section = '<section><h2>Technical Skills</h2><div class="skills-grid">' + render_skill_groups() + '</div></section>'
+    projects_section = '<section><h2>Projects</h2>' + f'{render_project_entries(projects)}</section>'
+    experience_section = '<section class="experience-section"><h2>Experience</h2>' + f'{render_role_entries(combined_experience)}</section>'
+    education_section = '<section class="card"><h2>Education</h2><div class="education-grid">' + render_education(education) + '</div></section>'
 
     page_header = header_html if header_html else render_header_html(name=name, headline=headline, contact=contact)
-    sidebar_cert = f'<section class="section"><div class="section-title">Certification</div>{cert_html}</section>' if cert_html else ''
+    cert_section = f'<section><h2>Certification</h2>{cert_html}</section>' if cert_html else ''
 
     html_doc = f'''<!doctype html>
 <html lang="en">
@@ -2845,15 +2908,13 @@ def render_html(
 <body>
 <main class="page">
   {page_header}
-  <div class="content">
-    <div>
-      {''.join(main_blocks)}
-    </div>
-    <aside class="sidebar">
-      <div class="section card"><div class="section-title">Education</div>{render_education(education)}</div>
-      <div class="section card"><div class="section-title">Skills</div>{render_skill_groups()}</div>
-      {sidebar_cert}
-    </aside>
+  <div class="content one-column">
+    {profile_section}
+    {skills_section}
+    {projects_section}
+    {experience_section}
+    {education_section}
+    {cert_section}
   </div>
 </main>
 </body>
@@ -2868,11 +2929,10 @@ def render_header_html(name: str, headline: str, contact):
     for raw in contact or []:
         value = normalize_text(str(raw or '')).strip()
         if value:
-            contact_html.append(f'<span>{linkify_text_compact_links(value)}</span>')
+            contact_html.append(f'<span>{_format_contact_item(value)}</span>')
     return f'''
 <header class="hero">
   <div>
-    <p class="eyebrow">Professional Resume</p>
     <h1>{html.escape(name or '')}</h1>
     <p class="headline">{html.escape(headline or '')}</p>
     <div class="contact">{''.join(contact_html)}</div>
@@ -3850,20 +3910,14 @@ def tailor_resume_selective_with_ai(
             )
         instructions = (
             "You are tailoring resume content for a specific job. Return STRICT JSON only.\n"
-            "Optimise for truthful ATS alignment and recruiter readability, not keyword stuffing.\n"
             "Do not add or remove roles. Update ONLY:\n"
             "1) professional summary text\n"
             "2) skill tags\n"
             "3) bullet points for provided project/work roles\n"
             "Rules:\n"
             "- No hallucinations; use only existing resume facts.\n"
-            "- Match the job description's strongest themes using only evidence present in the resume.\n"
-            "- Do not imply seniority, commercial years, degree completion, work rights, certifications, or production ownership unless explicitly present.\n"
-            "- If a requirement is a gap, do not camouflage it with vague wording.\n"
             "- Keep summary concise (45-65 words).\n"
-            "- Summary should lead with the candidate's most relevant proven angle for this job.\n"
             "- Skills must come only from provided skill list.\n"
-            "- Skill order should prioritise exact job matches first, then adjacent strengths.\n"
             "- For projects, you must only use and lightly rephrase the provided bullet points. Do not invent.\n"
             "- You may remove irrelevant bullets.\n"
             "- You may reorder bullet points to emphasize strategy priorities.\n"
@@ -4259,32 +4313,34 @@ def generate_cover_letter_with_ai(job_text: str, resume_text: str, name: str) ->
     if not _get_ai_provider():
         raise SystemExit('OPENAI_API_KEY or ANTHROPIC_API_KEY is required to use AI cover letters.')
     prompt = (
-        "You are a professional Australian cover letter writer and recruitment specialist.\n\n"
-        "Task: write a concise, tailored cover letter for this exact role using only the supplied job description and resume.\n\n"
-        "Non-negotiable truth rules:\n"
-        "- Do not invent, exaggerate, or imply experience, achievements, qualifications, seniority, dates, years, metrics, tools, work rights, or responsibilities.\n"
-        "- Only use facts, projects, skills, technologies, and outcomes already present in the resume.\n"
-        "- Do not describe personal/project experience as commercial/professional experience unless the resume explicitly says it is.\n"
-        "- Do not claim degree completion, certifications, leadership, production ownership, or enterprise scale unless explicitly evidenced.\n"
-        "- Use job-description keywords only when they honestly match resume evidence.\n"
-        "- If a requirement is not evidenced in the resume, avoid mentioning it rather than hand-waving.\n\n"
-        "Quality requirements:\n"
-        "- Tone: confident, specific, modern, human, and non-generic.\n"
-        "- Make the opening immediately relevant to the role/company/problem space.\n"
-        "- Prioritise the 2-3 strongest evidence-backed matches to the job.\n"
-        "- Connect projects/experience to the employer's likely needs: reliability, testing, maintainability, security, autonomy, and delivery.\n"
-        "- Avoid clichés, filler, buzzword soup, and obviously AI phrasing.\n"
-        "- Keep it concise: 250-380 words.\n\n"
-        "Structure:\n"
-        "1) Greeting. Use the company/hiring contact if clearly present; otherwise use 'Dear Hiring Manager,'.\n"
-        "2) Strong opening paragraph: role + why this opportunity fits + value proposition.\n"
-        "3) One or two middle paragraphs linking evidence-backed resume strengths to key job requirements.\n"
-        "4) Closing paragraph with enthusiasm and a simple call to action.\n\n"
-        "Formatting rules:\n"
-        "- Use Australian/UK spelling.\n"
-        "- Do not use 'To whom it may concern'.\n"
-        "- Return plain text only. Do not include a subject line.\n"
-        f"- End exactly with:\nKind regards,\n\n{name}\n\n"
+        "You are a professional cover letter writer and recruitment specialist.\n\n"
+        "I will provide you with:\n\n"
+        "A job description\n\n"
+        "My resume\n\n"
+        "Your task:\n\n"
+        "Write a highly tailored cover letter for this specific role.\n\n"
+        "Strict rules (must follow):\n\n"
+        "DO NOT invent or exaggerate experience, achievements, or skills.\n\n"
+        "DO NOT add fake metrics, fake projects, or fake responsibilities.\n\n"
+        "Only use information that already exists in my resume.\n\n"
+        "Never add technologies, tools, or outcomes that are not already present in my resume.\n\n"
+        "If something is not in my resume, do not mention it.\n\n"
+        "You may reword and present my experience in a stronger way, but the meaning must stay truthful.\n\n"
+        "Use keywords and language from the job description where relevant, but only when it matches my actual experience.\n\n"
+        "Cover letter requirements:\n\n"
+        "Tone must be confident, professional, and modern (not generic or robotic).\n\n"
+        "It must sound like a real person wrote it, not AI.\n\n"
+        "Keep it concise: 300â€“450 words max.\n\n"
+        "Structure it properly:\n\n"
+        "Strong opening paragraph (role + excitement + value)\n\n"
+        "Middle paragraph(s) linking my skills/projects to the job requirements\n\n"
+        "Closing paragraph with enthusiasm + call to action\n\n"
+        "Formatting rules:\n\n"
+        "Use Australian/UK spelling.\n\n"
+        "Do not use overly formal outdated wording (avoid: \"To whom it may concern\").\n\n"
+        "Address the company by name. If the company name is not present in the job description, use: \"Dear Hiring Manager\".\n\n"
+        f"End with:\nKind regards,\n\n{name}\n\n"
+        "Return plain text only. Do not include a subject line.\n\n"
         f"Job description:\n{job_text}\n\nResume:\n{resume_text}\n"
     )
     text = _call_ai_text(prompt=prompt, max_tokens=1024, model_tier='smart')
@@ -4644,8 +4700,6 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
         style_css = style_match.group(1).strip()
     else:
         style_css = ''
-    extra_pdf_css = "\n@media print { .page { padding-top: 6mm; } }\n"
-    style_css = style_css + extra_pdf_css
 
     name = parsed_resume.get('name', '')
     contact = [c for c in (parsed_resume.get('contact', []) or []) if c]
@@ -4685,13 +4739,13 @@ def generate_resume(resume_path, template_path, job_text=None, out_dir=None, lab
     grouped_skills = parsed_resume.get('skills_grouped', {})
     ordered_grouped_skills, _ordered_skills = reorder_skill_groups(
         grouped_skills=grouped_skills,
-        priority_groups=SKILL_GROUP_KEYS,
+        priority_groups=strategy.get('skill_priority_groups', SKILL_GROUP_KEYS),
     )
     skills = select_skills_deterministic(
         job_text=raw_job_text,
         grouped_skills=ordered_grouped_skills,
         max_skills=int(strategy.get('max_skills', 18)),
-        role_category=str(classification.get('primary_category', 'unknown')),
+        role_category=str(strategy.get('role_profile') or classification.get('primary_category', 'unknown')),
     )
 
     certificates = parsed_resume.get('certificates', [])

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Resume Template</title>
+<title>Mobeen Khan — micro1 Software Engineer Resume</title>
 <style>
 :root {
   --navy:#071426; --navy2:#0d2138; --ink:#172033; --muted:#5e6b7d;
@@ -12,7 +12,7 @@
 }
 * { box-sizing:border-box; }
 html { background:#dfe6f0; }
-body { margin:0; font:13.2px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:#dfe6f0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body { margin:0; font:13.2px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; color:var(--ink); background:#dfe6f0; }
 a { color:inherit; text-decoration:none; border-bottom:1px solid rgba(199,166,90,.55); }
 .page { max-width:980px; margin:28px auto; background:white; box-shadow:0 24px 90px rgba(7,20,38,.18); }
 .hero { display:block; padding:34px 42px 28px; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:white; border-bottom:5px solid var(--gold); }
@@ -22,33 +22,31 @@ h1 { margin:0; font-size:38px; line-height:1; letter-spacing:-.035em; }
 .contact { display:flex; flex-wrap:wrap; gap:8px 14px; color:#dbe5f2; font-size:12px; }
 .contact span { display:inline-flex; align-items:center; gap:6px; }
 .content { display:grid; grid-template-columns:1fr 285px; gap:30px; padding:30px 42px 38px; }
-.section { margin:0 0 22px; }
-.section-title { margin:0 0 11px; color:#0c1b2f; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; display:flex; align-items:center; gap:10px; }
-.section-title:before { content:""; width:22px; height:3px; background:var(--gold); border-radius:999px; flex:0 0 auto; }
+section { margin:0 0 22px; }
+h2 { margin:0 0 11px; color:#0c1b2f; font-size:15px; text-transform:uppercase; letter-spacing:.12em; display:flex; align-items:center; gap:10px; }
+h2:before { content:""; width:22px; height:3px; background:var(--gold); border-radius:999px; }
 h3 { margin:0; font-size:15.5px; color:#0c1b2f; }
 h4 { margin:0 0 7px; font-size:11px; color:#26364d; text-transform:uppercase; letter-spacing:.09em; }
 p { margin:0 0 8px; }
 ul { margin:8px 0 0 18px; padding:0; }
 li { margin:4px 0; }
 .summary { padding:16px 18px; background:#f4f7fb; border-left:4px solid var(--gold); border-radius:14px; }
-.project, .role, .section-projects > .entry { padding:14px 0; border-bottom:1px solid var(--line); break-inside:avoid; page-break-inside:avoid; }
-.project, .section-projects > .entry { padding-bottom:26px; margin-bottom:14px; }
-.project:first-of-type, .role:first-of-type, .section-projects > .entry:first-of-type { padding-top:0; }
+.project, .role { padding:14px 0; border-bottom:1px solid var(--line); break-inside:avoid; }
+.project:first-of-type, .role:first-of-type { padding-top:0; }
 .project-head { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
 .project-links { color:var(--muted); font-size:11px; white-space:nowrap; }
-.chips { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin:12px 0 12px; }
-.chips span { display:inline-flex; align-items:center; justify-content:center; min-height:22px; padding:4px 9px 4px; border-radius:999px; background:#edf2f8; color:#26364d; font-size:10.5px; font-weight:650; line-height:1; text-align:center; vertical-align:middle; }
+.chips { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 4px; }
+.chips span { padding:3px 7px; border-radius:999px; background:#edf2f8; color:#26364d; font-size:10.5px; font-weight:650; }
 .chips span:nth-child(3n+1) { background:#f3ead4; color:#614b16; }
 .sidebar { border-left:1px solid var(--line); padding-left:24px; }
 .card { background:#f7f9fc; border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:14px; }
-.edu-item { margin:0 0 16px; }
-.edu-degree { display:block; margin-bottom:4px; line-height:1.2; }
-.edu-location, .edu-dates, .edu-detail { display:block; margin:0 0 4px; line-height:1.28; }
-.edu-location, .edu-dates, .company, .dates { color:var(--muted); }
-.edu-detail { color:var(--ink); }
+.edu-item { margin:0 0 13px; }
+.edu-item strong, .edu-item span, .edu-item small { display:block; }
+.edu-item span, .company, .dates, .edu-item small { color:var(--muted); }
 .role { display:grid; grid-template-columns:1fr auto; gap:2px 12px; }
 .role ul { grid-column:1 / -1; }
 .cert { border:1px solid rgba(199,166,90,.5); background:#fbf6e9; color:#493714; padding:11px 12px; border-radius:14px; font-weight:650; }
+.footer-note { margin-top:18px; padding-top:12px; border-top:1px solid var(--line); color:#748094; font-size:10.5px; }
 @page { size:A4; margin:10mm; }
 @media print {
   html, body { background:#fff; font-size:9.2pt; line-height:1.35; }
@@ -57,13 +55,49 @@ li { margin:4px 0; }
   h1 { font-size:24pt; }
   .headline { font-size:10pt; }
   .content { grid-template-columns:1fr 62mm; gap:8mm; padding:8mm 11mm 10mm; }
-  .section { margin-bottom:5mm; }
-  .project, .role, .section-projects > .entry { padding:3.6mm 0; }
-  .project, .section-projects > .entry { padding-bottom:6.5mm; margin-bottom:3.5mm; }
+  section { margin-bottom:5mm; }
+  .project, .role { padding:3.6mm 0; }
   .summary { padding:3.5mm 4mm; border-radius:3mm; }
   .card { padding:3.2mm; border-radius:3mm; margin-bottom:3mm; }
-  .chips { gap:1.8mm; margin:3mm 0 3mm; }
-  .chips span { min-height:5.2mm; font-size:7.2pt; padding:1.6pt 4.8pt; line-height:1; }
+  .chips span { font-size:7.2pt; padding:1.5pt 4pt; }
+}
+
+@page { size: A4; margin: 0; }
+.content.one-column { display: block; padding: 24px 42px 34px; }
+.content.one-column .sidebar { border-left: 0; padding-left: 0; }
+.content.one-column .card { background: transparent; border: 0; padding: 0; margin-bottom: 18px; }
+.content.one-column .skills-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.content.one-column .skill-block { background:#f4f7fb; border-left:3px solid var(--gold); border-radius:12px; padding:9px 11px; }
+.content.one-column .education-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media print {
+  html, body { font-size: 8.55pt !important; line-height: 1.34 !important; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { padding: 0; font-size: 8.55pt !important; }
+  .hero { padding: 7mm 8mm 6mm; }
+  h1 { font-size: 23pt; }
+  .headline { font-size: 9.4pt; margin: 1.5mm 0 2.5mm; }
+  .contact { gap: 2.8mm; font-size: 7.5pt; }
+  .content.one-column { display: block; padding: 6.8mm 8mm 7.2mm; }
+  section { margin-bottom: 4.1mm; }
+  h2 { margin-top: 0; margin-bottom: 2.2mm; font-size: 9.4pt; }
+  h3 { font-size: 9.2pt; }
+  h4 { font-size: 6.9pt; margin-bottom: 1mm; }
+  p { margin-bottom: 1.7mm; }
+  ul { margin-top: 1.7mm; }
+  li { margin: 1.45pt 0; line-height: 1.3; }
+  .project, .role { padding: 2.05mm 0; }
+  .summary { line-height: 1.31; padding: 2.5mm 3.2mm; border-radius: 2mm; }
+  .chips { gap: 2.5pt; margin: 1.3mm 0 .9mm; }
+  .chips span { font-size: 6.05pt; padding: .7pt 2.4pt; }
+  .content.one-column .card { margin-bottom: 3.2mm; }
+  .content.one-column .skills-grid { grid-template-columns: 1fr 1fr 1fr; gap: 2.2mm 3.2mm; }
+  .content.one-column .skill-block { background:#f4f7fb; border-left:2.2pt solid var(--gold); border-radius:2.3mm; padding:1.7mm 2mm; }
+  .content.one-column .education-grid { grid-template-columns: 1fr 1fr; gap: 3.8mm; }
+  .edu-item { margin-bottom: 0; }
+  .edu-item p { margin: .8mm 0 0; }
+  .skill-block { margin-bottom: 0; }
+  .experience-section { break-before: page; page-break-before: always; padding-top: 5mm; }
+  .cert { padding: 1.9mm 2.5mm; border-radius: 2mm; }
 }
 </style>
 </head>
@@ -71,11 +105,150 @@ li { margin:4px 0; }
 <main class="page">
   <header class="hero">
     <div>
-      <p class="eyebrow">Professional Resume</p>
-      <h1>Resume</h1>
-      <p class="headline">Professional resume template</p>
+      <h1>Mobeen Khan</h1>
+      <p class="headline">Backend Software Engineer | Python / Java | Secure APIs, Testing &amp; AI Evaluation</p>
+      <div class="contact">
+        <span>✉️ mobeenk89@gmail.com</span>
+        <span>🌐 <a href="https://www.mobeenkhan.com">Portfolio</a></span>
+        <span>💻 <a href="https://github.com/mobeen786822">GitHub</a></span>
+        <span>🔗 <a href="https://www.linkedin.com/in/mobeen-khan-6b3340197/">LinkedIn</a></span>
+      </div>
     </div>
   </header>
+
+  <div class="content one-column">
+    <section>
+      <h2>Profile</h2>
+      <p class="summary">Software engineer with hands-on backend, API, testing, and secure software project experience across Python, Java, Flask/FastAPI, REST APIs, SQL/NoSQL data, and CI security checks. Built and maintained full-stack/backend systems with authentication, usage tracking, structured JSON workflows, automated checks, technical documentation, and reviewable AI-assisted outputs. Strong fit for backend programming tasks, code review, security-focused feedback, documentation, and AI model evaluation work requiring clear technical reasoning.</p>
+    </section>
+
+    <section>
+      <h2>Technical Skills</h2>
+      <div class="skills-grid">
+        
+      <div class="skill-block">
+        <h4>Backend</h4>
+        <div class="chips compact"><span>Python</span><span>Java</span><span>Flask</span><span>FastAPI</span><span>REST APIs</span><span>SQLAlchemy</span><span>Authentication</span></div>
+      </div>
+    
+      <div class="skill-block">
+        <h4>AI / Data</h4>
+        <div class="chips compact"><span>OpenAI API</span><span>Anthropic Claude API</span><span>AI Evaluation</span><span>Structured JSON</span><span>Prompt Engineering</span><span>Supabase</span><span>SQL</span><span>NoSQL</span></div>
+      </div>
+    
+      <div class="skill-block">
+        <h4>Testing</h4>
+        <div class="chips compact"><span>Unit Testing</span><span>Integration Testing</span><span>Test Planning</span><span>Static Analysis</span><span>Jest</span><span>Vitest</span></div>
+      </div>
+    
+      <div class="skill-block">
+        <h4>Security</h4>
+        <div class="chips compact"><span>Secure Coding</span><span>Application Security</span><span>OWASP</span><span>Vulnerability Assessment</span><span>Bandit</span><span>Semgrep</span><span>pip-audit</span></div>
+      </div>
+    
+      <div class="skill-block">
+        <h4>Quality</h4>
+        <div class="chips compact"><span>Code Review</span><span>Debugging</span><span>Maintainability</span><span>Technical Feedback</span><span>Documentation</span></div>
+      </div>
+    
+      <div class="skill-block">
+        <h4>Tools</h4>
+        <div class="chips compact"><span>Git</span><span>GitHub Actions</span><span>Docker</span><span>Linux</span><span>Windows</span><span>Asynchronous Communication</span></div>
+      </div>
+    
+      </div>
+    </section>
+
+    <section>
+      <h2>Projects</h2>
+      
+      <article class="project">
+        <div class="project-head">
+          <h3>Job Application Assistant</h3>
+          <div class="project-links"><a href="https://github.com/mobeen786822/job-application-assistant">Github</a></div>
+        </div>
+        <div class="chips"><span>Python</span><span>Flask</span><span>Anthropic Claude API</span><span>OpenAI API</span><span>Supabase</span><span>Flask-Session</span><span>GitHub Actions</span><span>Bandit</span></div>
+        <ul><li>Built a full-stack AI-assisted resume tailoring platform using Python, Flask, Supabase Auth, server-side sessions, structured JSON data, and HTML/PDF generation.</li><li>Implemented validation rules, weighted scoring, usage limits, provider fallback logic, and review steps to keep AI-generated outputs factual.</li><li>Documented technical reasoning and output constraints so generated content could be reviewed, traced, and improved safely.</li><li>Worked with OpenAI and Anthropic APIs to structure model outputs, reduce unsupported claims, and support repeatable AI evaluation workflows.</li></ul>
+      </article>
+    
+      <article class="project">
+        <div class="project-head">
+          <h3>Production Support Incident Console</h3>
+          <div class="project-links"><a href="https://github.com/mobeen786822/Production-Support-Incident-Console">Github</a> · <a href="https://incident-console-ui.onrender.com/">Live</a></div>
+        </div>
+        <div class="chips"><span>React</span><span>TypeScript</span><span>Vite</span><span>FastAPI</span><span>Python</span><span>SQLAlchemy</span><span>JWT</span><span>Docker</span></div>
+        <ul><li>Built a backend/API-driven incident console with FastAPI/Python, SQLAlchemy, JWT authentication, Docker, and a React/TypeScript frontend.</li><li>Implemented severity classification, status transitions, SLA indicators, root-cause notes, troubleshooting workflows, and technical documentation.</li><li>Used API workflows and debugging notes to support maintainability, incident review, and clear handover of engineering decisions.</li><li>Resolved dependency and tooling issues through npm audit and pip-audit review, including library replacement and frontend toolchain updates.</li></ul>
+      </article>
+    
+      <article class="project">
+        <div class="project-head">
+          <h3>Khan Security Testing</h3>
+          <div class="project-links"><a href="https://github.com/mobeen786822/khan-security-testing">Github</a></div>
+        </div>
+        <div class="chips"><span>React</span><span>TypeScript</span><span>Vite</span><span>Tailwind CSS</span><span>Application Security</span><span>Penetration Testing</span><span>Security Readiness</span><span>LinkedIn Outreach</span></div>
+        <ul><li>Built a React/TypeScript landing page for application security, penetration testing, secure coding, and security-readiness services.</li><li>Documented review coverage, follow-up items, and evidence artefacts for repeatable vulnerability assessment and remediation tracking.</li></ul>
+      </article>
+    
+      <article class="project">
+        <div class="project-head">
+          <h3>CSCI926 Software Testing and Analysis Group Project</h3>
+          <div class="project-links"></div>
+        </div>
+        <div class="chips"><span>Software Testing</span><span>Verification and Validation</span><span>Static Analysis</span><span>Test Planning</span><span>Presentation</span><span>Technical Reporting</span><span>LaTeX</span></div>
+        <ul><li>Completed software testing and analysis coursework covering verification and validation, static analysis, test planning, reporting, and presentation.</li><li>Collaborated to communicate findings, reason about correctness and maintainability, and document software quality decisions.</li></ul>
+      </article>
+    
+    </section>
+
+    <section class="experience-section">
+      <h2>Experience</h2>
+      
+      <article class="role">
+        <div>
+          <h3>Web Developer (Volunteer)</h3>
+          <p class="company">Catch A Drive</p>
+        </div>
+        <p class="dates">11/2025 — 01/2026</p>
+        <ul><li>Contributed to web platform features by translating stakeholder requirements into responsive UI components, API-driven workflows, and implementation tasks.</li><li>Collaborated on practical fixes and incremental improvements while communicating progress and implementation trade-offs clearly.</li></ul>
+      </article>
+    
+      <article class="role">
+        <div>
+          <h3>Web Developer</h3>
+          <p class="company">Hentley</p>
+        </div>
+        <p class="dates">01/2018 — 03/2019</p>
+        <ul><li>Implemented custom front-end features and supported server-side functionality for product displays, transactional workflows, content updates, and troubleshooting.</li><li>Maintained website updates with attention to usability, responsiveness, reliability, and clear handover for future changes.</li></ul>
+      </article>
+    
+    </section>
+
+    <section class="card">
+      <h2>Education</h2>
+      <div class="education-grid">
+        
+      <div class="edu-item">
+        <strong>Bachelor of Computer Science</strong>
+        <span>University of Wollongong</span>
+        <small>01/2021 — 05/2024</small>
+        <p>Major in Software Engineering and Cybersecurity</p>
+      </div>
+    
+      <div class="edu-item">
+        <strong>Masters of Computer Science (Cybersecurity)</strong>
+        <span>University of Wollongong</span>
+        <small>03/2025 — Present</small>
+        <p>Cybersecurity specialisation with software testing, secure systems, AI, and applied project work.</p>
+      </div>
+    
+      </div>
+    </section>
+
+    <section>
+      <h2>Certification</h2>
+      <p class="cert">AWS Academy Graduate – AWS Academy Cloud Foundations award</p>
+    </section>
+  </div>
 </main>
 </body>
 </html>

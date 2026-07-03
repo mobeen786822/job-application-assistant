@@ -30,33 +30,45 @@ SOC workflows, SIEM context, incident response, vulnerability remediation, Essen
 """
 
 
-def extract_project_titles_from_html(html_text: str, limit: int = 6) -> list[str]:
-    m = re.search(
+def extract_project_section(html_text: str) -> str:
+    section = re.search(
+        r'<section><h2>Projects</h2>([\s\S]*?)</section>\s*<section class="experience-section">',
+        html_text,
+        flags=re.IGNORECASE,
+    )
+    if section:
+        return section.group(1)
+    legacy = re.search(
         r'<div class="section section-projects">([\s\S]*?)</div>\s*<div class="section">',
         html_text,
         flags=re.IGNORECASE,
     )
-    if not m:
+    return legacy.group(1) if legacy else ''
+
+
+def extract_project_titles_from_html(html_text: str, limit: int = 6) -> list[str]:
+    block = extract_project_section(html_text)
+    if not block:
         return []
-    block = m.group(1)
-    return re.findall(r'<span class="entry-title">(.*?)</span>', block, flags=re.IGNORECASE)[:limit]
+    titles = re.findall(r'<article class="project">[\s\S]*?<h3>(.*?)</h3>', block, flags=re.IGNORECASE)
+    if not titles:
+        titles = re.findall(r'<span class="entry-title">(.*?)</span>', block, flags=re.IGNORECASE)
+    return titles[:limit]
 
 
 def extract_project_first_bullets(html_text: str) -> dict[str, str]:
     out = {}
-    section = re.search(
-        r'<div class="section section-projects">([\s\S]*?)</div>\s*<div class="section">',
-        html_text,
-        flags=re.IGNORECASE,
-    )
-    if not section:
+    block = extract_project_section(html_text)
+    if not block:
         return out
-    block = section.group(1)
     pattern = re.compile(
-        r'<span class="entry-title">(.*?)</span>[\s\S]*?<ul>\s*<li>(.*?)</li>',
+        r'<article class="project">[\s\S]*?<h3>(.*?)</h3>[\s\S]*?<ul>\s*<li>(.*?)</li>',
         flags=re.IGNORECASE,
     )
-    for title, bullet in pattern.findall(block):
+    matches = pattern.findall(block)
+    if not matches:
+        matches = re.findall(r'<span class="entry-title">(.*?)</span>[\s\S]*?<ul>\s*<li>(.*?)</li>', block, flags=re.IGNORECASE)
+    for title, bullet in matches:
         clean_title = re.sub(r'<.*?>', '', title).strip()
         clean_bullet = re.sub(r'<.*?>', '', bullet).strip()
         out[clean_title] = clean_bullet
@@ -64,25 +76,26 @@ def extract_project_first_bullets(html_text: str) -> dict[str, str]:
 
 
 def extract_project_bullets(html_text: str, project_title: str) -> list[str]:
-    section = re.search(
-        r'<div class="section section-projects">([\s\S]*?)</div>\s*<div class="section">',
-        html_text,
-        flags=re.IGNORECASE,
-    )
-    if not section:
+    block = extract_project_section(html_text)
+    if not block:
         return []
-    block = section.group(1)
     idx = block.lower().find(project_title.lower())
     if idx == -1:
         return []
-    next_idx = block.lower().find('<span class="entry-title">', idx + 1)
+    next_idx = block.lower().find('<article class="project">', idx + 1)
+    if next_idx == -1:
+        next_idx = block.lower().find('<span class="entry-title">', idx + 1)
     project_block = block[idx:next_idx] if next_idx != -1 else block[idx:]
     return [re.sub(r'<.*?>', '', x).strip() for x in re.findall(r'<li>(.*?)</li>', project_block, flags=re.IGNORECASE)]
 
 
 def assert_non_empty_sections(html_text: str) -> None:
-    projects_ok = bool(re.search(r'<div class="section-title">Projects</div>[\s\S]*?<div class="entry">', html_text, flags=re.IGNORECASE))
-    education_ok = bool(re.search(r'<div class="section-title">Education</div>[\s\S]*?<div class="entry">', html_text, flags=re.IGNORECASE))
+    projects_ok = bool(re.search(r'<section><h2>Projects</h2>[\s\S]*?<article class="project">', html_text, flags=re.IGNORECASE))
+    education_ok = bool(re.search(r'<section class="card"><h2>Education</h2>[\s\S]*?<div class="edu-item">', html_text, flags=re.IGNORECASE))
+    if not projects_ok:
+        projects_ok = bool(re.search(r'<div class="section-title">Projects</div>[\s\S]*?<div class="entry">', html_text, flags=re.IGNORECASE))
+    if not education_ok:
+        education_ok = bool(re.search(r'<div class="section-title">Education</div>[\s\S]*?<div class="entry">', html_text, flags=re.IGNORECASE))
     assert projects_ok, 'Projects section rendered empty'
     assert education_ok, 'Education section rendered empty'
 
