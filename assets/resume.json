@@ -851,6 +851,787 @@
   ],
   "experience": [
     {
+      "title": "Freelance Web Developer & Digital Solutions Consultant",
+      "company": "JZ Tech",
+      "start": "08/2026",
+      "end": "Present",
+      "links": {
+        "github": "https://github.com/Malaka-02/jztech-website",
+        "live": "https://jztech.com.au",
+        "website": "https://jztech.com.au"
+      },
+      "technologies": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Tailwind CSS 4",
+        "Vercel",
+        "GitHub Actions",
+        "WCAG Accessibility",
+        "Responsive Design",
+        "Technical SEO",
+        "Design Tokens",
+        "Magic Patterns",
+        "AI Media Generation",
+        "Browser QA"
+      ],
+      "bullets": [
+        {
+          "text": "Delivered three production websites for Australian small businesses across web services, disability and property support, and boutique fitness, owning the lifecycle from discovery and content planning through development, launch and handoff.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "freelance",
+            "client-delivery",
+            "full-lifecycle",
+            "small-business"
+          ]
+        },
+        {
+          "text": "Translated stakeholder goals, supplied brand guides and incomplete business information into clear requirements, site architecture, conversion journeys and maintainable implementation plans.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "requirements",
+            "stakeholder-management",
+            "information-architecture",
+            "consulting"
+          ]
+        },
+        {
+          "text": "Designed and built responsive web applications using Next.js, React, TypeScript, JavaScript, Vite, Tailwind CSS and component-based design systems tailored to each client's technical and visual needs.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "nextjs",
+            "react",
+            "typescript",
+            "responsive"
+          ]
+        },
+        {
+          "text": "Created and applied reusable brand systems covering colour, typography, spacing, imagery, design tokens and component states, including a configurable HTML and JSON brand-guide generator.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "branding",
+            "design-system",
+            "design-tokens",
+            "tooling"
+          ]
+        },
+        {
+          "text": "Improved lead and booking journeys through clear value propositions, proof-first content, mobile-first navigation, prominent calls to action, class and service discovery, FAQs and direct third-party booking integrations.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "ux",
+            "conversion",
+            "content-strategy",
+            "integration"
+          ]
+        },
+        {
+          "text": "Implemented WCAG-aligned patterns including semantic landmarks, keyboard navigation, skip links, visible focus states, accessible accordions, contrast validation, responsive layouts and reduced-motion fallbacks.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "accessibility",
+            "wcag",
+            "keyboard-navigation",
+            "inclusive-design"
+          ]
+        },
+        {
+          "text": "Established technical SEO foundations with page-specific metadata, canonical URLs, Open Graph data, robots directives, XML sitemaps, meaningful heading structures and local-business content pathways.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "seo",
+            "metadata",
+            "sitemap",
+            "local-business"
+          ]
+        },
+        {
+          "text": "Introduced repeatable quality gates using ESLint, TypeScript type checking, production builds, automated contrast checks, browser screenshots and desktop and mobile interaction testing.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "quality-assurance",
+            "typescript",
+            "browser-testing"
+          ]
+        },
+        {
+          "text": "Automated build and source-control workflows with GitHub Actions, protected production work through branch-based experimentation and configured upstream synchronisation for client-owned repositories.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "github-actions",
+            "ci-cd",
+            "git",
+            "automation"
+          ]
+        },
+        {
+          "text": "Deployed and handed over production sites through Vercel, configuring custom domains, HTTPS, production branches, GitHub application access and client-controlled repository and hosting ownership.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "vercel",
+            "deployment",
+            "dns",
+            "client-handoff"
+          ]
+        },
+        {
+          "text": "Diagnosed cross-platform production incidents involving stale Vercel commits, recreated GitHub repository identities, author-permission restrictions, DNS propagation, SSL redirects and Microsoft 365 mail records.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "troubleshooting",
+            "incident-response",
+            "vercel",
+            "dns",
+            "microsoft-365"
+          ]
+        },
+        {
+          "text": "Integrated external platforms including Mindbody booking and timetable services, Google Maps and directions, Microsoft 365 email DNS, Relume Library MCP and client-owned GitHub and Vercel accounts.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "integration",
+            "mindbody",
+            "microsoft-365",
+            "relume",
+            "github"
+          ]
+        },
+        {
+          "text": "Produced technical handoff documentation and structured project ownership so clients could control domains, repositories, deployments and future content updates without being locked into the developer's accounts.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "documentation",
+            "client-handoff",
+            "ownership",
+            "maintainability"
+          ]
+        },
+        {
+          "text": "Designed and developed the production website for JZ Tech, an Australian web studio, using Next.js 16, React 19, TypeScript, Tailwind CSS and a responsive conversion-focused layout.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "nextjs",
+            "business"
+          ]
+        },
+        {
+          "text": "Owned the end-to-end product workflow from business positioning and information architecture through visual exploration, implementation, browser QA, deployment preparation and client handoff.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "product-delivery",
+            "requirements",
+            "client-work",
+            "full-lifecycle"
+          ]
+        },
+        {
+          "text": "Implemented a portable brand system using JSON, CSS and Tailwind design tokens, with an automated WCAG contrast gate included in the production build and GitHub Actions quality pipeline.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "accessibility",
+            "design-system",
+            "ci-cd"
+          ]
+        },
+        {
+          "text": "Developed a name-neutral brand foundation and reusable HTML brand-guide generator with configurable colours, typography, logo assets, JSON import and export, browser persistence and print-ready PDF output.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "branding",
+            "design-system",
+            "json",
+            "html",
+            "tooling"
+          ]
+        },
+        {
+          "text": "Structured the homepage around a clear value proposition, service offering, delivery process, proof, frequently asked questions and strong calls to action for Australian small-business clients.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "information-architecture",
+            "ux",
+            "conversion",
+            "copywriting"
+          ]
+        },
+        {
+          "text": "Used Magic Patterns and AI-assisted image-to-video generation to explore multiple hero directions, then translated the selected concept into maintainable production code rather than shipping generated prototype code directly.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "prototyping",
+            "ai",
+            "visual-design",
+            "frontend"
+          ]
+        },
+        {
+          "text": "Built a cinematic hero experience with a web-optimised video, static mobile poster, muted desktop playback, data-saving behaviour and reduced-motion fallback while preserving headline readability and performance.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "frontend",
+            "performance",
+            "accessibility"
+          ]
+        },
+        {
+          "text": "Implemented responsive navigation, keyboard-accessible interactions, visible focus states, semantic landmarks, reduced-motion support and verified colour contrast across desktop and mobile layouts.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "accessibility",
+            "wcag",
+            "responsive",
+            "keyboard-navigation"
+          ]
+        },
+        {
+          "text": "Added production SEO foundations including metadata, Open Graph artwork, robots directives and XML sitemap generation, then prepared the GitHub and Vercel workflow for client-owned deployment and future updates.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "seo",
+            "deployment",
+            "client-handoff"
+          ]
+        },
+        {
+          "text": "Created a repeatable quality gate covering ESLint, TypeScript type checking, production builds and automated brand-contrast validation, with the checks enforced through GitHub Actions.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "typescript",
+            "ci-cd",
+            "github-actions",
+            "quality-assurance"
+          ]
+        },
+        {
+          "text": "Used isolated Git branches and local preview environments to test major redesign and cinematic-media experiments without destabilising the production branch or live website.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "git",
+            "branching",
+            "release-management",
+            "risk-management"
+          ]
+        },
+        {
+          "text": "Prepared a client-owned GitHub and Vercel operating model with repository transfer, production-branch configuration, upstream synchronisation and maintainable update workflows.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "github",
+            "vercel",
+            "deployment",
+            "client-handoff"
+          ]
+        },
+        {
+          "text": "Diagnosed stale Vercel deployments caused by recreated GitHub repository IDs and commit-author membership restrictions, separating source-control issues from DNS and browser caching problems.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "troubleshooting",
+            "vercel",
+            "github",
+            "deployment"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Freelance Web Developer & Digital Solutions Consultant",
+      "company": "JZ Supports & Maintenance",
+      "start": "08/2026",
+      "end": "Present",
+      "links": {
+        "github": "https://github.com/Malaka-02/jzsm-website",
+        "live": "https://www.jzsm.com.au",
+        "website": "https://www.jzsm.com.au"
+      },
+      "technologies": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Tailwind CSS 4",
+        "shadcn/ui",
+        "Radix UI",
+        "Relume",
+        "Relume Library MCP",
+        "Motion",
+        "Vercel",
+        "WCAG Accessibility",
+        "Technical SEO",
+        "Responsive Design",
+        "Content Architecture"
+      ],
+      "bullets": [
+        {
+          "text": "Rebuilt and launched a seven-route service website for JZ Supports & Maintenance using Next.js 16, React 19, TypeScript and genuine Relume component sources adapted into an editable local codebase.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "nextjs",
+            "client-work"
+          ]
+        },
+        {
+          "text": "Used the authenticated Relume Library MCP to source genuine editable React marketing components, vendored the component code locally and adapted it to the project's brand, content and interaction requirements.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "relume",
+            "mcp",
+            "react",
+            "component-library"
+          ]
+        },
+        {
+          "text": "Integrated shadcn/ui, Radix UI, Relume Icons and Motion primitives into a cohesive component system while preserving full local ownership of the production source code.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "shadcn",
+            "radix-ui",
+            "motion",
+            "design-system"
+          ]
+        },
+        {
+          "text": "Structured service journeys for NDIS supports, injury recovery domestic assistance, cleaning, lawns and property maintenance, with clear scope boundaries and no unverified business, funding or eligibility claims.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "content-architecture",
+            "integrity",
+            "ux"
+          ]
+        },
+        {
+          "text": "Created dedicated routes for the homepage, about page, contact page, NDIS supports, injury-recovery assistance, indoor services and outdoor services, using reusable service, proof, FAQ and call-to-action sections.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "routing",
+            "information-architecture",
+            "reusability",
+            "ux"
+          ]
+        },
+        {
+          "text": "Researched and linked authoritative scheme information while adding clear disclaimers around NDIS and insurance eligibility, approvals and service scope to avoid unsupported commercial or funding claims.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "research",
+            "content-integrity",
+            "compliance",
+            "risk-management"
+          ]
+        },
+        {
+          "text": "Repaired generated component dependencies and accessibility issues, then implemented keyboard navigation, skip links, responsive layouts, reduced-motion behaviour and accessible interactive states.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "accessibility",
+            "debugging",
+            "responsive"
+          ]
+        },
+        {
+          "text": "Built responsive desktop and mobile navigation, reusable service cards, accessible accordions, enquiry pathways, telephone and email links, and motion-enhanced content reveals with graceful reduced-motion behaviour.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "responsive",
+            "accessibility",
+            "interaction-design",
+            "frontend"
+          ]
+        },
+        {
+          "text": "Implemented a reusable visual system covering typography, spacing, colour tokens, image treatments, buttons, cards and interaction states across all seven routes.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "design-system",
+            "tailwind",
+            "ui",
+            "consistency"
+          ]
+        },
+        {
+          "text": "Implemented canonical metadata, robots and sitemap generation, local image assets, automated lint, typecheck and production-build checks, and a client-owned GitHub and Vercel deployment workflow.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "seo",
+            "quality-assurance",
+            "deployment"
+          ]
+        },
+        {
+          "text": "Added page-specific titles, descriptions and canonical URLs, Open Graph metadata, XML sitemap generation and robots directives for a consistent technical SEO foundation.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "seo",
+            "metadata",
+            "sitemap",
+            "nextjs"
+          ]
+        },
+        {
+          "text": "Optimised locally owned images with Next.js Image, responsive sizing, meaningful alternative text and priority loading where appropriate to improve performance and avoid external asset dependencies.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "performance",
+            "images",
+            "accessibility",
+            "nextjs"
+          ]
+        },
+        {
+          "text": "Verified the project through ESLint, TypeScript type checking, production builds and desktop and mobile browser review before committing and pushing the production release.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "quality-assurance",
+            "browser-testing",
+            "release"
+          ]
+        },
+        {
+          "text": "Configured client-owned GitHub and Vercel deployment, custom domains and HTTPS, then identified a root-domain certificate mismatch while confirming the canonical www site remained healthy.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "vercel",
+            "dns",
+            "ssl",
+            "troubleshooting"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Freelance Web Developer & Digital Solutions Consultant",
+      "company": "Golden Hour Pilates",
+      "start": "08/2026",
+      "end": "Present",
+      "links": {
+        "github": "https://github.com/Malaka-02/golden-hour-pilates-landing",
+        "live": "https://www.goldenhourpilates.com.au",
+        "website": "https://www.goldenhourpilates.com.au"
+      },
+      "technologies": [
+        "React",
+        "Vite",
+        "JavaScript",
+        "CSS",
+        "Mindbody",
+        "Google Maps",
+        "Vercel",
+        "GitHub Actions",
+        "Responsive Design",
+        "WCAG Accessibility",
+        "DNS Management",
+        "Microsoft 365"
+      ],
+      "bullets": [
+        {
+          "text": "Designed, developed and launched a responsive client website for Golden Hour Pilates using React and Vite, translating an existing visual identity into a conversion-focused digital experience.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "client-work",
+            "responsive"
+          ]
+        },
+        {
+          "text": "Translated the client's supplied logo application guide into a production colour palette, typography hierarchy, logo treatment and reusable responsive components while preserving the established Golden Hour identity.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "branding",
+            "design-system",
+            "client-requirements",
+            "frontend"
+          ]
+        },
+        {
+          "text": "Built a complete single-page customer journey spanning hero messaging, studio proof, introductory offer, class discovery, timetable, first-visit guidance, frequently asked questions, location and contact information.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "information-architecture",
+            "ux",
+            "conversion",
+            "content"
+          ]
+        },
+        {
+          "text": "Created clear class, studio and booking journeys with strengthened calls to action, mobile-first navigation and direct pathways into the client's external booking platform.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "ux",
+            "conversion",
+            "integration"
+          ]
+        },
+        {
+          "text": "Integrated the client's Mindbody timetable and booking journeys, including direct new-member offer links, class booking calls to action, loading and recovery states, and studio-contact fallback behaviour.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "mindbody",
+            "third-party-integration",
+            "booking",
+            "error-handling"
+          ]
+        },
+        {
+          "text": "Implemented interactive React features including a mobile navigation drawer, active-section tracking, scroll progress, class finder, animated FAQ accordion, reveal transitions and a persistent mobile booking bar.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "react",
+            "interaction-design",
+            "mobile",
+            "frontend"
+          ]
+        },
+        {
+          "text": "Added responsive Google Maps and directions integration, semantic telephone and email links, studio details and external booking links to connect the marketing site with the client's real operating systems.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "google-maps",
+            "integration",
+            "local-business",
+            "ux"
+          ]
+        },
+        {
+          "text": "Implemented semantic landmarks, ARIA-labelled navigation, keyboard-operable controls, visible focus states, reduced-motion behaviour and mobile-first layouts to improve accessibility across devices.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "accessibility",
+            "wcag",
+            "keyboard-navigation",
+            "responsive"
+          ]
+        },
+        {
+          "text": "Optimised locally supplied logo and studio assets into appropriate SVG, WebP and image formats, preserving brand quality while reducing reliance on external assets.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "performance",
+            "assets",
+            "images",
+            "branding"
+          ]
+        },
+        {
+          "text": "Performed desktop and mobile visual QA, responsive breakpoint review and production Vite builds before release, using local preview artefacts to identify and correct layout issues.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "responsive-testing",
+            "browser-qa",
+            "vite"
+          ]
+        },
+        {
+          "text": "Managed the GitHub ownership handoff and Vercel deployment workflow, including custom-domain configuration, HTTPS validation and automated fork synchronisation for ongoing upstream updates.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "deployment",
+            "github",
+            "client-handoff"
+          ]
+        },
+        {
+          "text": "Configured a reusable upstream-to-client fork synchronisation workflow so the client retained repository ownership while approved technical updates could continue through GitHub Actions.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "github-actions",
+            "automation",
+            "source-control",
+            "client-ownership"
+          ]
+        },
+        {
+          "text": "Diagnosed stale production deployments caused by recreated repository IDs and commit-author permissions, and traced Microsoft 365 mail disruption to missing DNS records during the hosting cutover.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "troubleshooting",
+            "dns",
+            "microsoft-365"
+          ]
+        },
+        {
+          "text": "Verified Vercel origin health, redirects and certificate behaviour independently from public DNS, allowing hosting, propagation and local resolver issues to be isolated without unnecessary production changes.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "dns",
+            "ssl",
+            "vercel",
+            "troubleshooting"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Software Engineering Contractor",
+      "company": "Mideo Pty Ltd",
+      "start": "09/2025",
+      "end": "Present",
+      "bullets": [
+        {
+          "text": "Delivered project-based AI development and software updates, handling technical scoping, implementation, testing, and documentation across recurring engagements.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "contract",
+            "project-delivery",
+            "ai",
+            "software-development",
+            "requirements",
+            "testing",
+            "documentation"
+          ]
+        },
+        {
+          "text": "Built and iterated full-stack applications using Python, Flask or FastAPI, React, TypeScript, REST APIs, and database-backed workflows.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "full-stack",
+            "python",
+            "react",
+            "typescript",
+            "api",
+            "database"
+          ]
+        },
+        {
+          "text": "Integrated OpenAI, Anthropic, and local LLM tooling into structured generation, benchmarking, automation, and security-testing workflows.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "ai",
+            "llm",
+            "openai",
+            "anthropic",
+            "automation",
+            "testing"
+          ]
+        },
+        {
+          "text": "Developed responsive React and TypeScript interfaces for dashboards, reporting, review workflows, and technical project demonstrations.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "react",
+            "typescript",
+            "ui",
+            "responsive"
+          ]
+        },
+        {
+          "text": "Developed Python API services and integrations for authentication, structured data processing, report generation, and third-party platform workflows.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "backend",
+            "python",
+            "api",
+            "authentication",
+            "integration"
+          ]
+        },
+        {
+          "text": "Implemented secure development checks with GitHub Actions, Bandit, Semgrep, Gitleaks, pip-audit, and npm audit, then remediated identified application and dependency issues.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "security",
+            "devsecops",
+            "ci-cd",
+            "remediation",
+            "github-actions"
+          ]
+        },
+        {
+          "text": "Containerised, deployed, and maintained applications using Docker, Nginx, Vercel, Supabase, and controlled remote-access tooling.",
+          "core": false,
+          "importance": 3,
+          "tags": [
+            "deployment",
+            "docker",
+            "nginx",
+            "vercel",
+            "supabase",
+            "operations"
+          ]
+        },
+        {
+          "text": "Tested and troubleshot software across Windows, WSL2, and Linux environments, documenting fixes, technical decisions, and handover notes.",
+          "core": false,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "troubleshooting",
+            "windows",
+            "linux",
+            "documentation",
+            "support"
+          ]
+        }
+      ]
+    },
+    {
       "title": "Web Developer (Volunteer)",
       "company": "Catch A Drive",
       "start": "11/2025",
@@ -935,11 +1716,18 @@
       "Next.js",
       "Vite",
       "Tailwind CSS",
+      "shadcn/ui",
+      "Radix UI",
       "Framer Motion",
       "React Router",
       "HTML",
       "CSS",
-      "Responsive Design"
+      "Responsive Design",
+      "WCAG Accessibility",
+      "Design Systems",
+      "Design Tokens",
+      "Web Performance",
+      "Technical SEO"
     ],
     "backend": [
       "FastAPI",
@@ -961,7 +1749,13 @@
       "Jest",
       "Vitest",
       "React Testing Library",
-      "ESLint"
+      "ESLint",
+      "TypeScript Type Checking",
+      "Browser QA",
+      "Responsive Testing",
+      "Accessibility Testing",
+      "Contrast Validation",
+      "Production Build Validation"
     ],
     "security": [
       "Cybersecurity",
@@ -1014,6 +1808,12 @@
       "WSL2",
       "Render",
       "Vercel",
+      "Relume Library MCP",
+      "Magic Patterns",
+      "GitHub Actions",
+      "DNS Management",
+      "Microsoft 365 Administration",
+      "Mindbody Integration",
       "Windows",
       "Technical Documentation",
       "Troubleshooting",
