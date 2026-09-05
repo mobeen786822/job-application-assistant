@@ -7,8 +7,8 @@
     "github": "https://github.com/mobeen786822",
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
-  "headline": "IT Helpdesk Support Officer | Troubleshooting | Secure Systems",
-  "summary": "Computer Science graduate with hands-on software support, incident workflow, technical documentation, networking, and secure systems project experience. Built support-oriented tools covering incident triage, lifecycle tracking, root-cause capture, secure deployment, and vulnerability remediation, with a practical focus on clear communication, reliable troubleshooting, and careful escalation of technical issues.",
+  "headline": "General Manager & Lead Developer | Full-Stack Web Development | Application Security",
+  "summary": "Computer Science graduate and General Manager & Lead Developer at JZ Tech, combining hands-on software development with technical scoping, stakeholder communication and end-to-end website delivery. Delivered and maintain live websites for JZ Tech, JZ Supports & Maintenance and Golden Hour Pilates using Next.js, React, TypeScript, Vite and Vercel. Practical experience includes accessible responsive interfaces, booking-platform integrations, browser testing, release workflows and secure full-stack applications, alongside postgraduate study in cybersecurity.",
   "education": [
     {
       "degree": "Bachelor of Computer Science",
@@ -851,14 +851,109 @@
   ],
   "experience": [
     {
+      "title": "General Manager & Lead Developer",
+      "company": "JZ Tech",
+      "start": "09/2026",
+      "end": "Present",
+      "links": {
+        "github": "https://github.com/mobeen786822/jztech-website",
+        "live": "https://www.jztech.com.au",
+        "website": "https://www.jztech.com.au"
+      },
+      "technologies": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Tailwind CSS 4",
+        "Vite",
+        "Vercel",
+        "GitHub Actions",
+        "Responsive Design",
+        "Accessibility Testing",
+        "Browser QA",
+        "Technical SEO"
+      ],
+      "bullets": [
+        {
+          "text": "Lead technical scoping, implementation planning and website delivery at JZ Tech, translating business and client requirements into maintainable releases.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "leadership",
+            "requirements",
+            "client-delivery",
+            "technical-planning"
+          ]
+        },
+        {
+          "text": "Develop and maintain live websites for JZ Tech, JZ Supports & Maintenance and Golden Hour Pilates, covering responsive interfaces, service discovery, booking integrations and release quality.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "full-stack",
+            "client-work",
+            "frontend",
+            "maintenance"
+          ]
+        },
+        {
+          "text": "Refined the JZ Tech website with a clearer service hierarchy, client-project showcase, mobile enquiry navigation and a two-step enquiry interface while preserving the existing backend.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "nextjs",
+            "react",
+            "typescript",
+            "ux",
+            "forms"
+          ]
+        },
+        {
+          "text": "Implemented resilient hero-video behaviour with user playback controls, mobile poster presentation, offscreen pausing and reduced-motion, data-saving, load-failure and no-JavaScript fallbacks.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "frontend",
+            "performance",
+            "accessibility",
+            "progressive-enhancement"
+          ]
+        },
+        {
+          "text": "Verified a JZ Tech release with 37 Chromium browser assertions across five viewport widths, alongside contact-schema tests, ESLint, TypeScript, production builds and 16 automated contrast checks.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "testing",
+            "browser-qa",
+            "responsive-testing",
+            "accessibility",
+            "quality-assurance"
+          ]
+        },
+        {
+          "text": "Coordinated stakeholder review and approved releases across the three websites, preserving remote Git history, client-owned assets and existing integrations while documenting verification evidence and outstanding limitations.",
+          "core": true,
+          "importance": 3,
+          "tags": [
+            "stakeholder-management",
+            "release-management",
+            "git",
+            "client-handoff",
+            "documentation"
+          ]
+        }
+      ]
+    },
+    {
       "title": "Freelance Web Developer & Digital Solutions Consultant",
       "company": "JZ Tech",
       "start": "08/2026",
-      "end": "Present",
+      "end": "08/2026",
       "links": {
-        "github": "https://github.com/Malaka-02/jztech-website",
-        "live": "https://jztech.com.au",
-        "website": "https://jztech.com.au"
+        "github": "https://github.com/mobeen786822/jztech-website",
+        "live": "https://www.jztech.com.au",
+        "website": "https://www.jztech.com.au"
       },
       "technologies": [
         "Next.js 16",
@@ -1225,24 +1320,24 @@
           ]
         },
         {
-          "text": "Structured service journeys for NDIS supports, injury recovery domestic assistance, cleaning, lawns and property maintenance, with clear scope boundaries and no unverified business, funding or eligibility claims.",
+          "text": "Structured service journeys for NDIS supports, domestic assistance, indoor services and outdoor maintenance, with clear service boundaries and no unverified funding or eligibility claims.",
           "core": true,
           "importance": 3,
           "tags": [
-            "content-architecture",
-            "integrity",
-            "ux"
+            "information-architecture",
+            "content-strategy",
+            "client-requirements"
           ]
         },
         {
-          "text": "Created dedicated routes for the homepage, about page, contact page, NDIS supports, injury-recovery assistance, indoor services and outdoor services, using reusable service, proof, FAQ and call-to-action sections.",
+          "text": "Developed seven public routes for the homepage, about, contact and four service areas using reusable service, FAQ and navigation components, with consistent Domestic Assistance naming.",
           "core": true,
           "importance": 3,
           "tags": [
-            "routing",
-            "information-architecture",
-            "reusability",
-            "ux"
+            "nextjs",
+            "react",
+            "reusable-components",
+            "content-architecture"
           ]
         },
         {
@@ -1257,24 +1352,25 @@
           ]
         },
         {
-          "text": "Repaired generated component dependencies and accessibility issues, then implemented keyboard navigation, skip links, responsive layouts, reduced-motion behaviour and accessible interactive states.",
+          "text": "Fixed reduced-motion hydration mismatches and initially hidden page content, keeping primary content visible without JavaScript and providing keyboard-operable navigation and accordions.",
           "core": true,
           "importance": 3,
           "tags": [
             "accessibility",
+            "progressive-enhancement",
             "debugging",
-            "responsive"
+            "react"
           ]
         },
         {
-          "text": "Built responsive desktop and mobile navigation, reusable service cards, accessible accordions, enquiry pathways, telephone and email links, and motion-enhanced content reveals with graceful reduced-motion behaviour.",
+          "text": "Built responsive navigation and photo-led service discovery, replacing disabled enquiry forms with clear contact-status guidance and preparation checklists while operational contact details remained unconfirmed.",
           "core": true,
           "importance": 3,
           "tags": [
             "responsive",
-            "accessibility",
-            "interaction-design",
-            "frontend"
+            "ux",
+            "content-design",
+            "service-discovery"
           ]
         },
         {
@@ -1321,14 +1417,15 @@
           ]
         },
         {
-          "text": "Verified the project through ESLint, TypeScript type checking, production builds and desktop and mobile browser review before committing and pushing the production release.",
+          "text": "Validated all seven public pages with build, lint and TypeScript checks, responsive homepage checks across six widths, keyboard and no-JavaScript testing, and automated axe WCAG A/AA scans reporting zero violations on the tested pages.",
           "core": true,
           "importance": 3,
           "tags": [
             "testing",
-            "quality-assurance",
-            "browser-testing",
-            "release"
+            "accessibility",
+            "browser-qa",
+            "typescript",
+            "responsive-testing"
           ]
         },
         {
@@ -1340,6 +1437,16 @@
             "dns",
             "ssl",
             "troubleshooting"
+          ]
+        },
+        {
+          "text": "Reduced homepage length by approximately 18% at a 1440-pixel viewport through a tighter hero, clearer four-service navigation and more concise process content.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ux",
+            "responsive",
+            "content-design"
           ]
         }
       ]
@@ -1359,14 +1466,15 @@
         "Vite",
         "JavaScript",
         "CSS",
-        "Mindbody",
+        "Momence",
         "Google Maps",
         "Vercel",
         "GitHub Actions",
         "Responsive Design",
         "WCAG Accessibility",
         "DNS Management",
-        "Microsoft 365"
+        "Microsoft 365",
+        "Brevo"
       ],
       "bullets": [
         {
@@ -1412,12 +1520,13 @@
           ]
         },
         {
-          "text": "Integrated the client's Mindbody timetable and booking journeys, including direct new-member offer links, class booking calls to action, loading and recovery states, and studio-contact fallback behaviour.",
+          "text": "Integrated the Momence timetable and booking journeys, including class and introductory-offer links, loading and recovery states, and studio-contact fallbacks; maintained the existing Brevo subscription form integration.",
           "core": true,
           "importance": 3,
           "tags": [
-            "mindbody",
-            "third-party-integration",
+            "integration",
+            "momence",
+            "brevo",
             "booking",
             "error-handling"
           ]
@@ -1445,14 +1554,14 @@
           ]
         },
         {
-          "text": "Implemented semantic landmarks, ARIA-labelled navigation, keyboard-operable controls, visible focus states, reduced-motion behaviour and mobile-first layouts to improve accessibility across devices.",
+          "text": "Improved mobile navigation and timetable accessibility with shared overlay focus management, background inertness, Escape handling, focus restoration and removal of hidden booking controls from keyboard navigation.",
           "core": true,
           "importance": 3,
           "tags": [
             "accessibility",
-            "wcag",
             "keyboard-navigation",
-            "responsive"
+            "react",
+            "mobile"
           ]
         },
         {
@@ -1467,14 +1576,15 @@
           ]
         },
         {
-          "text": "Performed desktop and mobile visual QA, responsive breakpoint review and production Vite builds before release, using local preview artefacts to identify and correct layout issues.",
+          "text": "Validated a website release with 25 Chromium browser assertions across five viewport widths, covering Momence widget mounting, navigation, timetable keyboard behaviour, class and FAQ interactions, and simulated widget-load failure.",
           "core": true,
           "importance": 3,
           "tags": [
             "testing",
-            "responsive-testing",
             "browser-qa",
-            "vite"
+            "responsive-testing",
+            "integration",
+            "accessibility"
           ]
         },
         {
@@ -1517,6 +1627,17 @@
             "ssl",
             "vercel",
             "troubleshooting"
+          ]
+        },
+        {
+          "text": "Clarified introductory pricing and class-pack value with per-class comparisons, tighter mobile typography and fixed-header anchor offsets while preserving existing prices and purchase destinations.",
+          "core": false,
+          "importance": 2,
+          "tags": [
+            "ux",
+            "content-design",
+            "responsive",
+            "booking"
           ]
         }
       ]
