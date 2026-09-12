@@ -3,7 +3,7 @@
   "basics": {
     "name": "Mobeen Khan",
     "email": "mobeenk89@gmail.com",
-    "portfolio": "https://www.mobeenkhan.com",
+    "portfolio": "https://www.mobeenkhan.com/?utm_source=resume&utm_medium=document&utm_campaign=job_search",
     "github": "https://github.com/mobeen786822",
     "linkedin": "https://www.linkedin.com/in/mobeen-khan-6b3340197/"
   },
@@ -134,8 +134,8 @@
       "name": "Portfolio",
       "links": {
         "github": "https://github.com/mobeen786822/Portfolio",
-        "live": "https://www.mobeenkhan.com",
-        "website": "https://www.mobeenkhan.com"
+        "live": "https://www.mobeenkhan.com/?utm_source=resume&utm_medium=document&utm_campaign=job_search",
+        "website": "https://www.mobeenkhan.com/?utm_source=resume&utm_medium=document&utm_campaign=job_search"
       },
       "technologies": [
         "JavaScript",
